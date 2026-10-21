@@ -6,3 +6,6 @@ scikit-learn>=1.5,<1.8
 joblib>=1.4
 matplotlib>=3.9
 pytest>=8
+
+# Dashboard interactivo (opcional)
+streamlit>=1.37,<2

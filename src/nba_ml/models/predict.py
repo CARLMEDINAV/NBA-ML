@@ -158,6 +158,8 @@ def predict_game(
         "model_name": artifact["model_name"],
         "home_last_game": str(home_state["last_game_date"]),
         "away_last_game": str(away_state["last_game_date"]),
+        "home_elo": float(home_state["elo"]),
+        "away_elo": float(away_state["elo"]),
         "home_rest": float(home_state["days_rest"]),
         "away_rest": float(away_state["days_rest"]),
     }

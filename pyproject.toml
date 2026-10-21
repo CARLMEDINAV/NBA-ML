@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+app = ["streamlit>=1.37,<2"]
 
 [project.scripts]
 nba-ml = "nba_ml.cli:main"

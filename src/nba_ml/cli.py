@@ -49,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     predict_parser.add_argument("--date", help="Fecha del partido (YYYY-MM-DD)")
     predict_parser.add_argument("--line", type=float, help="Linea de over/under")
 
+    dashboard_parser = subparsers.add_parser(
+        "dashboard", help="Abre el dashboard interactivo (Streamlit)"
+    )
+    dashboard_parser.add_argument("--port", type=int, default=8501, help="Puerto local")
+
     all_parser = subparsers.add_parser("all", help="Pipeline completo")
     all_parser.add_argument("--force", action="store_true", help="Fuerza la descarga")
 
@@ -68,6 +73,12 @@ def main(argv: list[str] | None = None) -> int:
     _configure_logging(args.verbose)
 
     try:
+        if args.command == "dashboard":
+            from .dashboard import run
+
+            run(port=args.port)
+            return 0
+
         if args.command in ("download", "all"):
             download(
                 seasons=args.seasons if args.command == "download" else SEASONS,

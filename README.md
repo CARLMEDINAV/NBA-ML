@@ -47,7 +47,8 @@ nba-ml/
 ├── requirements.txt
 ├── src/nba_ml/
 │   ├── config.py             # rutas, temporadas, ventanas, splits
-│   ├── cli.py                # nba-ml download|build|eda|train|predict|all
+│   ├── cli.py                # nba-ml download|build|eda|train|predict|dashboard|all
+│   ├── dashboard.py          # dashboard interactivo (Streamlit)
 │   ├── eda.py                # análisis exploratorio -> reports/
 │   ├── data/
 │   │   ├── download.py       # nba_api con caché y reintentos
@@ -56,6 +57,7 @@ nba-ml/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
 │       └── predict.py        # predicción y probabilidad over/under
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
+├── tests/test_dashboard.py   # test de humo del dashboard
 ├── data/
 │   ├── raw/                  # game logs por temporada (cache, gitignored)
 │   └── processed/            # games.csv, team_games.csv, team_state.csv
@@ -77,7 +79,7 @@ de Anaconda):
 cd $env:USERPROFILE\Desktop\nba-ml
 & "$env:USERPROFILE\anaconda3\python.exe" -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install -e ".[dev,app]"
 ```
 
 Si PowerShell bloquea la activación:
@@ -107,7 +109,28 @@ nba-ml build                    # -> data/processed/
 nba-ml eda                      # -> reports/eda.md + figuras
 nba-ml train                    # -> models/model.joblib + reports/metrics.md
 nba-ml predict --home BOS --away LAL --date 2026-10-22 --line 225.5
+nba-ml dashboard                # dashboard en http://localhost:8501
 ```
+
+También puedes abrir el dashboard directamente:
+
+```powershell
+streamlit run src/nba_ml/dashboard.py --server.port 8501
+```
+
+### Dashboard
+
+Tres pestañas:
+
+- **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
+  intervalo 80%, probabilidad de over, comparación de Elo/forma/descanso y
+  gráfico de los últimos 10 totales de cada equipo.
+- **Rendimiento**: informe `reports/metrics.md` y figuras de test, residuos,
+  walk-forward e importancia de variables.
+- **Datos**: resumen por temporada y figuras del EDA.
+
+El modelo y los datos se cachean. Tras reentrenar, usa el botón
+**Recargar datos y modelo** de la barra lateral.
 
 Ejemplo de salida:
 
@@ -196,8 +219,8 @@ media, que es exactamente lo que conviene en este problema.
 
 Cubren: emparejado local/visitante, exclusión de sedes neutrales, cálculo de
 medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
-back-to-back, consistencia del estado usado en predicción, contrato de features
-y orden temporal de los splits.
+back-to-back, consistencia del estado usado en predicción, contrato de features,
+orden temporal de los splits y un test de humo del dashboard (12 en total).
 
 ---
 
