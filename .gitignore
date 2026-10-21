@@ -20,3 +20,5 @@ reports/*.csv
 .idea/
 .DS_Store
 Thumbs.db
+
+.vercel

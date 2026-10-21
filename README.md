@@ -1,5 +1,7 @@
 # NBA Totals ML
 
+**Demo pública:** https://nba-ml-flax.vercel.app
+
 Predicción del **total de puntos** (over/under) de partidos NBA con datos oficiales
 de `stats.nba.com`, un pipeline reproducible y validación temporal estricta.
 

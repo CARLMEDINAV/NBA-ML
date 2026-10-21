@@ -1,9 +1,9 @@
-.venv/
-.pytest_cache/
-.vscode/
-data/
-models/
-reports/figures/
-tests/
+/.venv/
+/.pytest_cache/
+/.vscode/
+/data/
+/models/
+/reports/
+/tests/
 **/__pycache__/
 *.py[cod]

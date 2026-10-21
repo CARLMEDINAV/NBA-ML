@@ -549,6 +549,12 @@ async function init() {
     playersMin.max = "82";
     playersMin.value = String(state.players.minGp);
 
+    // En el móvil, 7 días suponen demasiadas filas; empezamos con 3.
+    if (window.matchMedia("(max-width: 640px)").matches) {
+      state.upcoming.days = 3;
+      $("#upcomingDays").value = "3";
+    }
+
     await loadUpcoming();
   } catch (error) {
     $("#statusBadge").textContent = "API no disponible";
