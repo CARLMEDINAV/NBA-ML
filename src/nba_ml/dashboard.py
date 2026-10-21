@@ -322,17 +322,27 @@ def main() -> None:
         _render_data()
 
 
-def run(port: int = 8501) -> None:
-    """Lanza Streamlit desde la CLI del proyecto."""
+def run(port: int = 8501, open_browser: bool = True) -> None:
+    """Lanza Streamlit desde la CLI del proyecto.
+
+    Se fuerza el modo headless para evitar el onboarding interactivo de
+    Streamlit y se abre el navegador desde aqui.
+    """
+    import threading
+    import webbrowser
+
     from streamlit.web import cli as streamlit_cli
 
+    url = f"http://localhost:{port}"
     sys.argv = [
         "streamlit",
         "run",
         str(Path(__file__).resolve()),
-        "--server.port",
-        str(port),
+        f"--server.port={port}",
+        "--server.headless=true",
     ]
+    if open_browser:
+        threading.Timer(3.0, lambda: webbrowser.open(url)).start()
     raise SystemExit(streamlit_cli.main())
 
 
