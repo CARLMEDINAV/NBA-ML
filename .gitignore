@@ -1,0 +1,22 @@
+# Entorno
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Datos (se regeneran con `nba-ml download` / `nba-ml build`)
+data/raw/
+data/processed/
+
+# Artefactos (se regeneran con `nba-ml train`)
+models/*.joblib
+reports/*.json
+reports/*.csv
+# Las figuras de reports/figures sí se versionan para documentar resultados
+
+# Editores / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
