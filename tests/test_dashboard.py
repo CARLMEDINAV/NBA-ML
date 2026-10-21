@@ -9,6 +9,7 @@ pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest
 
 from nba_ml.config import MODELS_DIR, PROCESSED_DIR, PROJECT_ROOT
+from nba_ml.data.players import player_stats_path
 from nba_ml.data.schedule import current_season, schedule_path
 
 DASHBOARD = PROJECT_ROOT / "src" / "nba_ml" / "dashboard.py"
@@ -34,8 +35,15 @@ def test_dashboard_runs_and_predicts():
     assert 150.0 < predicted < 320.0
 
     assert "Próximos partidos" in [tab.label for tab in app.tabs]
+    assert "Jugadores" in [tab.label for tab in app.tabs]
 
     if schedule_path(current_season()).exists():
         upcoming = app.dataframe[0].value
         assert not upcoming.empty
         assert {"Fecha", "Partido", "Total", "Inclinación"} <= set(upcoming.columns)
+
+    if player_stats_path("2025-26", "PerGame").exists():
+        tables = [frame.value for frame in app.dataframe]
+        player_tables = [table for table in tables if "Jugador" in table.columns]
+        assert player_tables
+        assert {"PTS", "REB", "AST", "PRA"} <= set(player_tables[0].columns)

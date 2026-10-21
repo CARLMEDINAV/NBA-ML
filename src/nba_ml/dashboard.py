@@ -14,7 +14,10 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from nba_ml.config import FIGURES_DIR, PROCESSED_DIR, REPORTS_DIR
+import altair as alt
+
+from nba_ml.config import FIGURES_DIR, PROCESSED_DIR, REPORTS_DIR, SEASONS
+from nba_ml.data.players import load_player_stats, player_stats_path
 from nba_ml.data.schedule import (
     current_season,
     load_schedule,
@@ -205,6 +208,169 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
             "El modelo no conoce lesiones, alineaciones, cuotas ni el resultado "
             "de los partidos que se juegan hoy. No es consejo de apuestas."
         )
+
+
+def _render_players() -> None:
+    st.subheader("Estadísticas de jugadores")
+    st.caption(
+        "PRA = puntos + rebotes + asistencias. Fuente: `LeagueDashPlayerStats` "
+        "de stats.nba.com."
+    )
+
+    seasons = list(dict.fromkeys([SEASONS[-1], current_season()]))
+    controls = st.columns([1.2, 1.4, 1.2])
+    season = controls[0].selectbox(
+        "Temporada",
+        seasons,
+        index=0,
+        format_func=lambda value: (
+            f"{value} ({'en curso' if value == current_season() else 'completa'})"
+        ),
+    )
+    mode_label = controls[1].radio(
+        "Modo", ["Por partido", "Totales"], horizontal=True
+    )
+    per_mode = "PerGame" if mode_label == "Por partido" else "Totals"
+    path = player_stats_path(season, per_mode)
+
+    if controls[2].button("Actualizar", help="Vuelve a descargar estas estadísticas"):
+        with st.spinner("Actualizando estadísticas de jugadores..."):
+            try:
+                load_player_stats(season, per_mode, refresh=True)
+            except Exception as error:
+                st.error(f"No se pudieron actualizar las estadísticas: {error}")
+            else:
+                st.rerun()
+
+    if not path.exists():
+        st.info(
+            f"No hay estadísticas descargadas para {season} ({mode_label.lower()})."
+        )
+        if st.button("Descargar estadísticas", type="primary"):
+            with st.spinner("Descargando desde stats.nba.com..."):
+                try:
+                    load_player_stats(season, per_mode, refresh=True)
+                except Exception as error:
+                    st.error(f"No se pudieron descargar las estadísticas: {error}")
+                else:
+                    st.rerun()
+        return
+
+    stats = load_player_stats(season, per_mode)
+    if stats.empty:
+        st.warning("La consulta no devolvió jugadores.")
+        return
+
+    max_gp = int(stats["gp"].max())
+    if season == current_season() and max_gp <= 2:
+        st.info(
+            f"La temporada {season} acaba de empezar: hay {max_gp} partido(s) por "
+            f"jugador. Para un ranking estable usa {SEASONS[-1]}."
+        )
+
+    filters = st.columns([1.6, 1.4, 1.2, 0.8])
+    selected_teams = filters[0].multiselect(
+        "Equipos", sorted(stats["team"].unique()), default=[]
+    )
+    query = filters[1].text_input("Buscar jugador", placeholder="Nombre")
+    sort_label = filters[2].selectbox("Ordenar por", ["PRA", "PTS", "REB", "AST"])
+    rows = int(filters[3].selectbox("Filas", [10, 25, 50, 100], index=1))
+
+    if max_gp > 1:
+        min_gp = st.slider(
+            "Mínimo de partidos jugados", 1, max_gp, min(10, max_gp)
+        )
+    else:
+        min_gp = 1
+        st.caption("Solo hay un partido por jugador: las medias son poco fiables.")
+
+    view = stats[stats["gp"] >= min_gp]
+    if selected_teams:
+        view = view[view["team"].isin(selected_teams)]
+    if query.strip():
+        view = view[
+            view["player_name"].str.contains(
+                query.strip(), case=False, regex=False
+            )
+        ]
+    if view.empty:
+        st.info("No hay jugadores que cumplan esos filtros.")
+        return
+
+    sort_column = {"PRA": "pra", "PTS": "pts", "REB": "reb", "AST": "ast"}[
+        sort_label
+    ]
+    view = view.sort_values([sort_column, "pra"], ascending=False)
+    leader = view.iloc[0]
+
+    summary = st.columns(3)
+    summary[0].metric("Jugadores", len(view))
+    summary[1].metric(f"Media de {sort_label}", f"{view[sort_column].mean():.1f}")
+    summary[2].metric(
+        f"Líder en {sort_label}",
+        f"{leader['player_name']} · {leader[sort_column]:.1f}",
+    )
+
+    table = view.head(rows)[
+        ["player_name", "team", "gp", "min", "pts", "reb", "ast", "pra"]
+    ].copy()
+    table.columns = ["Jugador", "Equipo", "Partidos", "Min", "PTS", "REB", "AST", "PRA"]
+    for column in ["Min", "PTS", "REB", "AST", "PRA"]:
+        table[column] = table[column].astype(float).round(1)
+
+    st.dataframe(
+        table,
+        hide_index=True,
+        height=min(700, 40 + 35 * len(table)),
+    )
+    st.caption(
+        f"{len(view)} jugadores con al menos {min_gp} partidos · "
+        f"modo {'por partido' if per_mode == 'PerGame' else 'totales'} · "
+        "PRA = PTS + REB + AST"
+    )
+
+    st.subheader("Top 10 por PRA")
+    chart_data = view.nlargest(10, "pra")[
+        ["player_name", "team", "pts", "reb", "ast"]
+    ].copy()
+    chart_data["Jugador"] = (
+        chart_data["player_name"] + " (" + chart_data["team"] + ")"
+    )
+    melted = chart_data.melt(
+        id_vars="Jugador",
+        value_vars=["pts", "reb", "ast"],
+        var_name="Estadística",
+        value_name="Valor",
+    )
+    melted["Estadística"] = melted["Estadística"].map(
+        {"pts": "PTS", "reb": "REB", "ast": "AST"}
+    )
+    chart = (
+        alt.Chart(melted)
+        .mark_bar()
+        .encode(
+            y=alt.Y("Jugador:N", sort="-x", title=None),
+            x=alt.X(
+                "Valor:Q",
+                title="Por partido" if per_mode == "PerGame" else "Total temporada",
+            ),
+            color=alt.Color(
+                "Estadística:N",
+                scale=alt.Scale(
+                    domain=["PTS", "REB", "AST"],
+                    range=["#4c78a8", "#f58518", "#54a24b"],
+                ),
+                title=None,
+            ),
+            tooltip=[
+                "Jugador",
+                "Estadística",
+                alt.Tooltip("Valor:Q", format=".1f"),
+            ],
+        )
+        .properties(height=max(280, 30 * len(chart_data)))
+    )
+    st.altair_chart(chart, width="stretch")
 
 
 def _render_prediction(result: dict, state: pd.DataFrame, home: str, away: str) -> None:
@@ -457,9 +623,10 @@ def main() -> None:
             icon="📅",
         )
 
-    upcoming_tab, prediction_tab, performance_tab, data_tab = st.tabs(
+    upcoming_tab, players_tab, prediction_tab, performance_tab, data_tab = st.tabs(
         [
             "Próximos partidos",
+            "Jugadores",
             "Predicción",
             "Rendimiento del modelo",
             "Datos",
@@ -467,6 +634,8 @@ def main() -> None:
     )
     with upcoming_tab:
         _render_upcoming(artifact, state, line)
+    with players_tab:
+        _render_players()
     with prediction_tab:
         _render_prediction(result, state, home, away)
     with performance_tab:

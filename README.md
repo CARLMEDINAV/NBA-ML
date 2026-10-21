@@ -53,15 +53,17 @@ nba-ml/
 │   ├── data/
 │   │   ├── download.py       # nba_api con caché y reintentos
 │   │   ├── build_dataset.py  # emparejado, features, Elo, estado por equipo
-│   │   └── schedule.py       # calendario y próximos partidos (ScheduleLeagueV2)
+│   │   ├── schedule.py       # calendario y próximos partidos (ScheduleLeagueV2)
+│   │   └── players.py        # PTS/REB/AST/PRA (LeagueDashPlayerStats)
 │   └── models/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
 │       └── predict.py        # predicción y probabilidad over/under
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
 ├── tests/test_schedule.py    # normalización y filtros del calendario
+├── tests/test_players.py     # cálculo de PRA y caché de jugadores
 ├── tests/test_dashboard.py   # test de humo del dashboard
 ├── data/
-│   ├── raw/                  # game logs por temporada (cache, gitignored)
+│   ├── raw/                  # game logs, calendario y stats de jugadores (cache)
 │   └── processed/            # games.csv, team_games.csv, team_state.csv
 ├── models/model.joblib       # modelo + features + residuos
 └── reports/                  # metrics.md, eda.md, figuras, predicciones test
@@ -122,13 +124,17 @@ streamlit run src/nba_ml/dashboard.py --server.port 8501
 
 ### Dashboard
 
-Cuatro pestañas:
+Cinco pestañas:
 
 - **Próximos partidos**: calendario de la temporada en curso (por defecto, los
   siguientes 7 días), filtro por equipo, total previsto, intervalo 80% y
   probabilidad de over frente a la línea de referencia. El calendario se cachea
   en `data/raw/schedule_<temporada>.csv`; el botón **Actualizar** lo vuelve a
   descargar.
+- **Jugadores**: ranking de puntos, rebotes, asistencias y **PRA** (PTS+REB+AST)
+  por partido o en totales, con filtros por temporada, equipo, partidos jugados
+  y búsqueda por nombre. Incluye un gráfico de barras apiladas con el top 10.
+  Los datos se cachean en `data/raw/player_stats_<temporada>_<modo>.csv`.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, comparación de Elo/forma/descanso y
   gráfico de los últimos 10 totales de cada equipo.
@@ -138,6 +144,10 @@ Cuatro pestañas:
 
 El modelo y los datos se cachean. Tras reentrenar, usa el botón
 **Recargar datos y modelo** de la barra lateral.
+
+En **Jugadores**, la temporada 2025-26 aparece como completa y la 2026-27 como
+en curso. Al empezar la temporada solo hay uno o dos partidos por jugador, así
+que las medias de la 2026-27 son todavía poco representativas.
 
 Si el calendario aún no se ha descargado, la pestaña de próximos partidos
 muestra un botón para hacerlo. Ten en cuenta que las predicciones usan el último
@@ -232,8 +242,8 @@ media, que es exactamente lo que conviene en este problema.
 Cubren: emparejado local/visitante, exclusión de sedes neutrales, cálculo de
 medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
-orden temporal de los splits, normalización y filtros del calendario y un test
-de humo del dashboard (15 en total).
+orden temporal de los splits, normalización y filtros del calendario, cálculo de
+PRA y caché de jugadores, y un test de humo del dashboard (19 en total).
 
 ---
 
