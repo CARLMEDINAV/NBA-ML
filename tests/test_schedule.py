@@ -38,6 +38,8 @@ def _raw_schedule() -> pd.DataFrame:
             "gameStatusText": ["Final", "7:30 pm ET", "Final", "TBD"],
             "homeTeam_teamTricode": ["TOR", "BOS", "LAL", "NYK"],
             "awayTeam_teamTricode": ["MIA", "NYK", "GSW", "BKN"],
+            "homeTeam_score": [105, 0, 120, 0],
+            "awayTeam_score": [129, 0, 118, 0],
             "arenaName": ["Montreal", "TD Garden", "Crypto.com", "MSG"],
             "isNeutral": [True, False, False, False],
         }
@@ -57,6 +59,9 @@ def test_normalize_filters_preseason_and_invalid_dates():
         "away",
         "arena",
         "is_neutral",
+        "home_score",
+        "away_score",
+        "total_points",
     ]
     assert len(frame) == 2
     assert set(frame["game_id"]) == {"0022600001", "0022600002"}
@@ -66,6 +71,8 @@ def test_normalize_filters_preseason_and_invalid_dates():
     ]
     assert frame["game_time_et"].tolist() == ["19:30", "20:00"]
     assert frame["home"].tolist() == ["BOS", "LAL"]
+    assert frame["total_points"].isna().tolist() == [True, False]
+    assert frame["total_points"].iloc[1] == 238.0
 
 
 def test_upcoming_filters_by_date_and_status():

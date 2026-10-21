@@ -25,6 +25,11 @@ from nba_ml.data.schedule import (
     upcoming_games,
 )
 from nba_ml.models.predict import load_artifact, load_team_state, predict_game
+from nba_ml.models.results import (
+    add_over_under,
+    load_test_predictions,
+    summarize_results,
+)
 
 MODEL_FIGURES = (
     "pred_vs_actual.png",
@@ -93,8 +98,14 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
     teams = sorted(set(schedule["home"]) | set(schedule["away"]))
 
     controls = st.columns([2, 1, 2])
-    days = controls[0].slider("Días a mostrar", min_value=1, max_value=30, value=7)
-    if controls[1].button("Actualizar", help="Vuelve a descargar el calendario"):
+    days = controls[0].slider(
+        "Días a mostrar", min_value=1, max_value=30, value=7, key="upcoming_days"
+    )
+    if controls[1].button(
+        "Actualizar",
+        help="Vuelve a descargar el calendario",
+        key="upcoming_refresh",
+    ):
         with st.spinner("Actualizando calendario..."):
             try:
                 load_schedule(season, refresh=True)
@@ -103,7 +114,7 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
             else:
                 st.rerun()
     selected_teams = controls[2].multiselect(
-        "Filtrar por equipo", teams, default=[]
+        "Filtrar por equipo", teams, default=[], key="upcoming_teams"
     )
 
     start = pd.Timestamp.today().normalize()
@@ -210,6 +221,245 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
         )
 
 
+def _render_results(artifact: dict, state: pd.DataFrame, line: float) -> None:
+    st.subheader("Resultados anteriores")
+    st.caption(
+        "Partidos ya jugados con total real, predicción y acierto over/under. "
+        "La línea es la de referencia de la barra lateral."
+    )
+
+    seasons = list(dict.fromkeys([SEASONS[-1], current_season()]))
+    default_index = 0
+    if len(seasons) > 1 and schedule_path(current_season()).exists():
+        cached = load_schedule(current_season())
+        if (
+            "total_points" in cached.columns
+            and cached["status"].eq(3).any()
+            and cached["total_points"].notna().any()
+        ):
+            default_index = seasons.index(current_season())
+
+    season = st.selectbox(
+        "Temporada de resultados",
+        seasons,
+        index=default_index,
+        key="results_season",
+        format_func=lambda value: (
+            f"{value} ({'en curso' if value == current_season() else 'completa'})"
+        ),
+    )
+
+    if season == SEASONS[-1]:
+        try:
+            frame = load_test_predictions()
+        except FileNotFoundError as error:
+            st.info(str(error))
+            return
+        frame = add_over_under(frame, line, artifact["residuals"])
+        source = "Predicciones fuera de muestra de la temporada de test"
+    else:
+        if not schedule_path(season).exists():
+            st.info("Descarga el calendario en la pestaña Próximos partidos.")
+            return
+        schedule = load_schedule(season)
+        if "total_points" not in schedule.columns:
+            schedule = load_schedule(season, refresh=True)
+        finals = schedule[
+            schedule["status"].eq(3) & schedule["total_points"].notna()
+        ].copy()
+        if finals.empty:
+            st.info(f"Todavía no hay partidos finalizados en {season}.")
+            return
+
+        rows: list[dict[str, object]] = []
+        for game in finals.itertuples(index=False):
+            try:
+                result = predict_game(
+                    artifact,
+                    state,
+                    home=game.home,
+                    away=game.away,
+                    as_of=pd.Timestamp(game.game_date),
+                    line=line,
+                    warn_stale=False,
+                )
+            except ValueError:
+                continue
+            rows.append(
+                {
+                    "game_date": pd.Timestamp(game.game_date),
+                    "home_team": game.home,
+                    "away_team": game.away,
+                    "total_points": float(game.total_points),
+                    "predicted_total": float(result["predicted_total"]),
+                }
+            )
+        if not rows:
+            st.warning("No se pudo predecir ninguno de los partidos finalizados.")
+            return
+        frame = add_over_under(pd.DataFrame(rows), line, artifact["residuals"])
+        source = "Partidos finalizados de la temporada en curso"
+
+    controls = st.columns([1.6, 1.2])
+    teams = sorted(set(frame["home_team"]) | set(frame["away_team"]))
+    selected_teams = controls[0].multiselect(
+        "Equipo", teams, default=[], key="results_teams"
+    )
+    rows_to_show = int(
+        controls[1].selectbox(
+            "Partidos a mostrar",
+            [10, 25, 50, 100],
+            index=1,
+            key="results_rows",
+        )
+    )
+
+    view = frame.copy()
+    if selected_teams:
+        view = view[
+            view["home_team"].isin(selected_teams)
+            | view["away_team"].isin(selected_teams)
+        ]
+    if view.empty:
+        st.info("No hay partidos para ese filtro.")
+        return
+
+    summary = summarize_results(view)
+    if summary["n"] == 0:
+        st.info("No hay partidos con resultado y predicción para evaluar.")
+        return
+    st.caption(f"{source} · línea de referencia {line:.1f}")
+
+    metrics = st.columns(5)
+    metrics[0].metric("Partidos", summary["n"])
+    metrics[1].metric(
+        "MAE", f"{summary['mae']:.2f}" if pd.notna(summary["mae"]) else "—"
+    )
+    metrics[2].metric(
+        "Acierto del modelo",
+        f"{summary['hit_rate']:.1%}" if pd.notna(summary["hit_rate"]) else "—",
+    )
+    metrics[3].metric(
+        "Over real",
+        f"{summary['over_rate']:.1%}" if pd.notna(summary["over_rate"]) else "—",
+    )
+    metrics[4].metric(
+        "Brier",
+        f"{summary['brier']:.3f}" if pd.notna(summary["brier"]) else "—",
+    )
+    bias_text = f"{summary['bias']:+.2f}" if pd.notna(summary["bias"]) else "—"
+    st.caption(
+        f"{summary['n_leans']} partidos con inclinación clara (P(over) ≥55% o "
+        f"≤45%) · sesgo medio {bias_text} puntos "
+        "(positivo = el modelo sobreestima)"
+    )
+    st.caption(
+        "Referencia sin modelo: elegir siempre OVER acertaría "
+        f"{summary['over_rate']:.1%}; siempre UNDER, {1 - summary['over_rate']:.1%}."
+    )
+
+    display = view.sort_values("game_date", ascending=False).head(rows_to_show).copy()
+    display["Fecha"] = pd.to_datetime(display["game_date"]).dt.strftime("%d/%m")
+    display["Partido"] = display["away_team"] + " @ " + display["home_team"]
+    display["Total real"] = display["total_points"].round(0).astype("Int64")
+    display["Predicción"] = display["predicted_total"].round(1)
+    display["Error"] = (display["predicted_total"] - display["total_points"]).round(1)
+    display["Línea"] = display["line"].round(1)
+    display["P(over)"] = display["probability_over"].map(
+        lambda value: f"{value:.1%}" if pd.notna(value) else "—"
+    )
+    display["Resultado"] = display["actual_result"]
+    display["Modelo"] = display["model_lean"]
+    display["Acierto"] = display["hit"].map(
+        lambda value: "✓" if value == 1 else ("✗" if value == 0 else "—")
+    )
+    table = display[
+        [
+            "Fecha",
+            "Partido",
+            "Total real",
+            "Predicción",
+            "Error",
+            "Línea",
+            "P(over)",
+            "Resultado",
+            "Modelo",
+            "Acierto",
+        ]
+    ]
+    st.dataframe(table, hide_index=True, height=min(650, 40 + 35 * len(table)))
+
+    chart_data = view.dropna(subset=["total_points", "predicted_total"]).copy()
+    if not chart_data.empty:
+        chart_data["Acierto"] = chart_data["hit"].map(
+            lambda value: "✓" if value == 1 else ("✗" if value == 0 else "—")
+        )
+        low = (
+            min(
+                chart_data["total_points"].min(),
+                chart_data["predicted_total"].min(),
+            )
+            - 5
+        )
+        high = (
+            max(
+                chart_data["total_points"].max(),
+                chart_data["predicted_total"].max(),
+            )
+            + 5
+        )
+        scatter = (
+            alt.Chart(chart_data)
+            .mark_circle(size=70, opacity=0.65)
+            .encode(
+                x=alt.X(
+                    "predicted_total:Q",
+                    title="Total previsto",
+                    scale=alt.Scale(domain=[low, high]),
+                ),
+                y=alt.Y(
+                    "total_points:Q",
+                    title="Total real",
+                    scale=alt.Scale(domain=[low, high]),
+                ),
+                color=alt.Color(
+                    "Acierto:N",
+                    scale=alt.Scale(
+                        domain=["✓", "✗", "—"],
+                        range=["#2ca02c", "#d62728", "#9e9e9e"],
+                    ),
+                    title=None,
+                ),
+                tooltip=[
+                    alt.Tooltip("game_date:T", title="Fecha", format="%d/%m/%Y"),
+                    "away_team:N",
+                    "home_team:N",
+                    alt.Tooltip("predicted_total:Q", title="Previsto", format=".1f"),
+                    alt.Tooltip("total_points:Q", title="Real", format=".0f"),
+                    alt.Tooltip("probability_over:Q", title="P(over)", format=".1%"),
+                    "model_lean:N",
+                    "actual_result:N",
+                ],
+            )
+        )
+        diagonal = (
+            alt.Chart(pd.DataFrame({"x": [low, high], "y": [low, high]}))
+            .mark_line(strokeDash=[5, 5], color="#888")
+            .encode(x="x:Q", y="y:Q")
+        )
+        st.altair_chart(scatter + diagonal, width="stretch")
+        st.caption(
+            "Cada punto es un partido; la diagonal marca predicción = total real."
+        )
+
+    st.warning(
+        "nba_api no proporciona líneas históricas de casas de apuestas. La línea "
+        "usada es la de referencia de la barra lateral, no la línea de cierre. "
+        "Para evaluar contra la línea real, habría que registrarla al predecir.",
+        icon="⚠️",
+    )
+
+
 def _render_players() -> None:
     st.subheader("Estadísticas de jugadores")
     st.caption(
@@ -223,17 +473,22 @@ def _render_players() -> None:
         "Temporada",
         seasons,
         index=0,
+        key="players_season",
         format_func=lambda value: (
             f"{value} ({'en curso' if value == current_season() else 'completa'})"
         ),
     )
     mode_label = controls[1].radio(
-        "Modo", ["Por partido", "Totales"], horizontal=True
+        "Modo", ["Por partido", "Totales"], horizontal=True, key="players_mode"
     )
     per_mode = "PerGame" if mode_label == "Por partido" else "Totals"
     path = player_stats_path(season, per_mode)
 
-    if controls[2].button("Actualizar", help="Vuelve a descargar estas estadísticas"):
+    if controls[2].button(
+        "Actualizar",
+        help="Vuelve a descargar estas estadísticas",
+        key="players_refresh",
+    ):
         with st.spinner("Actualizando estadísticas de jugadores..."):
             try:
                 load_player_stats(season, per_mode, refresh=True)
@@ -270,7 +525,7 @@ def _render_players() -> None:
 
     filters = st.columns([1.6, 1.4, 1.2, 0.8])
     selected_teams = filters[0].multiselect(
-        "Equipos", sorted(stats["team"].unique()), default=[]
+        "Equipos", sorted(stats["team"].unique()), default=[], key="players_teams"
     )
     query = filters[1].text_input("Buscar jugador", placeholder="Nombre")
     sort_label = filters[2].selectbox("Ordenar por", ["PRA", "PTS", "REB", "AST"])
@@ -278,7 +533,11 @@ def _render_players() -> None:
 
     if max_gp > 1:
         min_gp = st.slider(
-            "Mínimo de partidos jugados", 1, max_gp, min(10, max_gp)
+            "Mínimo de partidos jugados",
+            1,
+            max_gp,
+            min(10, max_gp),
+            key="players_min_gp",
         )
     else:
         min_gp = 1
@@ -623,9 +882,17 @@ def main() -> None:
             icon="📅",
         )
 
-    upcoming_tab, players_tab, prediction_tab, performance_tab, data_tab = st.tabs(
+    (
+        upcoming_tab,
+        results_tab,
+        players_tab,
+        prediction_tab,
+        performance_tab,
+        data_tab,
+    ) = st.tabs(
         [
             "Próximos partidos",
+            "Resultados",
             "Jugadores",
             "Predicción",
             "Rendimiento del modelo",
@@ -634,6 +901,8 @@ def main() -> None:
     )
     with upcoming_tab:
         _render_upcoming(artifact, state, line)
+    with results_tab:
+        _render_results(artifact, state, line)
     with players_tab:
         _render_players()
     with prediction_tab:

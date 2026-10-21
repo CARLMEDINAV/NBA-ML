@@ -27,6 +27,9 @@ SCHEDULE_COLUMNS = [
     "away",
     "arena",
     "is_neutral",
+    "home_score",
+    "away_score",
+    "total_points",
 ]
 
 
@@ -79,6 +82,16 @@ def normalize_schedule(raw: pd.DataFrame) -> pd.DataFrame:
         frame["is_neutral"] = frame["isNeutral"].fillna(False).astype(bool)
     else:
         frame["is_neutral"] = False
+    if "homeTeam_score" in frame:
+        frame["home_score"] = pd.to_numeric(frame["homeTeam_score"], errors="coerce")
+    else:
+        frame["home_score"] = float("nan")
+    if "awayTeam_score" in frame:
+        frame["away_score"] = pd.to_numeric(frame["awayTeam_score"], errors="coerce")
+    else:
+        frame["away_score"] = float("nan")
+    frame["total_points"] = frame["home_score"] + frame["away_score"]
+    frame.loc[frame["status"].ne(3), "total_points"] = float("nan")
 
     frame = frame.dropna(subset=["game_date", "home", "away"])
     frame = frame[frame["home"].ne("") & frame["away"].ne("")]

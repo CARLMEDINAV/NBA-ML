@@ -8,7 +8,7 @@ pytest.importorskip("streamlit")
 
 from streamlit.testing.v1 import AppTest
 
-from nba_ml.config import MODELS_DIR, PROCESSED_DIR, PROJECT_ROOT
+from nba_ml.config import MODELS_DIR, PROCESSED_DIR, REPORTS_DIR, PROJECT_ROOT
 from nba_ml.data.players import player_stats_path
 from nba_ml.data.schedule import current_season, schedule_path
 
@@ -47,3 +47,13 @@ def test_dashboard_runs_and_predicts():
         player_tables = [table for table in tables if "Jugador" in table.columns]
         assert player_tables
         assert {"PTS", "REB", "AST", "PRA"} <= set(player_tables[0].columns)
+
+    assert "Resultados" in [tab.label for tab in app.tabs]
+    if (REPORTS_DIR / "test_predictions.csv").exists():
+        tables = [frame.value for frame in app.dataframe]
+        results_tables = [
+            table
+            for table in tables
+            if {"Total real", "Resultado", "Acierto"} <= set(table.columns)
+        ]
+        assert results_tables

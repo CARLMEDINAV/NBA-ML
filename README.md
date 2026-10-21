@@ -57,10 +57,12 @@ nba-ml/
 │   │   └── players.py        # PTS/REB/AST/PRA (LeagueDashPlayerStats)
 │   └── models/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
-│       └── predict.py        # predicción y probabilidad over/under
+│       ├── predict.py        # predicción y probabilidad over/under
+│       └── results.py        # liquidación over/under contra resultados reales
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
 ├── tests/test_schedule.py    # normalización y filtros del calendario
 ├── tests/test_players.py     # cálculo de PRA y caché de jugadores
+├── tests/test_results.py     # resultado real, acierto y métricas
 ├── tests/test_dashboard.py   # test de humo del dashboard
 ├── data/
 │   ├── raw/                  # game logs, calendario y stats de jugadores (cache)
@@ -124,13 +126,17 @@ streamlit run src/nba_ml/dashboard.py --server.port 8501
 
 ### Dashboard
 
-Cinco pestañas:
+Seis pestañas:
 
 - **Próximos partidos**: calendario de la temporada en curso (por defecto, los
   siguientes 7 días), filtro por equipo, total previsto, intervalo 80% y
   probabilidad de over frente a la línea de referencia. El calendario se cachea
   en `data/raw/schedule_<temporada>.csv`; el botón **Actualizar** lo vuelve a
   descargar.
+- **Resultados**: partidos ya jugados con total real, predicción, error, línea
+  de referencia, resultado over/under y acierto del modelo. Incluye MAE, sesgo,
+  Brier y un gráfico de predicción vs total real. Por defecto muestra la
+  temporada en curso; cambia a 2025-26 para el backtest completo.
 - **Jugadores**: ranking de puntos, rebotes, asistencias y **PRA** (PTS+REB+AST)
   por partido o en totales, con filtros por temporada, equipo, partidos jugados
   y búsqueda por nombre. Incluye un gráfico de barras apiladas con el top 10.
@@ -148,6 +154,11 @@ El modelo y los datos se cachean. Tras reentrenar, usa el botón
 En **Jugadores**, la temporada 2025-26 aparece como completa y la 2026-27 como
 en curso. Al empezar la temporada solo hay uno o dos partidos por jugador, así
 que las medias de la 2026-27 son todavía poco representativas.
+
+En **Resultados**, la línea es la de referencia de la barra lateral, no la línea
+de cierre real: `nba_api` no proporciona cuotas históricas. Sirve para comparar
+el sesgo y el acierto direccional del modelo, no para afirmar que se habría
+batido el cierre.
 
 Si el calendario aún no se ha descargado, la pestaña de próximos partidos
 muestra un botón para hacerlo. Ten en cuenta que las predicciones usan el último
@@ -243,7 +254,8 @@ Cubren: emparejado local/visitante, exclusión de sedes neutrales, cálculo de
 medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
-PRA y caché de jugadores, y un test de humo del dashboard (19 en total).
+PRA y caché de jugadores, liquidación over/under y métricas de acierto, y un
+test de humo del dashboard (24 en total).
 
 ---
 
