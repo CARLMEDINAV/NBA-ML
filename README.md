@@ -52,11 +52,13 @@ nba-ml/
 │   ├── eda.py                # análisis exploratorio -> reports/
 │   ├── data/
 │   │   ├── download.py       # nba_api con caché y reintentos
-│   │   └── build_dataset.py  # emparejado, features, Elo, estado por equipo
+│   │   ├── build_dataset.py  # emparejado, features, Elo, estado por equipo
+│   │   └── schedule.py       # calendario y próximos partidos (ScheduleLeagueV2)
 │   └── models/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
 │       └── predict.py        # predicción y probabilidad over/under
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
+├── tests/test_schedule.py    # normalización y filtros del calendario
 ├── tests/test_dashboard.py   # test de humo del dashboard
 ├── data/
 │   ├── raw/                  # game logs por temporada (cache, gitignored)
@@ -120,8 +122,13 @@ streamlit run src/nba_ml/dashboard.py --server.port 8501
 
 ### Dashboard
 
-Tres pestañas:
+Cuatro pestañas:
 
+- **Próximos partidos**: calendario de la temporada en curso (por defecto, los
+  siguientes 7 días), filtro por equipo, total previsto, intervalo 80% y
+  probabilidad de over frente a la línea de referencia. El calendario se cachea
+  en `data/raw/schedule_<temporada>.csv`; el botón **Actualizar** lo vuelve a
+  descargar.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, comparación de Elo/forma/descanso y
   gráfico de los últimos 10 totales de cada equipo.
@@ -131,6 +138,11 @@ Tres pestañas:
 
 El modelo y los datos se cachean. Tras reentrenar, usa el botón
 **Recargar datos y modelo** de la barra lateral.
+
+Si el calendario aún no se ha descargado, la pestaña de próximos partidos
+muestra un botón para hacerlo. Ten en cuenta que las predicciones usan el último
+estado disponible de los equipos; si la temporada acaba de empezar, conviene
+actualizar los datos con `nba-ml download` y `nba-ml build`.
 
 Ejemplo de salida:
 
@@ -220,7 +232,8 @@ media, que es exactamente lo que conviene en este problema.
 Cubren: emparejado local/visitante, exclusión de sedes neutrales, cálculo de
 medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
-orden temporal de los splits y un test de humo del dashboard (12 en total).
+orden temporal de los splits, normalización y filtros del calendario y un test
+de humo del dashboard (15 en total).
 
 ---
 

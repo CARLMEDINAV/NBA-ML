@@ -15,6 +15,12 @@ import pandas as pd
 import streamlit as st
 
 from nba_ml.config import FIGURES_DIR, PROCESSED_DIR, REPORTS_DIR
+from nba_ml.data.schedule import (
+    current_season,
+    load_schedule,
+    schedule_path,
+    upcoming_games,
+)
 from nba_ml.models.predict import load_artifact, load_team_state, predict_game
 
 MODEL_FIGURES = (
@@ -59,6 +65,146 @@ def _read_report(name: str) -> str | None:
 
 def _format(value: float | None, decimals: int = 1) -> str:
     return "—" if value is None or pd.isna(value) else f"{value:.{decimals}f}"
+
+
+def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
+    season = current_season()
+    st.subheader(f"Próximos partidos · {season}")
+
+    if not schedule_path(season).exists():
+        st.info(
+            "Todavía no hay calendario descargado para esta temporada. "
+            "Se guarda en `data/raw/` y luego se actualiza cuando quieras."
+        )
+        if st.button("Descargar calendario", type="primary"):
+            with st.spinner("Descargando calendario desde stats.nba.com..."):
+                try:
+                    load_schedule(season, refresh=True)
+                except Exception as error:  # red, timeout o cambio de API
+                    st.error(f"No se pudo descargar el calendario: {error}")
+                else:
+                    st.rerun()
+        return
+
+    schedule = load_schedule(season)
+    teams = sorted(set(schedule["home"]) | set(schedule["away"]))
+
+    controls = st.columns([2, 1, 2])
+    days = controls[0].slider("Días a mostrar", min_value=1, max_value=30, value=7)
+    if controls[1].button("Actualizar", help="Vuelve a descargar el calendario"):
+        with st.spinner("Actualizando calendario..."):
+            try:
+                load_schedule(season, refresh=True)
+            except Exception as error:
+                st.error(f"No se pudo actualizar el calendario: {error}")
+            else:
+                st.rerun()
+    selected_teams = controls[2].multiselect(
+        "Filtrar por equipo", teams, default=[]
+    )
+
+    start = pd.Timestamp.today().normalize()
+    end = start + pd.Timedelta(days=int(days) - 1)
+    games = upcoming_games(
+        schedule,
+        start=start,
+        end=end,
+        only_scheduled=True,
+        teams=selected_teams or None,
+    )
+
+    last_state = pd.to_datetime(state["last_game_date"]).max().normalize()
+    stale_days = (pd.Timestamp.today().normalize() - last_state).days
+    if stale_days > 7:
+        st.warning(
+            f"El estado de los equipos es del {last_state.date()} "
+            f"({stale_days} días). Las predicciones usan la última temporada "
+            "completa; actualiza los datos para incorporar los partidos de esta.",
+            icon="📅",
+        )
+
+    if games.empty:
+        st.info(
+            "No hay partidos programados en el rango elegido"
+            + (" para esos equipos." if selected_teams else ".")
+        )
+        future = schedule[schedule["status"].eq(1)].copy()
+        future["game_date"] = pd.to_datetime(future["game_date"])
+        future = future[future["game_date"] >= start]
+        if not future.empty:
+            st.caption(f"El próximo partido es el {future['game_date'].min().date()}.")
+        return
+
+    weekdays = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+    rows: list[dict[str, object]] = []
+    skipped = 0
+    for game in games.itertuples(index=False):
+        try:
+            result = predict_game(
+                artifact,
+                state,
+                home=game.home,
+                away=game.away,
+                as_of=pd.Timestamp(game.game_date),
+                line=line,
+                warn_stale=False,
+            )
+        except ValueError:
+            skipped += 1
+            continue
+
+        low, high = result["interval_80"]
+        probability = float(result["probability_over"])
+        if probability >= 0.55:
+            signal = "OVER"
+        elif probability <= 0.45:
+            signal = "UNDER"
+        else:
+            signal = "—"
+
+        game_date = pd.Timestamp(game.game_date)
+        time_et = "—" if pd.isna(game.game_time_et) else str(game.game_time_et)
+        rows.append(
+            {
+                "Fecha": f"{weekdays[game_date.weekday()]} {game_date:%d/%m}",
+                "Hora ET": time_et,
+                "Partido": f"{game.away} @ {game.home}",
+                "Total": round(float(result["predicted_total"]), 1),
+                "IC 80%": f"{low:.0f} – {high:.0f}",
+                f"P(over {line:.1f})": f"{probability:.1%}",
+                "Inclinación": signal,
+            }
+        )
+
+    if not rows:
+        st.warning("No se pudo predecir ninguno de los partidos del rango.")
+        return
+
+    table = pd.DataFrame(rows)
+    st.dataframe(
+        table,
+        hide_index=True,
+        height=min(620, 40 + 35 * len(table)),
+        column_config={
+            "Total": st.column_config.NumberColumn("Total previsto", format="%.1f"),
+        },
+    )
+    st.caption(
+        f"{len(table)} partidos · línea de referencia {line:.1f} · "
+        f"probabilidad estimada con el estado al {last_state.date()}"
+        + (f" · {skipped} partidos omitidos" if skipped else "")
+    )
+
+    with st.expander("Cómo leer esta tabla"):
+        st.markdown(
+            "El total previsto es la salida del modelo Ridge. **P(over)** es la "
+            "probabilidad empírica de superar la línea de referencia de la barra "
+            "lateral, calculada con los residuos fuera de muestra. La señal solo "
+            "aparece cuando la probabilidad se aleja del 50% (≥55% OVER, ≤45% "
+            "UNDER); en caso contrario el modelo no ve ventaja.\n\n"
+            "El modelo no conoce lesiones, alineaciones, cuotas ni el resultado "
+            "de los partidos que se juegan hoy. No es consejo de apuestas."
+        )
 
 
 def _render_prediction(result: dict, state: pd.DataFrame, home: str, away: str) -> None:
@@ -236,7 +382,7 @@ def _sidebar(state: pd.DataFrame, artifact: dict) -> tuple[str, str, dt.date, fl
         )
 
         line = st.number_input(
-            "Línea over/under",
+            "Línea de referencia (over/under)",
             min_value=150.0,
             max_value=320.0,
             value=225.5,
@@ -311,9 +457,16 @@ def main() -> None:
             icon="📅",
         )
 
-    prediction_tab, performance_tab, data_tab = st.tabs(
-        ["Predicción", "Rendimiento del modelo", "Datos"]
+    upcoming_tab, prediction_tab, performance_tab, data_tab = st.tabs(
+        [
+            "Próximos partidos",
+            "Predicción",
+            "Rendimiento del modelo",
+            "Datos",
+        ]
     )
+    with upcoming_tab:
+        _render_upcoming(artifact, state, line)
     with prediction_tab:
         _render_prediction(result, state, home, away)
     with performance_tab:

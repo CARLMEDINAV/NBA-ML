@@ -107,6 +107,7 @@ def predict_game(
     away: str,
     as_of: str | pd.Timestamp | None = None,
     line: float | None = None,
+    warn_stale: bool = True,
 ) -> dict[str, object]:
     """Predice el total y, si se da una linea, P(total > linea)."""
     home_state = resolve_team(state, home)
@@ -122,7 +123,7 @@ def predict_game(
     home_state = _state_as_of(home_state, reference)
     away_state = _state_as_of(away_state, reference)
 
-    for team_state in (home_state, away_state):
+    for team_state in (home_state, away_state) if warn_stale else ():
         last = pd.Timestamp(team_state["last_game_date"])
         gap = (reference - last).days
         if gap > DEAD_DAYS_WARNING:
