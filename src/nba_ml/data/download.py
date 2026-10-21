@@ -7,7 +7,6 @@ import time
 from pathlib import Path
 
 import pandas as pd
-from nba_api.stats.endpoints import leaguegamelog
 
 from ..config import RAW_DIR, SEASON_TYPE, SEASONS, ensure_directories
 
@@ -27,6 +26,9 @@ def fetch_season(
     retries: int = 3,
 ) -> pd.DataFrame:
     """Descarga una temporada, con reintentos y espera exponencial."""
+    # Import perezoso: la API de Vercel solo lee artefactos y no necesita nba_api.
+    from nba_api.stats.endpoints import leaguegamelog
+
     last_error: Exception | None = None
     for attempt in range(1, retries + 1):
         try:

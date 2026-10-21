@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>NBA Totals ML · over/under y PRA</title>
+  <meta name="description" content="Predicción del total de puntos NBA y estadísticas PRA con datos de stats.nba.com.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">stats.nba.com · temporada regular</p>
+        <h1>NBA Totals <span>ML</span></h1>
+        <p class="lead">
+          Total de puntos previsto, probabilidad empírica de over/under y
+          estadísticas <strong>PRA</strong> (PTS + REB + AST). Sin promesas de
+          rentabilidad: el valor está en el pipeline y la evaluación honesta.
+        </p>
+      </div>
+      <div class="hero-side">
+        <span id="statusBadge" class="badge badge-soft">Cargando modelo…</span>
+        <a class="badge badge-link" href="https://github.com/CARLMEDINAV/NBA-ML" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </div>
+    </header>
+
+    <section class="panel line-panel" aria-label="Línea de referencia">
+      <div>
+        <label class="label" for="lineInput">Línea de referencia (over/under)</label>
+        <div class="line-control">
+          <button class="step" type="button" id="lineDown" aria-label="Bajar línea">−</button>
+          <input id="lineInput" type="number" min="100" max="350" step="0.5" value="225.5" inputmode="decimal">
+          <button class="step" type="button" id="lineUp" aria-label="Subir línea">+</button>
+        </div>
+      </div>
+      <p class="hint">
+        La línea la eliges tú. <code>nba_api</code> no incluye cuotas históricas:
+        no es la línea de cierre ni una recomendación de apuestas.
+      </p>
+    </section>
+
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button class="tab is-active" role="tab" aria-selected="true" data-tab="upcoming">Próximos</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="results">Resultados</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="players">Jugadores</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="predict">Predicción</button>
+    </nav>
+
+    <main>
+      <section id="tab-upcoming" class="tab-panel is-active" role="tabpanel">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Calendario</p>
+            <h2>Próximos partidos</h2>
+            <p class="muted">Total previsto, intervalo 80% y señal del modelo.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="upcomingRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row">
+          <label>Días
+            <select id="upcomingDays">
+              <option value="3">3 días</option>
+              <option value="7" selected>7 días</option>
+              <option value="14">14 días</option>
+              <option value="30">30 días</option>
+            </select>
+          </label>
+          <label>Equipo
+            <select id="upcomingTeam"><option value="">Todos</option></select>
+          </label>
+          <span class="control-note" id="upcomingRange"></span>
+        </div>
+        <div id="upcomingNotice" class="notice" hidden></div>
+        <div class="summary-grid" id="upcomingSummary"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Hora ET</th><th>Partido</th>
+                <th class="num">Total</th><th>IC 80%</th><th class="num">P(over)</th><th>Señal</th>
+              </tr>
+            </thead>
+            <tbody id="upcomingBody"></tbody>
+          </table>
+        </div>
+        <p class="table-note" id="upcomingNote"></p>
+      </section>
+
+      <section id="tab-results" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Backtest</p>
+            <h2>Resultados anteriores</h2>
+            <p class="muted">Total real frente a predicción y acierto over/under.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="resultsRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row">
+          <label>Temporada
+            <select id="resultsSeason">
+              <option value="2025-26" selected>2025-26 · completa</option>
+              <option value="2026-27">2026-27 · en curso</option>
+            </select>
+          </label>
+          <label>Equipo
+            <select id="resultsTeam"><option value="">Todos</option></select>
+          </label>
+          <label>Filas
+            <select id="resultsLimit">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+        <div id="resultsNotice" class="notice" hidden></div>
+        <div class="summary-grid" id="resultsSummary"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Partido</th><th class="num">Total real</th>
+                <th class="num">Predicción</th><th class="num">Error</th>
+                <th class="num">P(over)</th><th>Resultado</th><th>Modelo</th><th>Acierto</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
+        <p class="table-note" id="resultsNote"></p>
+      </section>
+
+      <section id="tab-players" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">LeagueDashPlayerStats</p>
+            <h2>Jugadores · PRA</h2>
+            <p class="muted">PRA = puntos + rebotes + asistencias.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="playersRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row">
+          <label>Temporada
+            <select id="playersSeason">
+              <option value="2025-26" selected>2025-26</option>
+              <option value="2026-27">2026-27</option>
+            </select>
+          </label>
+          <label>Modo
+            <select id="playersMode">
+              <option value="pergame" selected>Por partido</option>
+              <option value="totals">Totales</option>
+            </select>
+          </label>
+          <label>Orden
+            <select id="playersSort">
+              <option value="pra" selected>PRA</option>
+              <option value="pts">PTS</option>
+              <option value="reb">REB</option>
+              <option value="ast">AST</option>
+            </select>
+          </label>
+          <label>Equipo
+            <select id="playersTeam"><option value="">Todos</option></select>
+          </label>
+          <label>Mín. PJ
+            <input id="playersMinGp" type="number" min="1" max="82" value="10" inputmode="numeric">
+          </label>
+          <label>Filas
+            <select id="playersLimit">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          <label class="grow">Buscar
+            <input id="playersSearch" type="search" placeholder="Nombre del jugador">
+          </label>
+        </div>
+        <div id="playersNotice" class="notice" hidden></div>
+        <div class="summary-grid" id="playersSummary"></div>
+        <div class="bars" id="playersBars"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Jugador</th><th>Equipo</th><th class="num">PJ</th>
+                <th class="num">Min</th><th class="num">PTS</th><th class="num">REB</th>
+                <th class="num">AST</th><th class="num">PRA</th>
+              </tr>
+            </thead>
+            <tbody id="playersBody"></tbody>
+          </table>
+        </div>
+        <p class="table-note" id="playersNote"></p>
+      </section>
+
+      <section id="tab-predict" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Simulador</p>
+            <h2>Predecir un partido</h2>
+            <p class="muted">Elige local, visitante y fecha para ver la estimación.</p>
+          </div>
+        </div>
+        <form class="predict-form" id="predictForm">
+          <label>Local
+            <select id="predictHome" required></select>
+          </label>
+          <label>Visitante
+            <select id="predictAway" required></select>
+          </label>
+          <label>Fecha
+            <input id="predictDate" type="date" required>
+          </label>
+          <button class="btn btn-primary" type="submit">Predecir</button>
+        </form>
+        <div id="predictNotice" class="notice" hidden></div>
+        <div id="predictResult" class="predict-result"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Proyecto educativo. Sin lesiones, alineaciones ni cuotas.
+        No es consejo de apuestas. Datos: NBA / <code>nba_api</code>.
+      </p>
+      <p>
+        <a href="https://github.com/CARLMEDINAV/NBA-ML" target="_blank" rel="noreferrer">Código y metodología</a>
+        · Streamlit para el dashboard completo en local.
+      </p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

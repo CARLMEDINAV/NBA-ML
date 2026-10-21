@@ -43,8 +43,12 @@ evaluación rigurosa, no en prometer una ventaja inexistente.
 
 ```
 nba-ml/
+├── app.py                    # API FastAPI + frontend para Vercel
+├── public/                   # frontend estático (HTML/CSS/JS)
+├── artifacts/                # foto mínima de modelo/datos para Vercel
+├── vercel.json
 ├── pyproject.toml            # paquete instalable + configuración de pytest
-├── requirements.txt
+├── requirements.txt          # dependencias de la API (Vercel)
 ├── src/nba_ml/
 │   ├── config.py             # rutas, temporadas, ventanas, splits
 │   ├── cli.py                # nba-ml download|build|eda|train|predict|dashboard|all
@@ -64,6 +68,7 @@ nba-ml/
 ├── tests/test_players.py     # cálculo de PRA y caché de jugadores
 ├── tests/test_results.py     # resultado real, acierto y métricas
 ├── tests/test_dashboard.py   # test de humo del dashboard
+├── tests/test_api.py         # API FastAPI y frontend de Vercel
 ├── data/
 │   ├── raw/                  # game logs, calendario y stats de jugadores (cache)
 │   └── processed/            # games.csv, team_games.csv, team_state.csv
@@ -85,8 +90,11 @@ de Anaconda):
 cd $env:USERPROFILE\Desktop\nba-ml
 & "$env:USERPROFILE\anaconda3\python.exe" -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev,app]"
+pip install -e ".[dev,app,pipeline]"
 ```
+
+`.[app]` instala Streamlit y `.[pipeline]` instala `nba_api` y matplotlib.
+La API de Vercel solo necesita las dependencias base y FastAPI.
 
 Si PowerShell bloquea la activación:
 
@@ -189,6 +197,45 @@ con los residuos fuera de muestra del walk-forward (no se asume normalidad).
 
 ---
 
+## Demo pública en Vercel
+
+La app pública está pensada para abrirla desde el móvil:
+
+- **Frontend:** `public/` (HTML, CSS y JavaScript, sin build).
+- **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
+  `/api/players`, `/api/predict`).
+- **Datos:** `artifacts/` contiene una foto del modelo, el estado de los
+  equipos, el calendario, las estadísticas de jugadores y el backtest. Vercel
+  no escribe en disco ni conserva la caché de `data/`.
+
+Para probarla en local:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app:app --reload --port 8000
+# abrir http://localhost:8000
+```
+
+Para actualizar la foto que ve Vercel después de descargar/entrenar:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\export_vercel_artifacts.py
+git add artifacts
+git commit -m "Actualiza artefactos de Vercel"
+git push
+```
+
+Vercel detecta FastAPI desde `pyproject.toml`/`requirements.txt` y usa
+`app.py` como entrypoint. La app de Streamlit no se puede ejecutar en Vercel
+(necesita un servidor persistente con WebSockets); por eso la demo pública es
+una versión FastAPI + frontend estático. El dashboard completo sigue disponible
+en local con `nba-ml dashboard`.
+
+> La demo usa una foto de los datos, no se actualiza sola. Las predicciones de
+> la temporada en curso asumen el último estado disponible (2025-26) y avisan
+> cuando los datos están desactualizados.
+
+---
+
 ## Metodología
 
 ### Datos
@@ -255,7 +302,7 @@ medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
 PRA y caché de jugadores, liquidación over/under y métricas de acierto, y un
-test de humo del dashboard (24 en total).
+test de humo del dashboard y la API pública de Vercel (33 en total).
 
 ---
 
