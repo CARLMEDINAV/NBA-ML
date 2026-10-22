@@ -10,9 +10,9 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600089,2026-10-21,20:00,3,Final,MEM,UTA,FedExForum,False,123,103,226.0
 0022600090,2026-10-21,20:00,3,Final,NOP,IND,Smoothie King Center,False,120,123,243.0
 0022600091,2026-10-21,20:30,3,Final,HOU,DAL,Toyota Center,False,128,110,238.0
-0022600005,2026-10-21,22:00,2,Halftime,LAL,GSW,Crypto.com Arena,False,0,0,
-0022600092,2026-10-21,22:00,2,Halftime,POR,PHX,Moda Center,False,0,0,
-0022600093,2026-10-21,22:30,2,2nd Qtr,LAC,SAC,Intuit Dome,False,0,0,
+0022600005,2026-10-21,22:00,2,3rd Qtr,LAL,GSW,Crypto.com Arena,False,0,0,
+0022600092,2026-10-21,22:00,2,End of 3rd Qtr,POR,PHX,Moda Center,False,0,0,
+0022600093,2026-10-21,22:30,2,3rd Qtr,LAC,SAC,Intuit Dome,False,0,0,
 0022600006,2026-10-22,19:00,1,7:00 pm ET,PHI,CLE,Xfinity Mobile Arena,False,0,0,
 0022600007,2026-10-22,21:30,1,9:30 pm ET,OKC,DEN,Paycom Center,False,0,0,
 0022600099,2026-10-23,16:00,1,4:00 pm ET,MIL,CHI,Fiserv Forum,False,0,0,

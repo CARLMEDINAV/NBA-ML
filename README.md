@@ -213,6 +213,9 @@ La app pública está pensada para abrirla desde el móvil:
   la API consulta el marcador de la NBA (`stats.nba.com`) con ESPN como
   respaldo y fusiona los partidos finalizados. La página se refresca sola cada
   60 segundos; si ambos fallan, usa el calendario cacheado.
+- **Persistencia:** un workflow de GitHub Actions
+  (`.github/workflows/update-results.yml`) revisa el calendario cada 15 minutos
+  y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
 
 Para probarla en local:
 
