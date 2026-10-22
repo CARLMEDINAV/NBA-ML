@@ -81,6 +81,11 @@ FEATURES = SELECTED_FEATURES
 WALK_FORWARD_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25", "2025-26")
 ARTIFACT_PATH = MODELS_DIR / "model.joblib"
 
+# El hándicap se estima con un segundo Ridge sobre el margen local-visitante.
+# Es una estimación del modelo, no una línea oficial de una casa de apuestas.
+MARGIN_TARGET = "home_margin"
+MARGIN_ALPHA = 30.0
+
 
 # ---------------------------------------------------------------------------
 # Metricas y particiones
@@ -265,6 +270,65 @@ def walk_forward(
         )
 
     return rows, np.concatenate(residuals) if residuals else np.array([])
+
+
+def walk_forward_margin(
+    dataset: pd.DataFrame,
+    alpha: float = MARGIN_ALPHA,
+    seasons: tuple[str, ...] = WALK_FORWARD_SEASONS,
+) -> tuple[list[dict[str, object]], np.ndarray]:
+    """Validación walk-forward del margen local-visitante."""
+    rows: list[dict[str, object]] = []
+    residuals: list[np.ndarray] = []
+
+    for season in seasons:
+        train = dataset[dataset["season"].map(season_index) < season_index(season)]
+        test = dataset[dataset["season"] == season]
+        if train.empty or test.empty:
+            continue
+
+        model = make_model("ridge", {"model__alpha": alpha})
+        model.fit(train[FEATURES], train[MARGIN_TARGET])
+        predictions = model.predict(test[FEATURES])
+        actual = test[MARGIN_TARGET].to_numpy(dtype=float)
+        metrics = regression_metrics(actual, predictions)
+        metrics["season"] = season
+        metrics["winner_accuracy"] = float(np.mean((predictions > 0) == (actual > 0)))
+        rows.append(metrics)
+        residuals.append(actual - predictions)
+
+    return rows, np.concatenate(residuals) if residuals else np.array([])
+
+
+def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> dict:
+    """Entrena y evalúa el modelo de margen; devuelve el modelo de producción."""
+    train_frame, validation_frame, test_frame = split_by_season(dataset)
+    development = pd.concat([train_frame, validation_frame], ignore_index=True)
+
+    evaluation = make_model("ridge", {"model__alpha": alpha})
+    evaluation.fit(development[FEATURES], development[MARGIN_TARGET])
+    test_predictions = evaluation.predict(test_frame[FEATURES])
+    test_actual = test_frame[MARGIN_TARGET].to_numpy(dtype=float)
+    test_metrics = regression_metrics(test_actual, test_predictions)
+    test_metrics["winner_accuracy"] = float(
+        np.mean((test_predictions > 0) == (test_actual > 0))
+    )
+
+    walk_rows, residuals = walk_forward_margin(dataset, alpha)
+    if not residuals.size:
+        residuals = test_actual - test_predictions
+    sigma = float(np.std(residuals, ddof=1)) if residuals.size else float("nan")
+
+    production = make_model("ridge", {"model__alpha": alpha})
+    production.fit(dataset[FEATURES], dataset[MARGIN_TARGET])
+    return {
+        "model": production,
+        "residuals": residuals,
+        "sigma": sigma,
+        "test_metrics": test_metrics,
+        "walk_forward": walk_rows,
+        "alpha": alpha,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +593,9 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
     predictions_output["error"] = predictions_output[TARGET] - predictions_output["predicted_total"]
     predictions_output.to_csv(REPORTS_DIR / "test_predictions.csv", index=False, encoding="utf-8")
 
+    # Modelo auxiliar de margen para el hándicap sugerido.
+    margin = train_margin_model(dataset)
+
     # Artefacto final para produccion: todas las temporadas disponibles.
     production_model = make_model(best_name, best_params)
     production_model.fit(dataset[FEATURES], dataset[TARGET])
@@ -543,6 +610,11 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         "trained_through": str(dataset["season"].max()),
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "test_metrics": test_metrics,
+        "margin_model": margin["model"],
+        "margin_residuals": margin["residuals"],
+        "margin_sigma": margin["sigma"],
+        "margin_test_metrics": margin["test_metrics"],
+        "margin_walk_forward": margin["walk_forward"],
     }
     joblib.dump(artifact, ARTIFACT_PATH)
     LOG.info("Modelo guardado en %s", ARTIFACT_PATH)
@@ -564,6 +636,13 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         "test": {"metrics": test_metrics, "baselines": baseline_metrics},
         "walk_forward": walk_rows,
         "residual_sigma": residual_sigma,
+        "margin": {
+            "target": MARGIN_TARGET,
+            "alpha": margin["alpha"],
+            "sigma": margin["sigma"],
+            "test_metrics": margin["test_metrics"],
+            "walk_forward": margin["walk_forward"],
+        },
         "top_features": importance.head(15).to_dict("records"),
     }
 

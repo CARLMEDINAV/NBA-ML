@@ -36,13 +36,15 @@
         </div>
       </div>
       <p class="hint">
-        La línea la eliges tú. <code>nba_api</code> no incluye cuotas históricas:
-        no es la línea de cierre ni una recomendación de apuestas.
+        La línea de total la eliges tú. El hándicap y las cuotas de mercado se
+        consultan en ESPN cuando están disponibles; son informativos, no una
+        recomendación de apuestas.
       </p>
     </section>
 
     <nav class="tabs" role="tablist" aria-label="Secciones">
       <button class="tab is-active" role="tab" aria-selected="true" data-tab="upcoming">Próximos</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="analysis">Análisis</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="results">Resultados</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="players">Jugadores</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="predict">Predicción</button>
@@ -79,13 +81,60 @@
             <thead>
               <tr>
                 <th>Fecha</th><th>Hora ET</th><th>Partido</th>
-                <th class="num">Total</th><th>IC 80%</th><th class="num">P(over)</th><th>Señal</th>
+                <th class="num">Total</th><th>IC 80%</th><th class="num">P(over)</th><th>Señal</th><th>Hándicap</th>
               </tr>
             </thead>
             <tbody id="upcomingBody"></tbody>
           </table>
         </div>
         <p class="table-note" id="upcomingNote"></p>
+      </section>
+
+      <section id="tab-analysis" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Partido a partido</p>
+            <h2>Análisis y hándicap</h2>
+            <p class="muted">
+              Puntos proyectados, ganador probable, hándicap sugerido y cuotas
+              de mercado cuando están disponibles.
+            </p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="analysisRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row">
+          <label>Días
+            <select id="analysisDays">
+              <option value="3">3 días</option>
+              <option value="7" selected>7 días</option>
+              <option value="14">14 días</option>
+            </select>
+          </label>
+          <label>Equipo
+            <select id="analysisTeam"><option value="">Todos</option></select>
+          </label>
+          <span class="control-note" id="analysisRange"></span>
+        </div>
+        <div id="analysisNotice" class="notice" hidden></div>
+        <div class="summary-grid" id="analysisSummary"></div>
+        <div class="table-wrap">
+          <table class="analysis-table">
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Hora</th><th>Local</th><th>Visitante</th>
+                <th class="num">Proyección Puntos Local</th>
+                <th class="num">Proyección Puntos Visitante</th>
+                <th>Total Proyección de puntos partido</th>
+                <th>Posible Ganador</th><th>Handicap sugerido</th>
+                <th class="num">Cuota alta de puntos</th>
+                <th class="num">Cuota baja de puntos</th>
+              </tr>
+            </thead>
+            <tbody id="analysisBody"></tbody>
+          </table>
+        </div>
+        <p class="table-note" id="analysisNote"></p>
+        <div class="analysis-cards" id="analysisCards"></div>
       </section>
 
       <section id="tab-results" class="tab-panel" role="tabpanel" hidden>
@@ -125,6 +174,7 @@
                 <th>Fecha</th><th>Partido</th><th class="num">Total real</th>
                 <th class="num">Predicción</th><th class="num">Error</th>
                 <th class="num">P(over)</th><th>Resultado</th><th>Modelo</th><th>Acierto</th>
+                <th>Hándicap</th><th class="num">Margen real</th>
               </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
@@ -226,8 +276,9 @@
 
     <footer class="footer">
       <p>
-        Proyecto educativo. Sin lesiones, alineaciones ni cuotas.
-        No es consejo de apuestas. Datos: NBA / <code>nba_api</code>.
+        Proyecto educativo. Sin lesiones ni alineaciones. Cuotas de mercado de
+        ESPN cuando están disponibles; no es consejo de apuestas.
+        Datos: NBA / <code>nba_api</code>.
       </p>
       <p>
         <a href="https://github.com/CARLMEDINAV/NBA-ML" target="_blank" rel="noreferrer">Código y metodología</a>

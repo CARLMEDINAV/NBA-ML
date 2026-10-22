@@ -34,10 +34,29 @@ Validación walk-forward (entrenar con el pasado y predecir cada temporada):
 
 **Lectura honesta:** el modelo mejora un ~15% a predecir la media histórica de la
 liga, pero queda **prácticamente empatado** con un baseline simple de forma
-reciente. Eso es lo esperable: sin cuotas de casas de apuestas, lesiones ni
+reciente. Eso es lo esperable: sin cuotas históricas de cierre, lesiones ni
 alineaciones, el techo de información es bajo y el total de puntos tiene un
 componente aleatorio enorme. El valor del proyecto está en el pipeline y en la
 evaluación rigurosa, no en prometer una ventaja inexistente.
+
+### Hándicap y ganador probable
+
+El mismo set de 20 features alimenta un segundo Ridge sobre el **margen
+local-visitante**. En test 2025-26:
+
+| Métrica | Valor |
+|---|---:|
+| MAE del margen | 11.39 pts |
+| RMSE | 14.62 pts |
+| Acierto del ganador | 69.4% |
+| Sigma walk-forward | 13.99 pts |
+
+Con ese margen se estiman los puntos proyectados de cada equipo
+(`total ± margen`), el ganador probable y un hándicap redondeado a 0.5. La
+probabilidad de cubrir un hándicap de mercado usa la distribución empírica de
+residuos del margen. **No es una línea oficial**: el hándicap sugerido es una
+estimación del modelo. Las cuotas de over/under y la línea de mercado solo se
+muestran cuando ESPN las devuelve para partidos próximos.
 
 ---
 
@@ -139,7 +158,8 @@ streamlit run src/nba_ml/dashboard.py --server.port 8501
 Seis pestañas:
 
 - **Próximos partidos**: calendario de la temporada en curso (por defecto, los
-  siguientes 7 días), filtro por equipo, total previsto, intervalo 80% y
+  siguientes 7 días), filtro por equipo, total previsto, puntos proyectados de
+  cada equipo, ganador probable, hándicap del modelo, intervalo 80% y
   probabilidad de over frente a la línea de referencia. El calendario se cachea
   en `data/raw/schedule_<temporada>.csv`; el botón **Actualizar** lo vuelve a
   descargar.
@@ -152,8 +172,9 @@ Seis pestañas:
   y búsqueda por nombre. Incluye un gráfico de barras apiladas con el top 10.
   Los datos se cachean en `data/raw/player_stats_<temporada>_<modo>.csv`.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
-  intervalo 80%, probabilidad de over, comparación de Elo/forma/descanso y
-  gráfico de los últimos 10 totales de cada equipo.
+  intervalo 80%, probabilidad de over, margen, puntos proyectados, ganador
+  probable, hándicap del modelo, comparación de Elo/forma/descanso y gráfico de
+  los últimos 10 totales de cada equipo.
 - **Rendimiento**: informe `reports/metrics.md` y figuras de test, residuos,
   walk-forward e importancia de variables.
 - **Datos**: resumen por temporada y figuras del EDA.
@@ -203,9 +224,12 @@ con los residuos fuera de muestra del walk-forward (no se asume normalidad).
 
 La app pública está pensada para abrirla desde el móvil:
 
-- **Frontend:** `public/` (HTML, CSS y JavaScript, sin build).
+- **Frontend:** `public/` (HTML, CSS y JavaScript, sin build). Incluye una
+  pestaña **Análisis** con la tabla partido a partido: puntos proyectados,
+  total, posible ganador, hándicap sugerido y cuotas over/under.
 - **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
-  `/api/players`, `/api/predict`).
+  `/api/players`, `/api/predict`). `/api/upcoming?odds=1&analysis=1` añade
+  hándicap, proyecciones por equipo y cuotas de ESPN cuando están disponibles.
 - **Datos:** `artifacts/` contiene una foto del modelo, el estado de los
   equipos, el calendario, las estadísticas de jugadores y el backtest. Vercel
   no escribe en disco ni conserva la caché de `data/`.
@@ -213,6 +237,10 @@ La app pública está pensada para abrirla desde el móvil:
   la API consulta el marcador de la NBA (`stats.nba.com`) con ESPN como
   respaldo y fusiona los partidos finalizados. La página se refresca sola cada
   60 segundos; si ambos fallan, usa el calendario cacheado.
+- **Cuotas de mercado:** para partidos próximos, la API consulta el scoreboard
+  de ESPN y extrae el hándicap, el total y las cuotas over/under de DraftKings
+  cuando están publicadas. Se cachean 5 minutos y se marcan siempre como
+  informativas; no hay histórico de líneas de cierre.
 - **Persistencia:** un workflow de GitHub Actions
   (`.github/workflows/update-results.yml`) revisa el calendario cada 15 minutos
   y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
@@ -289,7 +317,12 @@ futuros no altera sus features.
   muestra y calibrar los intervalos.
 - Set parsimonioso de 20 features elegido por validación + walk-forward
   (14.84 MAE medio frente a 14.90 del set completo de 76).
-- Artefacto final reentrenado con todas las temporadas disponibles.
+- Segundo Ridge (`alpha=30`) sobre `home_margin` para el hándicap. Se evalúa
+  con el mismo split temporal y walk-forward; sus residuos calibran
+  `P(gana local)` y `P(cubre local)`.
+- Artefacto final reentrenado con todas las temporadas disponibles. El script
+  `scripts/update_margin_artifact.py` permite añadir el modelo de margen a un
+  artefacto ya entrenado sin reentrenar el total.
 
 ### Por qué Ridge
 
@@ -310,8 +343,9 @@ Cubren: emparejado local/visitante, exclusión de sedes neutrales, cálculo de
 medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
-PRA y caché de jugadores, liquidación over/under y métricas de acierto, y un
-test de humo del dashboard y la API pública de Vercel (33 en total).
+PRA y caché de jugadores, liquidación over/under y métricas de acierto, margen
+y hándicap, y un test de humo del dashboard y la API pública de Vercel (36 en
+total).
 
 ---
 
@@ -319,8 +353,10 @@ test de humo del dashboard y la API pública de Vercel (33 en total).
 
 - **Sin lesiones, sanciones ni alineaciones**: es la mayor fuente de información
   no capturada. Un modelo con disponibilidad de jugadores mejoraría el MAE.
-- **Sin cuotas reales**: no se puede evaluar ROI ni comparar contra el mercado.
-  `P(over)` es una probabilidad implícita del modelo, no una ventaja de apuestas.
+- **Sin histórico de cuotas**: solo se consultan cuotas actuales de ESPN para
+  partidos próximos. No se puede evaluar ROI, CLV ni comparar contra el cierre
+  histórico. `P(over)` y `P(cubre)` son probabilidades del modelo, no una
+  ventaja de apuestas.
 - **Solo temporada regular** y datos agregados por equipo; no se modela
   playoff, fatiga de viaje ni altitud.
 - **Cambios de reglas y estilo de juego**: las medias de liga ayudan, pero un
@@ -331,7 +367,7 @@ test de humo del dashboard y la API pública de Vercel (33 en total).
 ## Próximos pasos
 
 1. Añadir disponibilidad de jugadores (lesiones/rotaciones) vía player logs.
-2. Incorporar líneas de apertura/cierre de casas de apuestas y evaluar CLV.
+2. Incorporar líneas históricas de apertura/cierre y evaluar CLV.
 3. Modelar prórrogas y ritmo por separado (pace × eficiencia).
 4. Añadir viaje/distancia y altitud; 3 partidos en 4 días.
 5. Servir el modelo con una API pequeña (FastAPI) o un dashboard.

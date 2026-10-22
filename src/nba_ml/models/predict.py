@@ -100,6 +100,26 @@ def _state_as_of(state: pd.Series, as_of: pd.Timestamp) -> pd.Series:
     return updated
 
 
+ANALYSIS_FEATURES = (
+    "pace_sum",
+    "off_rtg_sum",
+    "def_rtg_sum",
+    "form_total",
+    "exp_total",
+    "ot_rate_sum",
+    "close_rate_sum",
+    "rest_diff",
+    "b2b_sum",
+    "elo_diff",
+    "pts_exp_home",
+    "pts_exp_away",
+    "opp_pts_exp_home",
+    "opp_pts_exp_away",
+    "pace_exp_home",
+    "pace_exp_away",
+)
+
+
 def predict_game(
     artifact: dict,
     state: pd.DataFrame,
@@ -107,9 +127,14 @@ def predict_game(
     away: str,
     as_of: str | pd.Timestamp | None = None,
     line: float | None = None,
+    handicap: float | None = None,
     warn_stale: bool = True,
 ) -> dict[str, object]:
-    """Predice el total y, si se da una linea, P(total > linea)."""
+    """Predice total, margen/hándicap y, si hay línea, P(total > línea).
+
+    ``handicap`` es la línea del equipo local en notación de apuestas
+    (por ejemplo, -4.5 si el local es favorito). No es una cuota oficial.
+    """
     home_state = resolve_team(state, home)
     away_state = resolve_team(state, away)
     if home_state["team_id"] == away_state["team_id"]:
@@ -146,6 +171,36 @@ def predict_game(
     if line is not None:
         probability_over = float(np.mean(residuals > (float(line) - predicted)))
 
+    predicted_margin = None
+    home_win_probability = None
+    projected_home = None
+    projected_away = None
+    model_home_spread = None
+    margin_residuals = np.asarray(artifact.get("margin_residuals", []), dtype=float)
+    margin_model = artifact.get("margin_model")
+    if margin_model is not None:
+        predicted_margin = float(margin_model.predict(features)[0])
+        projected_home = (predicted + predicted_margin) / 2.0
+        projected_away = (predicted - predicted_margin) / 2.0
+        model_home_spread = -predicted_margin
+        if margin_residuals.size:
+            home_win_probability = float(np.mean(margin_residuals > -predicted_margin))
+
+    home_cover_probability = None
+    away_cover_probability = None
+    if handicap is not None and predicted_margin is not None and margin_residuals.size:
+        # El local cubre si margen_real + handicap_local > 0.
+        home_cover_probability = float(
+            np.mean(margin_residuals > ((-float(handicap)) - predicted_margin))
+        )
+        away_cover_probability = float(1.0 - home_cover_probability)
+
+    feature_values = {
+        name: float(features.iloc[0][name])
+        for name in ANALYSIS_FEATURES
+        if name in features.columns
+    }
+
     return {
         "home": str(home_state["team_abbreviation"]),
         "away": str(away_state["team_abbreviation"]),
@@ -154,6 +209,16 @@ def predict_game(
         "interval_80": (predicted + float(lower), predicted + float(upper)),
         "line": float(line) if line is not None else None,
         "probability_over": probability_over,
+        "predicted_margin": predicted_margin,
+        "model_home_spread": model_home_spread,
+        "projected_home_score": projected_home,
+        "projected_away_score": projected_away,
+        "home_win_probability": home_win_probability,
+        "handicap": float(handicap) if handicap is not None else None,
+        "home_cover_probability": home_cover_probability,
+        "away_cover_probability": away_cover_probability,
+        "margin_sigma": float(artifact.get("margin_sigma", float("nan"))),
+        "features": feature_values,
         "residual_sigma": float(artifact["residual_sigma"]),
         "trained_through": artifact["trained_through"],
         "model_name": artifact["model_name"],
@@ -181,6 +246,27 @@ def format_prediction(result: dict[str, object]) -> str:
         lines.append(
             f"Linea {result['line']:.1f}: P(over) = {probability:.1%} -> {side}"
         )
+    if result.get("predicted_margin") is not None:
+        margin = float(result["predicted_margin"])
+        favorite = result["home"] if margin >= 0 else result["away"]
+        handicap_line = round(abs(margin) * 2) / 2
+        handicap = (
+            f"{favorite} -{handicap_line:.1f}" if handicap_line >= 0.5 else "Pick'em"
+        )
+        lines.append(
+            f"Margen previsto: {result['home']} {margin:+.1f} | "
+            f"handicap modelo: {handicap}"
+        )
+        lines.append(
+            f"Puntos proyectados: {result['home']} "
+            f"{float(result['projected_home_score']):.1f} - "
+            f"{result['away']} {float(result['projected_away_score']):.1f}"
+        )
+        if result.get("home_win_probability") is not None:
+            lines.append(
+                f"P(gana {result['home']}) = "
+                f"{float(result['home_win_probability']):.1%}"
+            )
     lines.append(
         f"Modelo {result['model_name']} | datos hasta {result['trained_through']} | "
         f"sigma residuos {result['residual_sigma']:.1f}"

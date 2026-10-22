@@ -11,8 +11,9 @@ const state = {
   meta: null,
   line: 225.5,
   active: "upcoming",
-  loaded: { upcoming: false, results: false, players: false },
+  loaded: { upcoming: false, analysis: false, results: false, players: false },
   upcoming: { days: 7, team: "" },
+  analysis: { days: 7, team: "" },
   results: { season: "2025-26", team: "", limit: 25 },
   players: {
     season: "2025-26",
@@ -57,6 +58,16 @@ function shortDate(value) {
     weekday: "short",
     day: "2-digit",
     month: "short",
+  });
+}
+
+function numericDate(value) {
+  if (!value) return "—";
+  const date = new Date(`${value}T12:00:00`);
+  return date.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
   });
 }
 
@@ -160,6 +171,7 @@ function fillTeams(select, teams, includeAll = false) {
 function populateTeams(meta) {
   const teams = meta.teams || [];
   fillTeams($("#upcomingTeam"), teams, true);
+  fillTeams($("#analysisTeam"), teams, true);
   fillTeams($("#resultsTeam"), teams, true);
   fillTeams($("#playersTeam"), teams, true);
   fillTeams($("#predictHome"), teams);
@@ -178,6 +190,7 @@ function setLine(value) {
   state.line = Math.min(350, Math.max(100, Math.round(parsed * 2) / 2));
   $("#lineInput").value = state.line.toFixed(1);
   if (state.active === "upcoming") loadUpcoming();
+  if (state.active === "analysis") loadAnalysis();
   if (state.active === "results") loadResults();
   if (state.active === "predict" && $("#predictResult").dataset.ready === "1") {
     $("#predictForm").requestSubmit();
@@ -188,7 +201,7 @@ async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
-    loadingRow(tbody, 7);
+    loadingRow(tbody, 8);
     setBusy(button, true);
     notice($("#upcomingNotice"), "");
     $("#upcomingSummary").innerHTML = "";
@@ -215,7 +228,7 @@ async function loadUpcoming(silent = false) {
     ].join("");
 
     if (!data.games.length) {
-      emptyRow(tbody, 7, "No hay partidos programados en ese rango para el filtro elegido.");
+      emptyRow(tbody, 8, "No hay partidos programados en ese rango para el filtro elegido.");
       $("#upcomingNote").textContent = "Prueba a ampliar los días o quitar el filtro de equipo.";
       notice($("#upcomingNotice"), data.warning || "");
       return;
@@ -232,6 +245,7 @@ async function loadUpcoming(silent = false) {
           <td>${num(game.interval_low, 0)} – ${num(game.interval_high, 0)}</td>
           <td class="num">${pct(game.probability_over)}</td>
           <td>${leanPill(game.lean)}</td>
+          <td>${esc(game.model_handicap || "—")}</td>
         </tr>`
       )
       .join("");
@@ -239,8 +253,126 @@ async function loadUpcoming(silent = false) {
     notice($("#upcomingNotice"), data.warning || "");
   } catch (error) {
     if (!silent) {
-      emptyRow(tbody, 7, "No se pudieron cargar los próximos partidos.");
+      emptyRow(tbody, 8, "No se pudieron cargar los próximos partidos.");
       notice($("#upcomingNotice"), error.message, true);
+      showToast(error.message);
+    }
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+async function loadAnalysis(silent = false) {
+  const tbody = $("#analysisBody");
+  const cards = $("#analysisCards");
+  const button = $("#analysisRefresh");
+  if (!silent) {
+    loadingRow(tbody, 11);
+    setBusy(button, true);
+    notice($("#analysisNotice"), "");
+    $("#analysisSummary").innerHTML = "";
+    $("#analysisNote").textContent = "";
+    cards.innerHTML = "";
+  }
+  try {
+    const data = await api("/api/upcoming", {
+      days: state.analysis.days,
+      team: state.analysis.team,
+      line: state.line,
+      live: 1,
+      odds: 1,
+      analysis: 1,
+    });
+    state.loaded.analysis = true;
+    $("#analysisRange").textContent = `${data.start} → ${data.end}`;
+    const games = data.games || [];
+    const signalSide = (game) =>
+      game.market_total !== null && game.market_total !== undefined
+        ? game.market_total_side
+        : game.total_side;
+    const overSignals = games.filter((game) => signalSide(game) === "OVER").length;
+    const underSignals = games.filter((game) => signalSide(game) === "UNDER").length;
+    $("#analysisSummary").innerHTML = [
+      summaryCard("Partidos", String(games.length), `${overSignals} over · ${underSignals} under`),
+      summaryCard("Línea", num(data.line, 1), "referencia"),
+      summaryCard("Cuotas", data.market_source ? "ESPN" : "—", data.market_source || "sin mercado"),
+      summaryCard("Modelo", state.meta?.model_name || "Ridge", `hasta ${state.meta?.trained_through || "—"}`),
+    ].join("");
+
+    if (!games.length) {
+      emptyRow(tbody, 11, "No hay partidos para ese rango o filtro.");
+      $("#analysisNote").textContent = "Prueba a ampliar los días o quitar el filtro de equipo.";
+      notice($("#analysisNotice"), data.warning || "");
+      return;
+    }
+
+    tbody.innerHTML = games
+      .map((game) => {
+        const hasMarketTotal = game.market_total !== null && game.market_total !== undefined;
+        const side = hasMarketTotal ? game.market_total_side : game.total_side;
+        const label = hasMarketTotal ? game.market_total_label : game.total_label;
+        const cls = side === "OVER" ? "total-over" : side === "UNDER" ? "total-under" : "total-neutral";
+        return `
+        <tr>
+          <td>${esc(numericDate(game.date))}</td>
+          <td>${esc(game.time_et || "—")}</td>
+          <td><span class="team">${esc(game.home_name || game.home)}</span></td>
+          <td><span class="team">${esc(game.away_name || game.away)}</span></td>
+          <td class="num">${num(game.projected_home_score)}</td>
+          <td class="num">${num(game.projected_away_score)}</td>
+          <td>
+            <div class="total-cell">
+              <strong>${num(game.predicted_total)}</strong>
+              <span class="${cls}">${esc(label || "—")}</span>
+              ${hasMarketTotal ? `<small>Mercado ${num(game.market_total)}</small>` : ""}
+            </div>
+          </td>
+          <td>${esc(game.possible_winner || "—")}</td>
+          <td>
+            <span>${esc(game.model_handicap || "—")}</span>
+            ${game.market_handicap ? `<small class="market-line">Mercado: ${esc(game.market_handicap)}</small>` : ""}
+          </td>
+          <td class="num">${esc(game.over_odds || "—")}</td>
+          <td class="num">${esc(game.under_odds || "—")}</td>
+        </tr>`;
+      })
+      .join("");
+
+    cards.innerHTML = games
+      .map((game) => {
+        const hasMarketTotal = game.market_total !== null && game.market_total !== undefined;
+        const side = hasMarketTotal ? game.market_total_side : game.total_side;
+        return `
+        <article class="analysis-card">
+          <div class="analysis-card-head">
+            <div>
+              <span class="analysis-date">${esc(shortDate(game.date))} · ${esc(game.time_et || "hora por confirmar")}</span>
+              <h3>${esc(game.away_name || game.away)} <span class="vs">@</span> ${esc(game.home_name || game.home)}</h3>
+            </div>
+            ${leanPill(side)}
+          </div>
+          <div class="analysis-metrics">
+            <div><span>Puntos proyectados</span><strong>${num(game.projected_home_score)} - ${num(game.projected_away_score)}</strong></div>
+            <div><span>Total previsto</span><strong>${num(game.predicted_total)}</strong></div>
+            <div><span>Posible ganador</span><strong>${esc(game.possible_winner || "—")}</strong></div>
+            <div><span>Hándicap modelo</span><strong>${esc(game.model_handicap || "—")}</strong></div>
+            <div><span>Mercado</span><strong>${esc(game.market_handicap || "Sin cuota")}${hasMarketTotal ? ` · ${num(game.market_total)}` : ""}</strong></div>
+            <div><span>Cuotas over/under</span><strong>${esc(game.over_odds || "—")} / ${esc(game.under_odds || "—")}</strong></div>
+          </div>
+          <p class="analysis-text">${esc(game.analysis || "Sin análisis disponible.")}</p>
+        </article>`;
+      })
+      .join("");
+
+    const source = data.market_source
+      ? ` Cuotas: ${data.market_source}. En la línea de mercado, Alta/Baja = probabilidad ≥55% / ≤45%; Leve = 50-55%.`
+      : " Sin cuotas de mercado para esas fechas.";
+    $("#analysisNote").textContent = `${games.length} partidos · línea de referencia ${num(data.line, 1)}.${source} ${data.handicap_note || ""}`;
+    notice($("#analysisNotice"), data.warning || "");
+  } catch (error) {
+    if (!silent) {
+      emptyRow(tbody, 11, "No se pudo cargar el análisis.");
+      notice($("#analysisNotice"), error.message, true);
       showToast(error.message);
     }
   } finally {
@@ -252,7 +384,7 @@ async function loadResults(silent = false) {
   const tbody = $("#resultsBody");
   const button = $("#resultsRefresh");
   if (!silent) {
-    loadingRow(tbody, 9);
+    loadingRow(tbody, 11);
     setBusy(button, true);
     notice($("#resultsNotice"), "");
     $("#resultsSummary").innerHTML = "";
@@ -278,7 +410,7 @@ async function loadResults(silent = false) {
     ].join("");
 
     if (!data.games.length) {
-      emptyRow(tbody, 9, "Todavía no hay partidos con resultado para esta temporada o filtro.");
+      emptyRow(tbody, 11, "Todavía no hay partidos con resultado para esta temporada o filtro.");
       $("#resultsNote").textContent = data.caveat || "";
       return;
     }
@@ -297,13 +429,15 @@ async function loadResults(silent = false) {
           <td>${resultPill(game.actual_result)}</td>
           <td>${leanPill(game.model_lean)}</td>
           <td>${hitMark(game.hit)}</td>
+          <td>${esc(game.model_handicap || "—")}</td>
+          <td class="num">${game.actual_margin == null ? "—" : signed(game.actual_margin, 1)}</td>
         </tr>`;
       })
       .join("");
     $("#resultsNote").textContent = `${data.source} · ${data.count} partidos · línea de referencia ${num(data.line, 1)}.${data.live_updated ? ` Actualizado ${data.live_updated}.` : ""} ${data.caveat || ""}`;
   } catch (error) {
     if (!silent) {
-      emptyRow(tbody, 9, "No se pudieron cargar los resultados.");
+      emptyRow(tbody, 11, "No se pudieron cargar los resultados.");
       notice($("#resultsNotice"), error.message, true);
       showToast(error.message);
     }
@@ -434,11 +568,16 @@ async function submitPrediction(event) {
           <div class="result-line"><span>Intervalo 80%</span><strong>${num(low, 0)} – ${num(high, 0)}</strong></div>
           <div class="result-line"><span>Línea</span><strong>${num(result.line, 1)}</strong></div>
           <div class="result-line"><span>Señal</span><strong>${leanPill(result.lean)}</strong></div>
+          <div class="result-line"><span>Puntos previstos</span><strong>${esc(result.home)} ${num(result.projected_home_score)} · ${esc(result.away)} ${num(result.projected_away_score)}</strong></div>
+          <div class="result-line"><span>Ganador probable</span><strong>${esc(result.possible_winner || "—")}</strong></div>
+          <div class="result-line"><span>Hándicap modelo</span><strong>${esc(result.model_handicap || "—")}</strong></div>
+          <div class="result-line"><span>P(gana ${esc(result.home)})</span><strong>${pct(result.home_win_probability)}</strong></div>
           <div class="result-line"><span>Descanso</span><strong>${esc(result.home)} ${num(result.home_rest, 0)}d · ${esc(result.away)} ${num(result.away_rest, 0)}d</strong></div>
           <div class="result-line"><span>Elo</span><strong>${num(result.home_elo, 0)} · ${num(result.away_elo, 0)}</strong></div>
           <div class="result-line"><span>Último partido</span><strong>${esc(result.home_last_game)} · ${esc(result.away_last_game)}</strong></div>
         </div>
-      </div>`;
+      </div>
+      ${result.analysis ? `<p class="analysis-text predict-analysis">${esc(result.analysis)}</p>` : ""}`;
     notice($("#predictNotice"), result.warning || "");
   } catch (error) {
     box.innerHTML = "";
@@ -460,6 +599,7 @@ function activateTab(name) {
     panel.classList.toggle("is-active", active);
   });
   if (name === "upcoming") loadUpcoming(state.loaded.upcoming);
+  if (name === "analysis") loadAnalysis(state.loaded.analysis);
   if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
 }
@@ -481,6 +621,16 @@ function bindEvents() {
   $("#upcomingTeam").addEventListener("change", (event) => {
     state.upcoming.team = event.target.value;
     loadUpcoming();
+  });
+
+  $("#analysisRefresh").addEventListener("click", () => loadAnalysis());
+  $("#analysisDays").addEventListener("change", (event) => {
+    state.analysis.days = Number(event.target.value);
+    loadAnalysis();
+  });
+  $("#analysisTeam").addEventListener("change", (event) => {
+    state.analysis.team = event.target.value;
+    loadAnalysis();
   });
 
   $("#resultsRefresh").addEventListener("click", loadResults);
@@ -543,6 +693,7 @@ function bindEvents() {
   window.setInterval(() => {
     if (document.visibilityState !== "visible") return;
     if (state.active === "upcoming") loadUpcoming(true);
+    if (state.active === "analysis") loadAnalysis(true);
     if (state.active === "results") loadResults(true);
   }, 60000);
 }
@@ -575,6 +726,8 @@ async function init() {
     if (window.matchMedia("(max-width: 640px)").matches) {
       state.upcoming.days = 3;
       $("#upcomingDays").value = "3";
+      state.analysis.days = 3;
+      $("#analysisDays").value = "3";
     }
 
     await loadUpcoming();
@@ -582,7 +735,7 @@ async function init() {
     $("#statusBadge").textContent = "API no disponible";
     showToast(error.message);
     const tbody = $("#upcomingBody");
-    if (tbody) emptyRow(tbody, 7, "No se pudo conectar con la API.");
+    if (tbody) emptyRow(tbody, 8, "No se pudo conectar con la API.");
   }
 }
 

@@ -184,9 +184,21 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
                 "Hora ET": time_et,
                 "Partido": f"{game.away} @ {game.home}",
                 "Total": round(float(result["predicted_total"]), 1),
+                "Pts local": (
+                    round(float(result["projected_home_score"]), 1)
+                    if result.get("projected_home_score") is not None
+                    else "—"
+                ),
+                "Pts visitante": (
+                    round(float(result["projected_away_score"]), 1)
+                    if result.get("projected_away_score") is not None
+                    else "—"
+                ),
                 "IC 80%": f"{low:.0f} – {high:.0f}",
                 f"P(over {line:.1f})": f"{probability:.1%}",
                 "Inclinación": signal,
+                "Ganador probable": result.get("possible_winner") or "—",
+                "Hándicap modelo": result.get("model_handicap") or "—",
             }
         )
 
@@ -201,6 +213,10 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
         height=min(620, 40 + 35 * len(table)),
         column_config={
             "Total": st.column_config.NumberColumn("Total previsto", format="%.1f"),
+            "Pts local": st.column_config.NumberColumn("Pts local", format="%.1f"),
+            "Pts visitante": st.column_config.NumberColumn(
+                "Pts visitante", format="%.1f"
+            ),
         },
     )
     st.caption(
@@ -216,6 +232,9 @@ def _render_upcoming(artifact: dict, state: pd.DataFrame, line: float) -> None:
             "lateral, calculada con los residuos fuera de muestra. La señal solo "
             "aparece cuando la probabilidad se aleja del 50% (≥55% OVER, ≤45% "
             "UNDER); en caso contrario el modelo no ve ventaja.\n\n"
+            "**Pts local/visitante**, **ganador probable** y **hándicap modelo** "
+            "salen de un segundo Ridge sobre el margen. El hándicap se redondea "
+            "a 0.5 y es una estimación, no una línea oficial.\n\n"
             "El modelo no conoce lesiones, alineaciones, cuotas ni el resultado "
             "de los partidos que se juegan hoy. No es consejo de apuestas."
         )
@@ -658,6 +677,31 @@ def _render_prediction(result: dict, state: pd.DataFrame, home: str, away: str) 
         text=f"OVER {probability:.0%}  ·  UNDER {1 - probability:.0%}",
     )
 
+    if result.get("predicted_margin") is not None:
+        margin = float(result["predicted_margin"])
+        margin_columns = st.columns(4)
+        margin_columns[0].metric("Margen previsto", f"{margin:+.1f} pts")
+        margin_columns[1].metric(
+            "Ganador probable", result.get("possible_winner") or "—"
+        )
+        margin_columns[2].metric(
+            "Hándicap modelo", result.get("model_handicap") or "—"
+        )
+        margin_columns[3].metric(
+            "P(gana local)",
+            (
+                f"{float(result['home_win_probability']):.1%}"
+                if result.get("home_win_probability") is not None
+                else "—"
+            ),
+        )
+        if result.get("projected_home_score") is not None:
+            st.caption(
+                "Puntos proyectados: "
+                f"{result['home']} {float(result['projected_home_score']):.1f} · "
+                f"{result['away']} {float(result['projected_away_score']):.1f}"
+            )
+
     if probability >= 0.55:
         st.success(
             "El modelo se inclina por el OVER, pero la ventaja es moderada. "
@@ -731,8 +775,9 @@ def _render_prediction(result: dict, state: pd.DataFrame, home: str, away: str) 
         )
 
     st.warning(
-        "El modelo no usa lesiones, alineaciones ni cuotas. La probabilidad es una "
-        "estimación del modelo, no una ventaja real de mercado.",
+        "El modelo no usa lesiones ni alineaciones. El hándicap y el ganador "
+        "probable son estimaciones del modelo, no líneas oficiales ni una ventaja "
+        "real de mercado.",
         icon="⚠️",
     )
 
