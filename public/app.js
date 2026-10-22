@@ -347,12 +347,12 @@ async function loadAnalysis(silent = false) {
           <div class="analysis-card-head">
             <div>
               <span class="analysis-date">${esc(shortDate(game.date))} · ${esc(game.time_et || "hora por confirmar")}</span>
-              <h3>${esc(game.away_name || game.away)} <span class="vs">@</span> ${esc(game.home_name || game.home)}</h3>
+              <h3>${esc(game.home_name || game.home)} <span class="vs">vs</span> ${esc(game.away_name || game.away)}</h3>
             </div>
             ${leanPill(side)}
           </div>
           <div class="analysis-metrics">
-            <div><span>Puntos proyectados</span><strong>${num(game.projected_home_score)} - ${num(game.projected_away_score)}</strong></div>
+            <div><span>Puntos proyectados</span><strong>Local ${num(game.projected_home_score)} · Visitante ${num(game.projected_away_score)}</strong></div>
             <div><span>Total previsto</span><strong>${num(game.predicted_total)}</strong></div>
             <div><span>Posible ganador</span><strong>${esc(game.possible_winner || "—")}</strong></div>
             <div><span>Hándicap modelo</span><strong>${esc(game.model_handicap || "—")}</strong></div>
