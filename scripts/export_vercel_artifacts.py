@@ -18,6 +18,7 @@ ARTIFACTS = ROOT / "artifacts"
 
 FILES = {
     ROOT / "models" / "model.joblib": ARTIFACTS / "model.joblib",
+    ROOT / "models" / "player_props.joblib": ARTIFACTS / "player_props.joblib",
     ROOT / "data" / "processed" / "team_state.csv": ARTIFACTS / "team_state.csv",
     ROOT / "data" / "raw" / "schedule_2026_27.csv": ARTIFACTS / "schedule_2026_27.csv",
     ROOT / "reports" / "test_predictions.csv": ARTIFACTS / "test_predictions.csv",

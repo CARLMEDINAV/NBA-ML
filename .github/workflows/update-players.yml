@@ -1,4 +1,4 @@
-name: Actualizar jugadores
+name: Actualizar jugadores y props
 
 on:
   schedule:
@@ -23,19 +23,23 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Instalar dependencias minimas
-        run: pip install "nba_api>=1.11,<1.12" "pandas>=2.1,<3" "python-dateutil>=2.9"
+        run: pip install "nba_api>=1.11,<1.12" "pandas>=2.1,<3" "python-dateutil>=2.9" "scikit-learn>=1.3,<2" "joblib>=1.3,<2"
       - name: Descargar estadisticas de jugadores
         env:
           PYTHONPATH: src
         run: python scripts/update_web_players.py
+      - name: Actualizar foto para props
+        env:
+          PYTHONPATH: src
+        run: python scripts/update_web_player_props.py
       - name: Commit si hay cambios
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add artifacts/player_stats_2026_27_pergame.csv artifacts/player_stats_2026_27_totals.csv
+          git add artifacts/player_stats_2026_27_pergame.csv artifacts/player_stats_2026_27_totals.csv artifacts/player_state.csv
           if git diff --cached --quiet; then
             echo "Sin cambios en los jugadores."
           else
-            git commit -m "Actualiza estadisticas de jugadores NBA"
+            git commit -m "Actualiza estadisticas de jugadores y props NBA"
             git push
           fi

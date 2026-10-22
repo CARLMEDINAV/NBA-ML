@@ -2,8 +2,9 @@
 
 **Demo pública:** https://nba-ml-flax.vercel.app
 
-Predicción del **total de puntos** (over/under) de partidos NBA con datos oficiales
-de `stats.nba.com`, un pipeline reproducible y validación temporal estricta.
+Predicción del **total de puntos** (over/under), hándicap y **props de jugadores**
+(PTS, REB, AST y PRA) con datos oficiales de `stats.nba.com`, un pipeline
+reproducible y validación temporal estricta.
 
 El proyecto descarga 11 temporadas regulares (2015-16 a 2025-26), construye
 features pre-partido sin fuga de información, entrena varios modelos y deja un
@@ -58,6 +59,22 @@ residuos del margen. **No es una línea oficial**: el hándicap sugerido es una
 estimación del modelo. Las cuotas de over/under y la línea de mercado solo se
 muestran cuando ESPN las devuelve para partidos próximos.
 
+### Props de jugadores
+
+Tres Ridge (`alpha=1`) predicen puntos, rebotes y asistencias por jugador; PRA es
+la suma de las tres proyecciones. Validación temporal con el tramo final de
+2025-26 (10.821 filas jugador-partido):
+
+| Stat | MAE | RMSE | R² | Baseline MAE |
+|---|---:|---:|---:|---:|
+| PTS | 4.67 | 6.06 | 0.476 | 6.70 |
+| REB | 1.92 | 2.53 | 0.413 | 2.55 |
+| AST | 1.38 | 1.88 | 0.462 | 1.95 |
+| PRA | 6.15 | 7.92 | 0.534 | 9.33 |
+
+Sin lesiones, alineaciones ni cuotas de props. La pestaña **Props** muestra los
+jugadores con minutos en 2026-27 ordenados por PRA proyectado.
+
 ---
 
 ## Estructura
@@ -79,10 +96,12 @@ nba-ml/
 │   │   ├── download.py       # nba_api con caché y reintentos
 │   │   ├── build_dataset.py  # emparejado, features, Elo, estado por equipo
 │   │   ├── schedule.py       # calendario y próximos partidos (ScheduleLeagueV2)
-│   │   └── players.py        # PTS/REB/AST/PRA (LeagueDashPlayerStats)
+│   │   ├── players.py        # PTS/REB/AST/PRA (LeagueDashPlayerStats)
+│   │   └── player_logs.py    # game logs por jugador (PlayerGameLogs)
 │   └── models/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
 │       ├── predict.py        # predicción y probabilidad over/under
+│       ├── player_props.py   # PTS/REB/AST/PRA por jugador
 │       └── results.py        # liquidación over/under contra resultados reales
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
 ├── tests/test_schedule.py    # normalización y filtros del calendario
@@ -93,7 +112,9 @@ nba-ml/
 ├── data/
 │   ├── raw/                  # game logs, calendario y stats de jugadores (cache)
 │   └── processed/            # games.csv, team_games.csv, team_state.csv
-├── models/model.joblib       # modelo + features + residuos
+├── models/model.joblib       # modelo de totales + features + residuos
+├── models/player_props.joblib # modelo de props + métricas
+├── artifacts/player_state.csv # foto reciente de jugadores para props
 └── reports/                  # metrics.md, eda.md, figuras, predicciones test
 ```
 
@@ -155,7 +176,8 @@ streamlit run src/nba_ml/dashboard.py --server.port 8501
 
 ### Dashboard
 
-Seis pestañas:
+El dashboard de Streamlit tiene seis pestañas. La web pública añade **Análisis**
+y **Props**; estas son las secciones principales:
 
 - **Próximos partidos**: calendario de la temporada en curso (por defecto, los
   siguientes 7 días), filtro por equipo, total previsto, puntos proyectados de
@@ -176,6 +198,9 @@ Seis pestañas:
   iniciales como respaldo si la imagen no existe) y un gráfico de barras
   apiladas con el top 10. Los datos se cachean en
   `data/raw/player_stats_<temporada>_<modo>.csv`.
+- **Props** (solo web): proyecciones de puntos, rebotes, asistencias y PRA por
+  jugador para los próximos partidos, con filtros por días, equipo y número de
+  jugadores por partido. No incluye lesiones ni alineaciones.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, margen, puntos proyectados, ganador
   probable, hándicap del modelo, comparación de Elo/forma/descanso y gráfico de
@@ -231,13 +256,16 @@ La app pública está pensada para abrirla desde el móvil:
 
 - **Frontend:** `public/` (HTML, CSS y JavaScript, sin build). Incluye una
   pestaña **Análisis** con la tabla partido a partido: puntos proyectados,
-  total, posible ganador, hándicap sugerido y cuotas over/under.
+  total, posible ganador, hándicap sugerido y cuotas over/under; y una pestaña
+  **Props** con PTS, REB, AST y PRA proyectados por jugador.
 - **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
-  `/api/players`, `/api/predict`). `/api/upcoming?odds=1&analysis=1` añade
-  hándicap, proyecciones por equipo y cuotas de ESPN cuando están disponibles.
-- **Datos:** `artifacts/` contiene una foto del modelo, el estado de los
-  equipos, el calendario, las estadísticas de jugadores y el backtest. Vercel
-  no escribe en disco ni conserva la caché de `data/`.
+  `/api/players`, `/api/player-props`, `/api/predict`).
+  `/api/upcoming?odds=1&analysis=1` añade hándicap, proyecciones por equipo y
+  cuotas de ESPN cuando están disponibles.
+- **Datos:** `artifacts/` contiene una foto del modelo de totales, el modelo de
+  props, el estado de los equipos y jugadores, el calendario, las estadísticas
+  de jugadores y el backtest. Vercel no escribe en disco ni conserva la caché de
+  `data/`.
 - **Resultados en vivo:** al abrir la pestaña Resultados (temporada en curso),
   la API consulta el marcador de la NBA (`stats.nba.com`) con ESPN como
   respaldo y fusiona los partidos finalizados. La página se refresca sola cada
@@ -249,10 +277,11 @@ La app pública está pensada para abrirla desde el móvil:
 - **Persistencia:** un workflow de GitHub Actions
   (`.github/workflows/update-results.yml`) revisa el calendario cada 15 minutos
   y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
-- **Jugadores:** otro workflow (`.github/workflows/update-players.yml`) refresca
-  cada 6 horas `player_stats_2026_27_pergame.csv` y `_totals.csv`. Así los
-  equipos actuales (por ejemplo, Giannis en Miami) llegan a la web sin que
-  Vercel tenga que consultar `stats.nba.com`.
+- **Jugadores y props:** otro workflow
+  (`.github/workflows/update-players.yml`) refresca cada 6 horas
+  `player_stats_2026_27_pergame.csv`, `_totals.csv` y `player_state.csv`. Así
+  los equipos actuales (por ejemplo, Giannis en Miami) y las medias móviles de
+  los props llegan a la web sin que Vercel tenga que consultar `stats.nba.com`.
 
 Para probarla en local:
 
@@ -264,6 +293,10 @@ Para probarla en local:
 Para actualizar la foto que ve Vercel después de descargar/entrenar:
 
 ```powershell
+# Opcional: reentrenar props y refrescar su foto actual
+.\.venv\Scripts\python.exe scripts\train_player_props.py
+.\.venv\Scripts\python.exe scripts\update_web_player_props.py
+
 .\.venv\Scripts\python.exe scripts\export_vercel_artifacts.py
 git add artifacts
 git commit -m "Actualiza artefactos de Vercel"
@@ -333,6 +366,29 @@ futuros no altera sus features.
   `scripts/update_margin_artifact.py` permite añadir el modelo de margen a un
   artefacto ya entrenado sin reentrenar el total.
 
+### Props de jugadores
+
+- **Datos:** game logs por jugador de 2023-24 a 2026-27
+  (`PlayerGameLogs`), cacheados en `data/raw/player_game_logs_<temporada>.csv`.
+- **Features:** medias móviles de 3, 5 y 10 partidos de minutos, PTS, REB, AST y
+  PRA; tiros y pérdidas recientes; ritmo por minuto; partidos jugados en la
+  temporada; descanso y back-to-back; localía; contexto ofensivo/defensivo y
+  pace del equipo y del rival; y promedios de la temporada anterior.
+- **Modelo:** tres Ridge (`alpha=1`) separados para PTS, REB y AST. **PRA =
+  PTS + REB + AST** para que las cuatro columnas sean coherentes.
+- **Validación temporal:** entrenamiento con partidos anteriores al
+  `2026-02-01`; prueba con el resto de 2025-26 (10.821 filas de jugador-partido).
+  MAE: **4.67 PTS**, **1.92 REB**, **1.38 AST**, **6.15 PRA**. La referencia
+  ingenua (media del entrenamiento) da 6.70, 2.55, 1.95 y 9.33.
+- **Producción:** se reentrena con todas las temporadas disponibles y se
+  publica `artifacts/player_props.joblib`. `artifacts/player_state.csv` guarda
+  la foto más reciente de cada jugador. El workflow de jugadores actualiza esa
+  foto cada 6 horas; el modelo se reentrena manualmente con
+  `python scripts/train_player_props.py`.
+- **Límites:** no hay lesiones, alineaciones, límite de minutos ni cuotas de
+  props. Se muestran los jugadores con minutos en la temporada actual, ordenados
+  por PRA proyectado, no una rotación oficial.
+
 ### Por qué Ridge
 
 Con 13.000 partidos y mucho ruido, los modelos no lineales no aportan: Ridge
@@ -352,16 +408,18 @@ Cubren: emparejado local/visitante, exclusión de sedes neutrales, cálculo de
 medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
-PRA y caché de jugadores, liquidación over/under y métricas de acierto, margen
-y hándicap, y un test de humo del dashboard y la API pública de Vercel (38 en
-total).
+PRA y caché de jugadores, props por jugador, liquidación over/under y métricas
+de acierto, margen y hándicap, y un test de humo del dashboard y la API pública
+de Vercel (40 en total).
 
 ---
 
 ## Limitaciones
 
 - **Sin lesiones, sanciones ni alineaciones**: es la mayor fuente de información
-  no capturada. Un modelo con disponibilidad de jugadores mejoraría el MAE.
+  no capturada. Un modelo con disponibilidad de jugadores mejoraría el MAE de
+  totales y, sobre todo, el de props. Los props tampoco modelan minutos ni
+  rotaciones: usan el promedio reciente de minutos como contexto.
 - **Sin histórico de cuotas**: solo se consultan cuotas actuales de ESPN para
   partidos próximos. No se puede evaluar ROI, CLV ni comparar contra el cierre
   histórico. `P(over)` y `P(cubre)` son probabilidades del modelo, no una
@@ -375,11 +433,12 @@ total).
 
 ## Próximos pasos
 
-1. Añadir disponibilidad de jugadores (lesiones/rotaciones) vía player logs.
+1. Añadir disponibilidad de jugadores (lesiones/rotaciones) y un modelo de
+   minutos para los props.
 2. Incorporar líneas históricas de apertura/cierre y evaluar CLV.
 3. Modelar prórrogas y ritmo por separado (pace × eficiencia).
 4. Añadir viaje/distancia y altitud; 3 partidos en 4 días.
-5. Servir el modelo con una API pequeña (FastAPI) o un dashboard.
+5. Calibrar intervalos por jugador para los props (hoy solo se publica el MAE).
 
 ## Fuente de datos
 

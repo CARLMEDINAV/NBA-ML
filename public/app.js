@@ -11,7 +11,7 @@ const state = {
   meta: null,
   line: 225.5,
   active: "upcoming",
-  loaded: { upcoming: false, analysis: false, results: false, players: false },
+  loaded: { upcoming: false, analysis: false, results: false, players: false, props: false },
   upcoming: { days: 7, team: "" },
   analysis: { days: 7, team: "" },
   results: { season: "2025-26", team: "", limit: 25 },
@@ -24,6 +24,7 @@ const state = {
     limit: 25,
     q: "",
   },
+  props: { days: 7, team: "", limit: 8 },
 };
 
 function esc(value) {
@@ -187,6 +188,7 @@ function populateTeams(meta) {
   fillTeams($("#analysisTeam"), teams, true);
   fillTeams($("#resultsTeam"), teams, true);
   fillTeams($("#playersTeam"), teams, true);
+  fillTeams($("#propsTeam"), teams, true);
   fillTeams($("#predictHome"), teams);
   fillTeams($("#predictAway"), teams);
 
@@ -567,6 +569,107 @@ async function loadPlayers() {
   }
 }
 
+async function loadProps(silent = false) {
+  const tbody = $("#propsBody");
+  const button = $("#propsRefresh");
+  if (!silent) {
+    loadingRow(tbody, 9);
+    setBusy(button, true);
+    notice($("#propsNotice"), "");
+    $("#propsSummary").innerHTML = "";
+    $("#propsNote").textContent = "";
+    $("#propsRange").textContent = "";
+  }
+  try {
+    const data = await api("/api/player-props", {
+      days: state.props.days,
+      team: state.props.team,
+      limit: state.props.limit,
+    });
+    state.loaded.props = true;
+    $("#propsRange").textContent = `${data.start} → ${data.end}`;
+    const games = data.games || [];
+    const players = games.flatMap((game) =>
+      (game.players || []).map((player) => ({ ...player, game }))
+    );
+    const top = players.reduce(
+      (best, player) =>
+        !best || Number(player.projected_pra) > Number(best.projected_pra) ? player : best,
+      null
+    );
+    const metrics = data.metrics || {};
+    const praMetrics = data.pra_metrics || {};
+    $("#propsSummary").innerHTML = [
+      summaryCard("Partidos", String(data.count), `${data.player_count} proyecciones`),
+      summaryCard("Mejor PRA", top ? top.player_name : "—", top ? `${num(top.projected_pra)} PRA · ${top.team}` : ""),
+      summaryCard("MAE PRA", num(praMetrics.mae), "validación 2025-26"),
+      summaryCard("Modelo", data.model_name || "Ridge props", `hasta ${data.trained_through || "—"}`),
+    ].join("");
+    notice($("#propsNotice"), data.warning || "");
+
+    if (!players.length) {
+      emptyRow(tbody, 9, "No hay jugadores para esos filtros.");
+      $("#propsNote").textContent = "Prueba a ampliar los días o quitar el filtro de equipo.";
+      return;
+    }
+
+    tbody.innerHTML = players
+      .map((player) => {
+        const game = player.game;
+        const headshotUrl =
+          player.headshot_url ||
+          (player.player_id
+            ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png`
+            : "");
+        const time = game.time_et ? `${game.time_et} ET` : "Hora por confirmar";
+        return `
+        <tr>
+          <td>${esc(shortDate(game.date))}</td>
+          <td>
+            <div class="matchup">${esc(game.away)} @ ${esc(game.home)}<small>${esc(time)}</small></div>
+          </td>
+          <td>
+            <div class="player-cell">
+              <span class="player-avatar" aria-hidden="true">
+                <span class="player-initials">${esc(initials(player.player_name))}</span>
+                ${
+                  headshotUrl
+                    ? `<img class="player-headshot" src="${esc(headshotUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+                    : ""
+                }
+              </span>
+              <strong class="player-name">${esc(player.player_name)}</strong>
+            </div>
+          </td>
+          <td>${esc(player.team)}</td>
+          <td class="num">${num(player.projected_pts)}</td>
+          <td class="num">${num(player.projected_reb)}</td>
+          <td class="num">${num(player.projected_ast)}</td>
+          <td class="num pra-value">${num(player.projected_pra)}</td>
+          <td class="num">${num(player.gp, 0)}</td>
+        </tr>`;
+      })
+      .join("");
+
+    const validation = data.validation || {};
+    const validationText = validation.from
+      ? `Validación ${validation.from} → ${validation.to}: MAE PTS ${num(metrics.pts?.mae)}, REB ${num(metrics.reb?.mae)}, AST ${num(metrics.ast?.mae)}, PRA ${num(praMetrics.mae)}.`
+      : "";
+    const maxGp = players.reduce((max, player) => Math.max(max, Number(player.gp || 0)), 0);
+    const earlySeasonText =
+      maxGp <= 2
+        ? "La 2026-27 acaba de empezar: con 1-2 partidos por jugador, el modelo se apoya en la temporada anterior."
+        : "";
+    $("#propsNote").textContent = `${data.note || ""} ${validationText} ${earlySeasonText}`.trim();
+  } catch (error) {
+    emptyRow(tbody, 9, "No se pudieron cargar las proyecciones de jugadores.");
+    notice($("#propsNotice"), error.message, true);
+    showToast(error.message);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 async function submitPrediction(event) {
   event?.preventDefault();
   const home = $("#predictHome").value;
@@ -633,6 +736,7 @@ function activateTab(name) {
   if (name === "analysis") loadAnalysis(state.loaded.analysis);
   if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
+  if (name === "props" && !state.loaded.props) loadProps();
 }
 
 function bindEvents() {
@@ -716,6 +820,20 @@ function bindEvents() {
     }, 350);
   });
 
+  $("#propsRefresh").addEventListener("click", () => loadProps());
+  $("#propsDays").addEventListener("change", (event) => {
+    state.props.days = Number(event.target.value);
+    loadProps();
+  });
+  $("#propsTeam").addEventListener("change", (event) => {
+    state.props.team = event.target.value;
+    loadProps();
+  });
+  $("#propsLimit").addEventListener("change", (event) => {
+    state.props.limit = Number(event.target.value);
+    loadProps();
+  });
+
   $("#predictForm").addEventListener("submit", submitPrediction);
 
   // Refresco silencioso: la NBA actualiza el marcador y los finales aparecen solos.
@@ -724,6 +842,7 @@ function bindEvents() {
     if (state.active === "upcoming") loadUpcoming(true);
     if (state.active === "analysis") loadAnalysis(true);
     if (state.active === "results") loadResults(true);
+    if (state.active === "props") loadProps(true);
   }, 60000);
 }
 
@@ -764,6 +883,8 @@ async function init() {
       $("#upcomingDays").value = "3";
       state.analysis.days = 3;
       $("#analysisDays").value = "3";
+      state.props.days = 3;
+      $("#propsDays").value = "3";
     }
 
     await loadUpcoming();

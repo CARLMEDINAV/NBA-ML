@@ -36,6 +36,11 @@ PUBLIC_DIR = ROOT / "public"
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
+from nba_ml.models.player_props import (
+    load_player_props_artifact,
+    load_player_state,
+    predict_player_props,
+)
 from nba_ml.models.predict import load_artifact, load_team_state, predict_game
 from nba_ml.models.results import add_over_under, summarize_results
 
@@ -63,8 +68,11 @@ ESPN_TO_NBA = {
 
 app = FastAPI(
     title="NBA ML API",
-    description="Prediccion de totales NBA y estadisticas PRA (PTS + REB + AST).",
-    version="0.3.0",
+    description=(
+        "Prediccion de totales, handicap y props de jugadores "
+        "(PTS, REB, AST y PRA)."
+    ),
+    version="0.4.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -116,6 +124,16 @@ def _players_cached(season: str, mode: str) -> pd.DataFrame:
     return pd.read_csv(path, dtype={"player_id": int})
 
 
+@lru_cache(maxsize=1)
+def _player_props_cached() -> dict:
+    return load_player_props_artifact(ARTIFACTS / "player_props.joblib")
+
+
+@lru_cache(maxsize=1)
+def _player_state_cached() -> pd.DataFrame:
+    return load_player_state(ARTIFACTS / "player_state.csv")
+
+
 def _artifact() -> dict:
     try:
         return _artifact_cached()
@@ -152,6 +170,20 @@ def _players(season: str, mode: str) -> pd.DataFrame:
             status_code=404,
             detail=f"No hay estadisticas de jugadores para {season} ({mode})",
         ) from error
+
+
+def _player_props() -> dict:
+    try:
+        return _player_props_cached()
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+def _player_state() -> pd.DataFrame:
+    try:
+        return _player_state_cached().copy()
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 # ---------------------------------------------------------------------------
@@ -1118,6 +1150,95 @@ def players(
             "sort": sort_key,
             "count": total,
             "players": rows,
+        }
+    )
+
+
+@app.get("/api/player-props")
+def player_props(
+    days: int = Query(7, ge=1, le=14),
+    team: str | None = None,
+    today: str | None = None,
+    limit: int = Query(10, ge=1, le=20),
+) -> JSONResponse:
+    artifact = _player_props()
+    player_state = _player_state()
+    state = _state()
+    schedule = _schedule()
+    start = _today(today)
+    end = start + pd.Timedelta(days=days - 1)
+
+    dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
+    mask = dates.between(start, end) & schedule["status"].eq(1)
+    selected = [item.strip().upper() for item in (team or "").split(",") if item.strip()]
+    if selected:
+        mask &= schedule["home"].isin(selected) | schedule["away"].isin(selected)
+    games = schedule.loc[mask].sort_values(["game_date", "game_time_et", "game_id"])
+
+    names = _team_names(state)
+    payload_games: list[dict[str, Any]] = []
+    player_count = 0
+    for game in games.itertuples(index=False):
+        players = predict_player_props(
+            artifact,
+            player_state,
+            state,
+            home=str(game.home),
+            away=str(game.away),
+            game_date=pd.Timestamp(game.game_date),
+            limit=limit,
+        )
+        if not players:
+            continue
+        player_count += len(players)
+        payload_games.append(
+            {
+                "game_id": game.game_id,
+                "date": pd.Timestamp(game.game_date).strftime("%Y-%m-%d"),
+                "time_et": None if pd.isna(game.game_time_et) else str(game.game_time_et),
+                "home": game.home,
+                "away": game.away,
+                "home_name": names.get(str(game.home), str(game.home)),
+                "away_name": names.get(str(game.away), str(game.away)),
+                "players": players,
+            }
+        )
+
+    last_state = pd.to_datetime(player_state["last_game_date"]).max().normalize()
+    team_state_date = pd.to_datetime(state["last_game_date"]).max().normalize()
+    stale_days = max(0, (start - last_state).days)
+    warning = None
+    if stale_days > 7:
+        warning = (
+            f"La foto de jugadores es del {last_state.date()} ({stale_days} dias). "
+            "Las proyecciones no incorporan partidos posteriores ni lesiones."
+        )
+    metrics = artifact.get("metrics", {})
+    return _ok(
+        {
+            "season": _season_for(start),
+            "start": start.strftime("%Y-%m-%d"),
+            "end": end.strftime("%Y-%m-%d"),
+            "count": len(payload_games),
+            "player_count": player_count,
+            "limit": limit,
+            "player_state_date": last_state.strftime("%Y-%m-%d"),
+            "team_state_date": team_state_date.strftime("%Y-%m-%d"),
+            "model_name": artifact.get("model_name"),
+            "trained_through": artifact.get("trained_through"),
+            "metrics": metrics.get("targets"),
+            "pra_metrics": metrics.get("pra"),
+            "validation": metrics.get("validation"),
+            "warning": warning,
+            "note": (
+                "Proyecciones por partido con un modelo Ridge entrenado con "
+                "game logs 2023-24 a 2026-27 y validado fuera de muestra en "
+                "2025-26. Usan medias móviles, descanso, localía y contexto "
+                "del rival; el contexto de equipo es la última foto disponible. "
+                "No incluyen lesiones, alineaciones ni cuotas de props; no es "
+                "consejo de apuestas."
+            ),
+            "games": payload_games,
         }
     )
 

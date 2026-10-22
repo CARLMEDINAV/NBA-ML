@@ -208,6 +208,53 @@ def test_players_current_season_uses_current_rosters():
     assert giannis["team"] == "MIA"
 
 
+def test_player_props_projections():
+    response = client.get(
+        "/api/player-props",
+        params={"today": "2026-10-22", "days": 3, "limit": 5},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] >= 1
+    assert payload["player_count"] >= payload["count"]
+    assert payload["model_name"] == "Ridge props"
+    assert payload["trained_through"] == "2026-27"
+    assert payload["pra_metrics"]["mae"] > 0
+    game = payload["games"][0]
+    assert len(game["players"]) <= 5
+    player = game["players"][0]
+    assert player["player_id"] > 0
+    assert player["gp"] >= 1
+    assert player["projected_pts"] >= 0
+    assert player["projected_reb"] >= 0
+    assert player["projected_ast"] >= 0
+    assert abs(
+        player["projected_pra"]
+        - (
+            player["projected_pts"]
+            + player["projected_reb"]
+            + player["projected_ast"]
+        )
+    ) < 1e-9
+    assert player["headshot_url"].startswith(
+        "https://cdn.nba.com/headshots/nba/latest/260x190/"
+    )
+
+
+def test_player_props_team_filter():
+    response = client.get(
+        "/api/player-props",
+        params={"today": "2026-10-22", "days": 7, "team": "PHI", "limit": 3},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] >= 1
+    for game in payload["games"]:
+        assert "PHI" in {game["home"], game["away"]}
+        for player in game["players"]:
+            assert player["team"] in {game["home"], game["away"]}
+
+
 def test_results_backtest_2025_26():
     response = client.get(
         "/api/results",
@@ -252,6 +299,8 @@ def test_static_frontend_is_served():
     assert "Análisis" in response.text
     assert "Handicap sugerido" in response.text
     assert "Jugadores" in response.text
+    assert "Props" in response.text
+    assert "Predicciones de jugadores" in response.text
 
 
 def test_static_javascript_includes_player_headshots():
@@ -259,3 +308,5 @@ def test_static_javascript_includes_player_headshots():
     assert response.status_code == 200
     assert "player-headshot" in response.text
     assert "cdn.nba.com/headshots" in response.text
+    assert "/api/player-props" in response.text
+    assert "loadProps" in response.text

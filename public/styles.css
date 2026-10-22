@@ -423,6 +423,30 @@ th.num { text-align: right; }
 }
 .player-name { min-width: 0; }
 
+.props-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 2px 2px 12px;
+  color: var(--faint);
+  font-size: 0.74rem;
+}
+.props-legend b {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+}
+.props-table { min-width: 880px; }
+.props-table .matchup { white-space: nowrap; }
+.props-table .matchup small {
+  display: block;
+  margin-top: 2px;
+  color: var(--faint);
+  font-size: 0.66rem;
+}
+.props-table .pra-value { color: #ffd8bd; font-weight: 800; }
+
 .pill {
   display: inline-flex;
   align-items: center;

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
-  <title>NBA Totals ML · over/under y PRA</title>
-  <meta name="description" content="Predicción del total de puntos NBA y estadísticas PRA con datos de stats.nba.com.">
+  <title>NBA Totals ML · over/under, hándicap y props</title>
+  <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos de stats.nba.com.">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -15,9 +15,11 @@
         <p class="eyebrow">stats.nba.com · temporada regular</p>
         <h1>NBA Totals <span>ML</span></h1>
         <p class="lead">
-          Total de puntos previsto, probabilidad empírica de over/under y
-          estadísticas <strong>PRA</strong> (PTS + REB + AST). Sin promesas de
-          rentabilidad: el valor está en el pipeline y la evaluación honesta.
+          Total de puntos previsto, probabilidad empírica de over/under,
+          hándicap estimado y props de jugadores: <strong>PTS</strong>,
+          <strong>REB</strong>, <strong>AST</strong> y <strong>PRA</strong>.
+          Sin promesas de rentabilidad: el valor está en el pipeline y la
+          evaluación honesta.
         </p>
       </div>
       <div class="hero-side">
@@ -47,6 +49,7 @@
       <button class="tab" role="tab" aria-selected="false" data-tab="analysis">Análisis</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="results">Resultados</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="players">Jugadores</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="props">Props</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="predict">Predicción</button>
     </nav>
 
@@ -248,6 +251,65 @@
           </table>
         </div>
         <p class="table-note" id="playersNote"></p>
+      </section>
+
+      <section id="tab-props" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Player props</p>
+            <h2>Predicciones de jugadores</h2>
+            <p class="muted">
+              Puntos, rebotes, asistencias y PRA proyectados para los próximos
+              partidos. Son estimaciones del modelo: no incluyen lesiones,
+              alineaciones ni cuotas de props.
+            </p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="propsRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row">
+          <label>Días
+            <select id="propsDays">
+              <option value="3">3 días</option>
+              <option value="7" selected>7 días</option>
+              <option value="14">14 días</option>
+            </select>
+          </label>
+          <label>Equipo
+            <select id="propsTeam"><option value="">Todos</option></select>
+          </label>
+          <label>Jugadores por partido
+            <select id="propsLimit">
+              <option value="5">5</option>
+              <option value="8" selected>8</option>
+              <option value="12">12</option>
+              <option value="20">20</option>
+            </select>
+          </label>
+          <span class="control-note" id="propsRange"></span>
+        </div>
+        <div id="propsNotice" class="notice" hidden></div>
+        <div class="summary-grid" id="propsSummary"></div>
+        <div class="props-legend">
+          <span><b>PTS</b> puntos</span>
+          <span><b>REB</b> rebotes</span>
+          <span><b>AST</b> asistencias</span>
+          <span><b>PRA</b> PTS + REB + AST</span>
+          <span><b>PJ</b> partidos jugados en 2026-27</span>
+        </div>
+        <div class="table-wrap">
+          <table class="props-table">
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Partido</th><th>Jugador</th><th>Equipo</th>
+                <th class="num">PTS</th><th class="num">REB</th>
+                <th class="num">AST</th><th class="num">PRA</th>
+                <th class="num">PJ</th>
+              </tr>
+            </thead>
+            <tbody id="propsBody"></tbody>
+          </table>
+        </div>
+        <p class="table-note" id="propsNote"></p>
       </section>
 
       <section id="tab-predict" class="tab-panel" role="tabpanel" hidden>
