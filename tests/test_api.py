@@ -178,6 +178,32 @@ def test_players_pra():
     assert player["pra"] == player["pts"] + player["reb"] + player["ast"]
 
 
+def test_players_current_season_uses_current_rosters():
+    current = client.get(
+        "/api/players",
+        params={"season": "2026-27", "mode": "pergame", "limit": 1, "min_gp": 1},
+    )
+    assert current.status_code == 200
+    assert current.json()["count"] > 250
+
+    response = client.get(
+        "/api/players",
+        params={
+            "season": "2026-27",
+            "mode": "pergame",
+            "limit": 5,
+            "min_gp": 1,
+            "q": "Giannis Antetokounmpo",
+        },
+    )
+    assert response.status_code == 200
+    players = response.json()["players"]
+    giannis = next(
+        player for player in players if player["player_name"] == "Giannis Antetokounmpo"
+    )
+    assert giannis["team"] == "MIA"
+
+
 def test_results_backtest_2025_26():
     response = client.get(
         "/api/results",

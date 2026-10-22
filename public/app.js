@@ -16,11 +16,11 @@ const state = {
   analysis: { days: 7, team: "" },
   results: { season: "2025-26", team: "", limit: 25 },
   players: {
-    season: "2025-26",
+    season: "2026-27",
     mode: "pergame",
     sort: "pra",
     team: "",
-    minGp: 10,
+    minGp: 1,
     limit: 25,
     q: "",
   },
@@ -526,7 +526,8 @@ async function loadPlayers() {
         </tr>`
       )
       .join("");
-    $("#playersNote").textContent = `PRA = PTS + REB + AST · ${data.count} jugadores con al menos ${state.players.minGp} partidos.`;
+    const rosterNote = data.season === "2025-26" ? "equipos de esa temporada" : "equipos actuales";
+    $("#playersNote").textContent = `PRA = PTS + REB + AST · ${data.season} · ${rosterNote} · ${data.count} jugadores con al menos ${state.players.minGp} partidos.`;
   } catch (error) {
     emptyRow(tbody, 9, "No se pudieron cargar los jugadores.");
     notice($("#playersNotice"), error.message, true);
@@ -650,10 +651,8 @@ function bindEvents() {
   $("#playersRefresh").addEventListener("click", loadPlayers);
   $("#playersSeason").addEventListener("change", (event) => {
     state.players.season = event.target.value;
-    if (event.target.value === "2026-27") {
-      state.players.minGp = 1;
-      $("#playersMinGp").value = "1";
-    }
+    state.players.minGp = event.target.value === "2025-26" ? 10 : 1;
+    $("#playersMinGp").value = String(state.players.minGp);
     loadPlayers();
   });
   $("#playersMode").addEventListener("change", (event) => {
@@ -714,13 +713,20 @@ async function init() {
       $("#resultsSeason").value = "2026-27";
     }
 
-    const dateInput = $("#predictDate");
-    dateInput.min = meta.min_date;
-    dateInput.value = meta.today >= meta.min_date ? meta.today : meta.min_date;
-
+    const playerSeasons = meta.players_seasons || [];
+    const playerSeason = playerSeasons.includes(meta.current_season)
+      ? meta.current_season
+      : playerSeasons[0] || "2025-26";
+    state.players.season = playerSeason;
+    state.players.minGp = playerSeason === "2025-26" ? 10 : 1;
+    $("#playersSeason").value = playerSeason;
     const playersMin = $("#playersMinGp");
     playersMin.max = "82";
     playersMin.value = String(state.players.minGp);
+
+    const dateInput = $("#predictDate");
+    dateInput.min = meta.min_date;
+    dateInput.value = meta.today >= meta.min_date ? meta.today : meta.min_date;
 
     // En el móvil, 7 días suponen demasiadas filas; empezamos con 3.
     if (window.matchMedia("(max-width: 640px)").matches) {

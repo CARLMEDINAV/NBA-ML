@@ -170,7 +170,9 @@ Seis pestañas:
   completo (con margen y hándicap out-of-sample).
 - **Jugadores**: ranking de puntos, rebotes, asistencias y **PRA** (PTS+REB+AST)
   por partido o en totales, con filtros por temporada, equipo, partidos jugados
-  y búsqueda por nombre. Incluye un gráfico de barras apiladas con el top 10.
+  y búsqueda por nombre. Por defecto abre **2026-27** con los equipos actuales;
+  la temporada **2025-26** es histórica y conserva el equipo que tenía cada
+  jugador en esa temporada. Incluye un gráfico de barras apiladas con el top 10.
   Los datos se cachean en `data/raw/player_stats_<temporada>_<modo>.csv`.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, margen, puntos proyectados, ganador
@@ -245,6 +247,10 @@ La app pública está pensada para abrirla desde el móvil:
 - **Persistencia:** un workflow de GitHub Actions
   (`.github/workflows/update-results.yml`) revisa el calendario cada 15 minutos
   y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
+- **Jugadores:** otro workflow (`.github/workflows/update-players.yml`) refresca
+  cada 6 horas `player_stats_2026_27_pergame.csv` y `_totals.csv`. Así los
+  equipos actuales (por ejemplo, Giannis en Miami) llegan a la web sin que
+  Vercel tenga que consultar `stats.nba.com`.
 
 Para probarla en local:
 
@@ -345,7 +351,7 @@ medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
 PRA y caché de jugadores, liquidación over/under y métricas de acierto, margen
-y hándicap, y un test de humo del dashboard y la API pública de Vercel (36 en
+y hándicap, y un test de humo del dashboard y la API pública de Vercel (37 en
 total).
 
 ---
