@@ -387,7 +387,8 @@ futuros no altera sus features.
   `python scripts/train_player_props.py`.
 - **Límites:** no hay lesiones, alineaciones, límite de minutos ni cuotas de
   props. Se muestran los jugadores con minutos en la temporada actual, ordenados
-  por PRA proyectado, no una rotación oficial.
+  por PRA proyectado, no una rotación oficial. Si un equipo aún no ha jugado en
+  2026-27, no aparece con proyecciones hasta que tenga minutos; la web lo avisa.
 
 ### Por qué Ridge
 

@@ -220,6 +220,7 @@ def test_player_props_projections():
     assert payload["model_name"] == "Ridge props"
     assert payload["trained_through"] == "2026-27"
     assert payload["pra_metrics"]["mae"] > 0
+    assert isinstance(payload["teams_without_games"], list)
     game = payload["games"][0]
     assert len(game["players"]) <= 5
     player = game["players"][0]

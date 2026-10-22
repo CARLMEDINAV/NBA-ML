@@ -1175,6 +1175,10 @@ def player_props(
         mask &= schedule["home"].isin(selected) | schedule["away"].isin(selected)
     games = schedule.loc[mask].sort_values(["game_date", "game_time_et", "game_id"])
 
+    available_teams = set(player_state["team"].astype(str).str.upper())
+    scheduled_teams = set(games["home"]) | set(games["away"])
+    teams_without_games = sorted(scheduled_teams - available_teams)
+
     names = _team_names(state)
     payload_games: list[dict[str, Any]] = []
     player_count = 0
@@ -1224,6 +1228,7 @@ def player_props(
             "limit": limit,
             "player_state_date": last_state.strftime("%Y-%m-%d"),
             "team_state_date": team_state_date.strftime("%Y-%m-%d"),
+            "teams_without_games": teams_without_games,
             "model_name": artifact.get("model_name"),
             "trained_through": artifact.get("trained_through"),
             "metrics": metrics.get("targets"),

@@ -605,7 +605,11 @@ async function loadProps(silent = false) {
       summaryCard("MAE PRA", num(praMetrics.mae), "validación 2025-26"),
       summaryCard("Modelo", data.model_name || "Ridge props", `hasta ${data.trained_through || "—"}`),
     ].join("");
-    notice($("#propsNotice"), data.warning || "");
+    const missingTeams = data.teams_without_games || [];
+    const missingTeamsText = missingTeams.length
+      ? `Aún no hay minutos en 2026-27 para ${missingTeams.join(", ")}; esos equipos aparecen sin proyecciones hasta que jueguen.`
+      : "";
+    notice($("#propsNotice"), [data.warning, missingTeamsText].filter(Boolean).join(" "));
 
     if (!players.length) {
       emptyRow(tbody, 9, "No hay jugadores para esos filtros.");
