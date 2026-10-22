@@ -71,6 +71,19 @@ function numericDate(value) {
   });
 }
 
+function initials(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
 function leanPill(lean) {
   const value = lean || "—";
   const cls = value === "OVER" ? "pill-over" : value === "UNDER" ? "pill-under" : "pill-neutral";
@@ -511,11 +524,28 @@ async function loadPlayers() {
       .join("");
 
     tbody.innerHTML = players
-      .map(
-        (player, index) => `
+      .map((player, index) => {
+        const headshotUrl =
+          player.headshot_url ||
+          (player.player_id
+            ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png`
+            : "");
+        return `
         <tr>
           <td class="na">${index + 1}</td>
-          <td><strong>${esc(player.player_name)}</strong></td>
+          <td>
+            <div class="player-cell">
+              <span class="player-avatar" aria-hidden="true">
+                <span class="player-initials">${esc(initials(player.player_name))}</span>
+                ${
+                  headshotUrl
+                    ? `<img class="player-headshot" src="${esc(headshotUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+                    : ""
+                }
+              </span>
+              <strong class="player-name">${esc(player.player_name)}</strong>
+            </div>
+          </td>
           <td>${esc(player.team)}</td>
           <td class="num">${num(player.gp, 0)}</td>
           <td class="num">${num(player.min)}</td>
@@ -523,8 +553,8 @@ async function loadPlayers() {
           <td class="num">${num(player.reb)}</td>
           <td class="num">${num(player.ast)}</td>
           <td class="num"><strong>${num(player.pra)}</strong></td>
-        </tr>`
-      )
+        </tr>`;
+      })
       .join("");
     const rosterNote = data.season === "2025-26" ? "equipos de esa temporada" : "equipos actuales";
     $("#playersNote").textContent = `PRA = PTS + REB + AST · ${data.season} · ${rosterNote} · ${data.count} jugadores con al menos ${state.players.minGp} partidos.`;

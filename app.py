@@ -1089,8 +1089,28 @@ def players(
     total = len(frame)
     frame = frame.sort_values([sort_key, "pra"], ascending=False)
 
-    fields = ["player_name", "team", "gp", "min", "pts", "reb", "ast", "pra"]
-    rows = frame.head(limit)[fields].to_dict(orient="records")
+    fields = [
+        "player_id",
+        "player_name",
+        "team",
+        "gp",
+        "min",
+        "pts",
+        "reb",
+        "ast",
+        "pra",
+    ]
+    rows = []
+    for record in frame.head(limit)[fields].to_dict(orient="records"):
+        player_id = record.get("player_id")
+        if player_id is not None and not pd.isna(player_id):
+            record["headshot_url"] = (
+                "https://cdn.nba.com/headshots/nba/latest/260x190/"
+                f"{int(player_id)}.png"
+            )
+        else:
+            record["headshot_url"] = None
+        rows.append(record)
     return _ok(
         {
             "season": season,

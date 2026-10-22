@@ -176,6 +176,10 @@ def test_players_pra():
     assert len(payload["players"]) == 5
     player = payload["players"][0]
     assert player["pra"] == player["pts"] + player["reb"] + player["ast"]
+    assert player["player_id"] > 0
+    assert player["headshot_url"].startswith(
+        "https://cdn.nba.com/headshots/nba/latest/260x190/"
+    )
 
 
 def test_players_current_season_uses_current_rosters():
@@ -247,3 +251,11 @@ def test_static_frontend_is_served():
     assert "Próximos" in response.text
     assert "Análisis" in response.text
     assert "Handicap sugerido" in response.text
+    assert "Jugadores" in response.text
+
+
+def test_static_javascript_includes_player_headshots():
+    response = client.get("/app.js")
+    assert response.status_code == 200
+    assert "player-headshot" in response.text
+    assert "cdn.nba.com/headshots" in response.text
