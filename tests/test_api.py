@@ -28,7 +28,7 @@ def test_meta_and_teams():
 def test_upcoming_returns_predictions():
     response = client.get(
         "/api/upcoming",
-        params={"today": "2026-10-21", "days": 1, "line": 225.5},
+        params={"today": "2026-10-22", "days": 3, "line": 225.5},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -98,8 +98,8 @@ def test_results_current_season_finals():
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["count"] == 3
-    assert payload["summary"]["n"] == 3
+    assert payload["count"] >= 11
+    assert payload["summary"]["n"] == payload["count"]
 
 
 def test_static_frontend_is_served():

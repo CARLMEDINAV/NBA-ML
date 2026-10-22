@@ -184,19 +184,22 @@ function setLine(value) {
   }
 }
 
-async function loadUpcoming() {
+async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
-  loadingRow(tbody, 7);
-  setBusy(button, true);
-  notice($("#upcomingNotice"), "");
-  $("#upcomingSummary").innerHTML = "";
-  $("#upcomingNote").textContent = "";
+  if (!silent) {
+    loadingRow(tbody, 7);
+    setBusy(button, true);
+    notice($("#upcomingNotice"), "");
+    $("#upcomingSummary").innerHTML = "";
+    $("#upcomingNote").textContent = "";
+  }
   try {
     const data = await api("/api/upcoming", {
       days: state.upcoming.days,
       team: state.upcoming.team,
       line: state.line,
+      live: 1,
     });
     state.loaded.upcoming = true;
     $("#upcomingRange").textContent = `${data.start} → ${data.end}`;
@@ -232,31 +235,36 @@ async function loadUpcoming() {
         </tr>`
       )
       .join("");
-    $("#upcomingNote").textContent = `${data.count} partidos · línea ${num(data.line, 1)} · P(over) calculada con los residuos fuera de muestra.`;
+    $("#upcomingNote").textContent = `${data.count} partidos · línea ${num(data.line, 1)} · P(over) calculada con los residuos fuera de muestra.${data.live_updated ? ` · actualizado ${data.live_updated}` : ""}`;
     notice($("#upcomingNotice"), data.warning || "");
   } catch (error) {
-    emptyRow(tbody, 7, "No se pudieron cargar los próximos partidos.");
-    notice($("#upcomingNotice"), error.message, true);
-    showToast(error.message);
+    if (!silent) {
+      emptyRow(tbody, 7, "No se pudieron cargar los próximos partidos.");
+      notice($("#upcomingNotice"), error.message, true);
+      showToast(error.message);
+    }
   } finally {
     setBusy(button, false);
   }
 }
 
-async function loadResults() {
+async function loadResults(silent = false) {
   const tbody = $("#resultsBody");
   const button = $("#resultsRefresh");
-  loadingRow(tbody, 9);
-  setBusy(button, true);
-  notice($("#resultsNotice"), "");
-  $("#resultsSummary").innerHTML = "";
-  $("#resultsNote").textContent = "";
+  if (!silent) {
+    loadingRow(tbody, 9);
+    setBusy(button, true);
+    notice($("#resultsNotice"), "");
+    $("#resultsSummary").innerHTML = "";
+    $("#resultsNote").textContent = "";
+  }
   try {
     const data = await api("/api/results", {
       season: state.results.season,
       team: state.results.team,
       limit: state.results.limit,
       line: state.line,
+      live: state.results.season === state.meta?.current_season ? 1 : 0,
     });
     state.loaded.results = true;
     const summary = data.summary || {};
@@ -292,11 +300,13 @@ async function loadResults() {
         </tr>`;
       })
       .join("");
-    $("#resultsNote").textContent = `${data.source} · ${data.count} partidos · línea de referencia ${num(data.line, 1)}. ${data.caveat || ""}`;
+    $("#resultsNote").textContent = `${data.source} · ${data.count} partidos · línea de referencia ${num(data.line, 1)}.${data.live_updated ? ` Actualizado ${data.live_updated}.` : ""} ${data.caveat || ""}`;
   } catch (error) {
-    emptyRow(tbody, 9, "No se pudieron cargar los resultados.");
-    notice($("#resultsNotice"), error.message, true);
-    showToast(error.message);
+    if (!silent) {
+      emptyRow(tbody, 9, "No se pudieron cargar los resultados.");
+      notice($("#resultsNotice"), error.message, true);
+      showToast(error.message);
+    }
   } finally {
     setBusy(button, false);
   }
@@ -449,8 +459,8 @@ function activateTab(name) {
     panel.hidden = !active;
     panel.classList.toggle("is-active", active);
   });
-  if (name === "upcoming" && !state.loaded.upcoming) loadUpcoming();
-  if (name === "results" && !state.loaded.results) loadResults();
+  if (name === "upcoming") loadUpcoming(state.loaded.upcoming);
+  if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
 }
 
@@ -528,6 +538,13 @@ function bindEvents() {
   });
 
   $("#predictForm").addEventListener("submit", submitPrediction);
+
+  // Refresco silencioso: la NBA actualiza el marcador y los finales aparecen solos.
+  window.setInterval(() => {
+    if (document.visibilityState !== "visible") return;
+    if (state.active === "upcoming") loadUpcoming(true);
+    if (state.active === "results") loadResults(true);
+  }, 60000);
 }
 
 async function init() {
@@ -540,6 +557,11 @@ async function init() {
     const modelName = String(meta.model_name || "Ridge");
     $("#statusBadge").textContent = `${modelName.charAt(0).toUpperCase()}${modelName.slice(1)} · hasta ${meta.trained_through}`;
     populateTeams(meta);
+
+    if (meta.current_season === "2026-27") {
+      state.results.season = "2026-27";
+      $("#resultsSeason").value = "2026-27";
+    }
 
     const dateInput = $("#predictDate");
     dateInput.min = meta.min_date;

@@ -2,6 +2,7 @@
 # Para el proyecto completo (pipeline + dashboard) usa:
 #   pip install -e ".[dev,app,pipeline]"
 fastapi>=0.115,<1
+httpx>=0.27
 joblib>=1.4
 numpy>=1.26,<2.5
 pandas>=2.1,<3

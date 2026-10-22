@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import math
 import sys
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
+import httpx
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
@@ -40,6 +43,19 @@ PLAYER_MODES = {"pergame": "pergame", "totals": "totals"}
 SORT_COLUMNS = {"pra", "pts", "reb", "ast", "min", "gp"}
 LEAN_OVER = 0.55
 LEAN_UNDER = 0.45
+NBA_ET = ZoneInfo("America/New_York")
+NBA_STATS_SCOREBOARD = "https://stats.nba.com/stats/scoreboardv3"
+LIVE_TIMEOUT = 9.0
+LIVE_CACHE_SECONDS = 25
+LIVE_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
+ESPN_TO_NBA = {
+    "GS": "GSW",
+    "NO": "NOP",
+    "NY": "NYK",
+    "SA": "SAS",
+    "UTAH": "UTA",
+    "WSH": "WAS",
+}
 
 app = FastAPI(
     title="NBA ML API",
@@ -168,7 +184,7 @@ def _ok(payload: dict[str, Any]) -> JSONResponse:
 
 def _today(value: str | None = None) -> pd.Timestamp:
     if not value:
-        return pd.Timestamp.today().normalize()
+        return _et_today()
     try:
         return pd.Timestamp(value).normalize()
     except (TypeError, ValueError) as error:
@@ -180,6 +196,200 @@ def _today(value: str | None = None) -> pd.Timestamp:
 def _season_for(day: pd.Timestamp) -> str:
     year = day.year if day.month >= 9 else day.year - 1
     return f"{year}-{str(year + 1)[-2:]}"
+
+
+def _et_today() -> pd.Timestamp:
+    """Fecha NBA: usa hora del Este, no la del servidor (Vercel corre en UTC)."""
+    return pd.Timestamp.now(tz=NBA_ET).normalize().tz_localize(None)
+
+
+def _nba_abbreviation(value: str) -> str:
+    text = str(value or "").upper().strip()
+    return ESPN_TO_NBA.get(text, text)
+
+
+def _fetch_espn_scoreboard(
+    day: pd.Timestamp, schedule: pd.DataFrame
+) -> pd.DataFrame:
+    """Marcadores de ESPN; se usan solo para actualizar la tabla de resultados."""
+    columns = [
+        "game_id",
+        "status",
+        "status_text",
+        "home_score",
+        "away_score",
+        "total_points",
+    ]
+    url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    try:
+        response = httpx.get(
+            url,
+            params={"dates": day.strftime("%Y%m%d")},
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; nba-ml/0.2)",
+                "Accept": "application/json",
+            },
+            timeout=LIVE_TIMEOUT,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        events = response.json().get("events", [])
+    except Exception:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, Any]] = []
+    for event in events:
+        competitions = event.get("competitions") or []
+        if not competitions:
+            continue
+        competitors = competitions[0].get("competitors") or []
+        home = next(
+            (item for item in competitors if item.get("homeAway") == "home"), None
+        )
+        away = next(
+            (item for item in competitors if item.get("homeAway") == "away"), None
+        )
+        if not home or not away:
+            continue
+        home_team = _nba_abbreviation(home.get("team", {}).get("abbreviation"))
+        away_team = _nba_abbreviation(away.get("team", {}).get("abbreviation"))
+        try:
+            event_day = (
+                pd.Timestamp(event["date"]).tz_convert(NBA_ET).normalize().tz_localize(None)
+            )
+        except Exception:
+            continue
+        candidates = schedule[
+            schedule["game_date"].eq(event_day)
+            & schedule["home"].eq(home_team)
+            & schedule["away"].eq(away_team)
+        ]
+        if candidates.empty:
+            continue
+
+        status_info = event.get("status", {}).get("type", {})
+        state = str(status_info.get("state") or "")
+        completed = bool(status_info.get("completed"))
+        status = 3 if completed or state == "post" else (2 if state == "in" else 1)
+        home_score = pd.to_numeric(home.get("score"), errors="coerce")
+        away_score = pd.to_numeric(away.get("score"), errors="coerce")
+        total = None
+        if status == 3 and pd.notna(home_score) and pd.notna(away_score):
+            total = float(home_score) + float(away_score)
+        rows.append(
+            {
+                "game_id": str(candidates.iloc[0]["game_id"]),
+                "status": status,
+                "status_text": str(
+                    status_info.get("shortDetail") or status_info.get("description") or ""
+                ).strip(),
+                "home_score": home_score,
+                "away_score": away_score,
+                "total_points": total,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _fetch_nba_scoreboard(day: pd.Timestamp) -> pd.DataFrame:
+    """Resultados en vivo de stats.nba.com para una fecha NBA (sin nba_api)."""
+    columns = [
+        "game_id",
+        "status",
+        "status_text",
+        "home_score",
+        "away_score",
+        "total_points",
+    ]
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.nba.com/",
+        "Origin": "https://www.nba.com",
+    }
+    params = {"GameDate": day.strftime("%m/%d/%Y"), "LeagueID": "00"}
+
+    try:
+        response = httpx.get(
+            NBA_STATS_SCOREBOARD,
+            params=params,
+            headers=headers,
+            timeout=LIVE_TIMEOUT,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        games = response.json()["scoreboard"]["games"]
+    except Exception:
+        # La web debe seguir funcionando con el calendario cacheado si la NBA falla.
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, Any]] = []
+    for game in games:
+        status = int(game.get("gameStatus") or 1)
+        home_score = pd.to_numeric(game.get("homeTeam", {}).get("score"), errors="coerce")
+        away_score = pd.to_numeric(game.get("awayTeam", {}).get("score"), errors="coerce")
+        total = None
+        if status == 3 and pd.notna(home_score) and pd.notna(away_score):
+            total = float(home_score) + float(away_score)
+        rows.append(
+            {
+                "game_id": str(game.get("gameId")),
+                "status": status,
+                "status_text": str(game.get("gameStatusText") or "").strip(),
+                "home_score": home_score,
+                "away_score": away_score,
+                "total_points": total,
+            }
+        )
+
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _fetch_scoreboard(day: pd.Timestamp, schedule: pd.DataFrame) -> pd.DataFrame:
+    """ESPN primero (Vercel lo alcanza de forma fiable) y stats.nba.com después."""
+    key = day.strftime("%Y-%m-%d")
+    cached = LIVE_CACHE.get(key)
+    if cached and time.time() - cached[0] < LIVE_CACHE_SECONDS:
+        return cached[1].copy()
+
+    frame = _fetch_espn_scoreboard(day, schedule)
+    if frame.empty:
+        frame = _fetch_nba_scoreboard(day)
+    LIVE_CACHE[key] = (time.time(), frame.copy())
+    return frame
+
+
+def _live_dates(date: str | None = None) -> list[pd.Timestamp]:
+    if date:
+        return [_today(date)]
+    today = _et_today()
+    # Incluye el dia anterior: los partidos del Oeste pueden acabar tras medianoche ET.
+    return [today - pd.Timedelta(days=1), today]
+
+
+def _merge_live(
+    schedule: pd.DataFrame, dates: list[pd.Timestamp]
+) -> tuple[pd.DataFrame, str | None]:
+    frames = [_fetch_scoreboard(day, schedule) for day in dates]
+    frames = [frame for frame in frames if not frame.empty]
+    if not frames:
+        return schedule, None
+
+    live = pd.concat(frames, ignore_index=True)
+    live = live.drop_duplicates(subset=["game_id"], keep="last").set_index("game_id")
+    merged = schedule.copy()
+    for column in ["status", "status_text", "home_score", "away_score", "total_points"]:
+        if column not in live.columns:
+            continue
+        mapped = merged["game_id"].map(live[column])
+        merged[column] = mapped.where(mapped.notna(), merged[column])
+    updated = pd.Timestamp.now(tz=NBA_ET).strftime("%Y-%m-%d %H:%M ET")
+    return merged, updated
 
 
 def _lean(probability: float | None) -> str:
@@ -266,12 +476,16 @@ def upcoming(
     line: float = Query(225.5, ge=100, le=350),
     team: str | None = None,
     today: str | None = None,
+    live: bool = False,
 ) -> JSONResponse:
     artifact = _artifact()
     state = _state()
     schedule = _schedule()
     start = _today(today)
     end = start + pd.Timedelta(days=days - 1)
+    live_updated = None
+    if live:
+        schedule, live_updated = _merge_live(schedule, _live_dates(today))
 
     dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
     mask = dates.between(start, end) & schedule["status"].eq(1)
@@ -335,6 +549,7 @@ def upcoming(
             "count": len(rows),
             "skipped": skipped,
             "warning": warning,
+            "live_updated": live_updated,
             "games": rows,
         }
     )
@@ -424,15 +639,19 @@ def results(
     limit: int = Query(25, ge=1, le=200),
     team: str | None = None,
     today: str | None = None,
+    live: bool = False,
 ) -> JSONResponse:
     artifact = _artifact()
     day = _today(today)
+    live_updated = None
 
     if season == "2025-26":
         frame = _test_predictions()
         source = "Predicciones fuera de muestra de 2025-26"
     elif season == _season_for(day):
         schedule = _schedule()
+        if live:
+            schedule, live_updated = _merge_live(schedule, _live_dates(today))
         finals = schedule[
             schedule["status"].eq(3) & schedule["total_points"].notna()
         ].copy()
@@ -461,6 +680,8 @@ def results(
             )
         frame = pd.DataFrame(rows)
         source = f"Partidos finalizados de {season}"
+        if live_updated:
+            source += " · resultados en vivo"
     else:
         raise HTTPException(
             status_code=404, detail=f"Temporada no disponible: {season}"
@@ -477,6 +698,7 @@ def results(
                     pd.DataFrame(columns=["total_points", "predicted_total", "hit"])
                 ),
                 "games": [],
+                "live_updated": live_updated,
             }
         )
 
@@ -517,6 +739,7 @@ def results(
             "count": int(len(frame)),
             "summary": summary,
             "games": games,
+            "live_updated": live_updated,
             "caveat": (
                 "La linea es la referencia introducida por el usuario. nba_api no "
                 "proporciona lineas historicas de casas de apuestas, asi que esto "

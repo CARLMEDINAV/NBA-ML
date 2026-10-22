@@ -209,6 +209,10 @@ La app pública está pensada para abrirla desde el móvil:
 - **Datos:** `artifacts/` contiene una foto del modelo, el estado de los
   equipos, el calendario, las estadísticas de jugadores y el backtest. Vercel
   no escribe en disco ni conserva la caché de `data/`.
+- **Resultados en vivo:** al abrir la pestaña Resultados (temporada en curso),
+  la API consulta el marcador de la NBA (`stats.nba.com`) con ESPN como
+  respaldo y fusiona los partidos finalizados. La página se refresca sola cada
+  60 segundos; si ambos fallan, usa el calendario cacheado.
 
 Para probarla en local:
 
