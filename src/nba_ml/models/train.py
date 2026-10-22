@@ -319,6 +319,12 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
         residuals = test_actual - test_predictions
     sigma = float(np.std(residuals, ddof=1)) if residuals.size else float("nan")
 
+    test_table = test_frame[
+        ["game_id", "home_team", "away_team", "home_margin"]
+    ].copy()
+    test_table["predicted_margin"] = test_predictions
+    test_table = test_table.rename(columns={"home_margin": "actual_margin"})
+
     production = make_model("ridge", {"model__alpha": alpha})
     production.fit(dataset[FEATURES], dataset[MARGIN_TARGET])
     return {
@@ -326,6 +332,7 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
         "residuals": residuals,
         "sigma": sigma,
         "test_metrics": test_metrics,
+        "test_predictions": test_table,
         "walk_forward": walk_rows,
         "alpha": alpha,
     }
@@ -591,10 +598,18 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
     ].copy()
     predictions_output["predicted_total"] = test_predictions
     predictions_output["error"] = predictions_output[TARGET] - predictions_output["predicted_total"]
-    predictions_output.to_csv(REPORTS_DIR / "test_predictions.csv", index=False, encoding="utf-8")
 
     # Modelo auxiliar de margen para el hándicap sugerido.
     margin = train_margin_model(dataset)
+    margin_table = margin["test_predictions"][
+        ["game_id", "predicted_margin", "actual_margin"]
+    ]
+    predictions_output = predictions_output.merge(
+        margin_table, on="game_id", how="left"
+    )
+    predictions_output.to_csv(
+        REPORTS_DIR / "test_predictions.csv", index=False, encoding="utf-8"
+    )
 
     # Artefacto final para produccion: todas las temporadas disponibles.
     production_model = make_model(best_name, best_params)

@@ -1114,6 +1114,7 @@ def results(
     artifact = _artifact()
     day = _today(today)
     live_updated = None
+    names = _team_names(_state())
 
     if season == "2025-26":
         frame = _test_predictions()
@@ -1126,7 +1127,6 @@ def results(
             schedule["status"].eq(3) & schedule["total_points"].notna()
         ].copy()
         state = _state()
-        names = _team_names(state)
         rows: list[dict[str, Any]] = []
         for game in finals.itertuples(index=False):
             try:
@@ -1206,6 +1206,57 @@ def results(
     games: list[dict[str, Any]] = []
     for row in view.itertuples(index=False):
         hit = None if pd.isna(row.hit) else int(float(row.hit) == 1.0)
+        raw_home_name = getattr(row, "home_name", None)
+        raw_away_name = getattr(row, "away_name", None)
+        home_name = (
+            str(raw_home_name)
+            if raw_home_name is not None and not pd.isna(raw_home_name)
+            else names.get(str(row.home_team), str(row.home_team))
+        )
+        away_name = (
+            str(raw_away_name)
+            if raw_away_name is not None and not pd.isna(raw_away_name)
+            else names.get(str(row.away_team), str(row.away_team))
+        )
+
+        predicted_margin = getattr(row, "predicted_margin", None)
+        if predicted_margin is not None and not pd.isna(predicted_margin):
+            predicted_margin = float(predicted_margin)
+            favorite = home_name if predicted_margin >= 0 else away_name
+            handicap_line = round(abs(predicted_margin) * 2) / 2
+            model_handicap = (
+                f"{favorite} -{handicap_line:.1f}"
+                if handicap_line >= 0.5
+                else "Pick'em"
+            )
+            possible_winner = favorite
+        else:
+            predicted_margin = None
+            model_handicap = getattr(row, "model_handicap", None)
+            possible_winner = getattr(row, "possible_winner", None)
+
+        actual_margin = getattr(row, "actual_margin", None)
+        if actual_margin is not None and not pd.isna(actual_margin):
+            actual_margin = float(actual_margin)
+        else:
+            actual_margin = None
+
+        margin_error = getattr(row, "margin_error", None)
+        if (
+            margin_error is None
+            and predicted_margin is not None
+            and actual_margin is not None
+        ):
+            margin_error = predicted_margin - actual_margin
+        if margin_error is not None and not pd.isna(margin_error):
+            margin_error = float(margin_error)
+        else:
+            margin_error = None
+
+        actual_winner = getattr(row, "actual_winner", None)
+        if not actual_winner and actual_margin is not None:
+            actual_winner = home_name if actual_margin >= 0 else away_name
+
         games.append(
             {
                 "game_date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
@@ -1219,14 +1270,14 @@ def results(
                 "actual_result": row.actual_result,
                 "model_lean": row.model_lean,
                 "hit": hit,
-                "home_name": getattr(row, "home_name", row.home_team),
-                "away_name": getattr(row, "away_name", row.away_team),
-                "predicted_margin": getattr(row, "predicted_margin", None),
-                "actual_margin": getattr(row, "actual_margin", None),
-                "margin_error": getattr(row, "margin_error", None),
-                "possible_winner": getattr(row, "possible_winner", None),
-                "model_handicap": getattr(row, "model_handicap", None),
-                "actual_winner": getattr(row, "actual_winner", None),
+                "home_name": home_name,
+                "away_name": away_name,
+                "predicted_margin": predicted_margin,
+                "actual_margin": actual_margin,
+                "margin_error": margin_error,
+                "possible_winner": possible_winner,
+                "model_handicap": model_handicap,
+                "actual_winner": actual_winner,
             }
         )
 

@@ -188,7 +188,13 @@ def test_results_backtest_2025_26():
     assert payload["count"] == 1225
     assert payload["summary"]["n"] == 1225
     assert len(payload["games"]) == 5
-    assert payload["games"][0]["actual_result"] in {"OVER", "UNDER", "PUSH"}
+    game = payload["games"][0]
+    assert game["actual_result"] in {"OVER", "UNDER", "PUSH"}
+    assert game["predicted_margin"] is not None
+    assert game["actual_margin"] is not None
+    assert game["model_handicap"]
+    assert game["possible_winner"]
+    assert game["margin_error"] is not None
 
 
 def test_results_current_season_finals():

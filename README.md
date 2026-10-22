@@ -164,9 +164,10 @@ Seis pestañas:
   en `data/raw/schedule_<temporada>.csv`; el botón **Actualizar** lo vuelve a
   descargar.
 - **Resultados**: partidos ya jugados con total real, predicción, error, línea
-  de referencia, resultado over/under y acierto del modelo. Incluye MAE, sesgo,
-  Brier y un gráfico de predicción vs total real. Por defecto muestra la
-  temporada en curso; cambia a 2025-26 para el backtest completo.
+  de referencia, resultado over/under, margen real, hándicap del modelo y
+  acierto. Incluye MAE, sesgo, Brier y un gráfico de predicción vs total real.
+  Por defecto muestra la temporada en curso; cambia a 2025-26 para el backtest
+  completo (con margen y hándicap out-of-sample).
 - **Jugadores**: ranking de puntos, rebotes, asistencias y **PRA** (PTS+REB+AST)
   por partido o en totales, con filtros por temporada, equipo, partidos jugados
   y búsqueda por nombre. Incluye un gráfico de barras apiladas con el top 10.
