@@ -10,6 +10,8 @@ import shutil
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -17,6 +19,7 @@ from nba_ml.data.players import load_player_stats, player_stats_path  # noqa: E4
 
 SEASON = "2026-27"
 MODES = {"PerGame": "pergame", "Totals": "totals"}
+BIO = ROOT / "artifacts" / "player_bio.csv"
 
 
 def _destinations() -> list[Path]:
@@ -24,6 +27,59 @@ def _destinations() -> list[Path]:
         ROOT / "artifacts" / f"player_stats_{SEASON.replace('-', '_')}_{suffix}.csv"
         for suffix in MODES.values()
     ]
+
+
+def _update_bio() -> None:
+    """Altura actual para estimar el rol defensivo sin depender de posiciones."""
+    try:
+        from nba_api.stats.endpoints import leaguedashplayerbiostats
+
+        raw = leaguedashplayerbiostats.LeagueDashPlayerBioStats(
+            season=SEASON,
+            season_type_all_star="Regular Season",
+            timeout=120,
+        ).get_data_frames()[0]
+    except Exception as error:  # noqa: BLE001 - no bloquear las estadisticas
+        print(f"::warning::No se pudo actualizar {BIO.name}: {error}")
+        return
+
+    frame = raw.rename(
+        columns={
+            "PLAYER_ID": "player_id",
+            "PLAYER_NAME": "player_name",
+            "TEAM_ABBREVIATION": "team",
+            "PLAYER_HEIGHT_INCHES": "height_inches",
+            "PLAYER_WEIGHT": "weight",
+        }
+    )
+    required = {"player_id", "player_name", "team", "height_inches", "weight"}
+    if not required.issubset(frame.columns):
+        print(f"::warning::{BIO.name}: faltan columnas de biografia")
+        return
+    frame = frame[
+        ["player_id", "player_name", "team", "height_inches", "weight"]
+    ].copy()
+    frame["player_id"] = pd.to_numeric(frame["player_id"], errors="coerce")
+    frame["height_inches"] = pd.to_numeric(
+        frame["height_inches"], errors="coerce"
+    )
+    frame["weight"] = pd.to_numeric(frame["weight"], errors="coerce")
+    frame["player_name"] = frame["player_name"].fillna("").astype(str).str.strip()
+    frame["team"] = (
+        frame["team"].fillna("").astype(str).str.upper().str.strip()
+    )
+    frame = frame.dropna(subset=["player_id", "height_inches"])
+    frame = frame[
+        frame["player_name"].ne("")
+        & frame["team"].ne("")
+        & frame["height_inches"].gt(0)
+    ].copy()
+    frame["player_id"] = frame["player_id"].astype(int)
+    frame = frame.sort_values("player_id")
+    temporary = BIO.with_suffix(".tmp")
+    frame.to_csv(temporary, index=False)
+    temporary.replace(BIO)
+    print(f"{BIO.relative_to(ROOT)}: {len(frame)} jugadores")
 
 
 def main() -> int:
@@ -57,6 +113,7 @@ def main() -> int:
             f"{destination.relative_to(ROOT)}: {len(frame)} jugadores, "
             f"{int(frame['gp'].max())} partidos maximos"
         )
+    _update_bio()
     return 0
 
 

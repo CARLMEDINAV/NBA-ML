@@ -308,6 +308,18 @@ def test_player_card_detail():
     assert defender["player_name"]
     assert defender["matchup_min_pg"] is not None
     assert defender["player_pts_pg"] is not None
+    likely = payload["likely_defender"]
+    assert likely["team"] == payload["upcoming"]["opponent"]
+    assert likely["player_name"]
+    assert likely["role"] in {"big", "guard", "wing"}
+    assert likely["basis"] in {"historial", "rol"}
+    assert likely["confidence"] in {"media", "baja"}
+    assert likely["headshot_url"].startswith(
+        "https://cdn.nba.com/headshots/nba/latest/260x190/"
+    )
+    if likely["is_historical"]:
+        assert likely["matchup_gp"] >= 1
+        assert likely["matchup_min_pg"] is not None
     assert payload["teammates"]
     assert payload["note"]
 
@@ -366,6 +378,7 @@ def test_static_frontend_is_served():
     assert 'id="playerDetail"' in response.text
     assert 'id="pdEfficiency"' in response.text
     assert 'id="pdH2H"' in response.text
+    assert 'id="pdLikelyDefender"' in response.text
     assert 'id="pdDefenders"' in response.text
     assert "VER ANÁLISIS DEL PARTIDO" in response.text
 

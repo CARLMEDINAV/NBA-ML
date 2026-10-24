@@ -77,9 +77,9 @@ jugadores con minutos en 2026-27 ordenados por PRA proyectado. Al hacer clic en
 un jugador se abre una ficha con sus últimos partidos, la línea ajustable, el
 acierto histórico, el próximo partido y sus compañeros. Incluye minutos,
 efectividad de tiro (FG%, 3P%, FT%, TS% y eFG%), uso estimado, H2H contra el
-próximo rival y los defensores que más lo marcaron según los datos de matchup
-de la NBA. Las barras comparan cada partido con la línea; la fila **PRÓX.** es
-una proyección, no un resultado.
+próximo rival, un posible defensor para ese partido y los defensores que más lo
+marcaron según los datos de matchup de la NBA. Las barras comparan cada partido
+con la línea; la fila **PRÓX.** es una proyección, no un resultado.
 
 ---
 
@@ -123,6 +123,7 @@ nba-ml/
 ├── artifacts/player_state.csv # foto reciente de jugadores para props
 ├── artifacts/player_game_logs_recent.csv # hasta 40 partidos por jugador (ficha/H2H)
 ├── artifacts/player_defenders_recent.csv # defensores con más minutos de matchup
+├── artifacts/player_bio.csv # altura y peso actual para estimar el rol defensivo
 └── reports/                  # metrics.md, eda.md, figuras, predicciones test
 ```
 
@@ -211,11 +212,12 @@ y **Props**; estas son las secciones principales:
   jugadores por partido. Al abrir un jugador se muestra su ficha con los últimos
   partidos, línea ajustable, acierto histórico, próximo partido y compañeros.
   Añade minutos como estadística seleccionable, FG%, 3P%, FT%, TS%, eFG% y uso
-  estimado, un resumen H2H contra el próximo rival y los defensores que más
-  minutos de matchup acumularon. El uso se estima con los totales del equipo
-  en cada box score; los defensores son datos de matchup de la NBA, no una
-  asignación defensiva del próximo partido. No incluye lesiones, alineaciones
-  ni cuotas de props.
+  estimado, un resumen H2H contra el próximo rival y un posible defensor para
+  ese partido. El posible defensor se elige por historial de matchup si el rival
+  actual tiene un defensor con muestra; si no, por altura, rol y minutos. Es una
+  estimación, no una asignación oficial. También se listan los defensores que
+  más minutos de matchup acumularon. El uso se estima con los totales del equipo
+  en cada box score; no incluye lesiones, alineaciones ni cuotas de props.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, margen, puntos proyectados, ganador
   probable, hándicap del modelo, comparación de Elo/forma/descanso y gráfico de
@@ -297,10 +299,11 @@ La app pública está pensada para abrirla desde el móvil:
 - **Jugadores y props:** otro workflow
   (`.github/workflows/update-players.yml`) refresca cada 6 horas
   `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv`,
-  `player_game_logs_recent.csv` y `player_defenders_recent.csv`. Así los equipos
-  actuales (por ejemplo, Giannis en Miami), las medias móviles de los props, los
-  últimos partidos, la efectividad/uso y los defensores de cada ficha llegan a
-  la web sin que Vercel tenga que consultar `stats.nba.com`. Los artefactos de
+  `player_game_logs_recent.csv`, `player_defenders_recent.csv` y
+  `player_bio.csv`. Así los equipos actuales (por ejemplo, Giannis en Miami),
+  las medias móviles de los props, los últimos partidos, la efectividad/uso, el
+  posible defensor y el historial de defensores de cada ficha llegan a la web
+  sin que Vercel tenga que consultar `stats.nba.com`. Los artefactos de
   historial y defensores conservan los datos anteriores si la descarga falla.
 
 Para probarla en local:

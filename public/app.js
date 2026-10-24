@@ -1235,9 +1235,95 @@ function renderDetailH2H(data) {
 
 function renderDetailDefenders(data) {
   const defenders = data.defenders || [];
-  $("#pdDefendersTeam").textContent = "muestra reciente";
-  $("#pdDefenders").innerHTML = defenders.length
-    ? defenders
+  const likely = data.likely_defender;
+  const opponent = data.upcoming?.opponent;
+  $("#pdDefendersTeam").textContent = opponent
+    ? `${data.upcoming.is_home ? "vs" : "@"} ${opponent}`
+    : "";
+
+  const likelyContainer = $("#pdLikelyDefender");
+  if (!likely) {
+    likelyContainer.innerHTML = `<div class="pd-empty">${
+      opponent
+        ? "Sin defensor probable identificado para el próximo partido."
+        : "Sin próximo partido para estimar un defensor."
+    }</div>`;
+  } else {
+    const roleLabels = { big: "interior", guard: "perímetro", wing: "alero" };
+    const roleLabel = roleLabels[likely.role] || "rol";
+    const historical = Boolean(likely.is_historical);
+    const confidenceLabel =
+      likely.confidence === "media" ? "Conf. media" : "Conf. baja";
+    const confidenceClass =
+      likely.confidence === "media" ? "is-medium" : "is-low";
+    let stats;
+    if (historical) {
+      stats = [
+        ["PTS perm.", likely.player_pts_pg],
+        ["MIN/part.", likely.matchup_min_pg],
+        ["FG% perm.", likely.fg_pct, true],
+      ];
+    } else if (likely.role === "guard") {
+      stats = [
+        ["MIN", likely.min],
+        ["AST", likely.ast],
+        ["STL", likely.stl],
+      ];
+    } else if (likely.role === "big") {
+      stats = [
+        ["MIN", likely.min],
+        ["REB", likely.reb],
+        ["BLK", likely.blk],
+      ];
+    } else {
+      stats = [
+        ["MIN", likely.min],
+        ["PTS", likely.pts],
+        ["STL", likely.stl],
+      ];
+    }
+    const reason = historical
+      ? `Basado en ${num(likely.matchup_gp, 0)} PJ de matchup (${num(likely.matchup_min)} min totales). ${
+          Number(likely.matchup_min || 0) < 10 ? "Muestra corta." : "Muestra limitada."
+        }`
+      : `Estimado por rol (${roleLabel}) y minutos. No es una asignación oficial.`;
+    likelyContainer.innerHTML = `
+      <div class="pd-likely">
+        <div class="pd-likely-top">
+          <span class="pd-likely-avatar" aria-hidden="true">
+            <span>${esc(initials(likely.player_name))}</span>
+            ${
+              likely.headshot_url
+                ? `<img src="${esc(likely.headshot_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+                : ""
+            }
+          </span>
+          <span class="pd-likely-main">
+            <strong>${esc(likely.player_name)}</strong>
+            <small>${esc(likely.team)} · ${historical ? "historial de matchup" : `rol ${roleLabel}`}</small>
+          </span>
+          <span class="pd-likely-badge ${confidenceClass}">${confidenceLabel}</span>
+        </div>
+        <div class="pd-likely-stats">
+          ${stats
+            .map(
+              ([label, value, isPct]) => `
+                <span class="pd-likely-stat">
+                  <small>${label}</small>
+                  <b>${isPct ? pct(value) : num(value)}</b>
+                </span>`
+            )
+            .join("")}
+        </div>
+        <div class="pd-likely-reason">${reason}</div>
+      </div>`;
+  }
+
+  const historicalDefenders = defenders.filter(
+    (defender) => !likely || defender.player_id !== likely.player_id
+  );
+  $("#pdDefenders").innerHTML = historicalDefenders.length
+    ? historicalDefenders
         .slice(0, 4)
         .map((defender) => {
           const teamText = defender.team ? `${esc(defender.team)} · ` : "";
@@ -1259,12 +1345,12 @@ function renderDetailDefenders(data) {
               <span class="pd-defender-stats">
                 <b>${num(defender.player_pts_pg)}</b>
                 <small>PTS/part.</small>
-                <small>${pct(defender.fg_pct)} FG perm.</small>
+                <small>${pct(defender.fg_pct)} FG</small>
               </span>
             </div>`;
         })
         .join("")
-    : '<div class="pd-empty">Sin datos de defensores para este jugador.</div>';
+    : '<div class="pd-empty">Sin otros defensores con muestra reciente.</div>';
 }
 
 function renderDetailTeammates(data) {

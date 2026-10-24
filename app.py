@@ -123,7 +123,7 @@ app = FastAPI(
         "Prediccion de totales, handicap y props de jugadores "
         "(PTS, REB, AST y PRA)."
     ),
-    version="0.5.0",
+    version="0.6.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -208,6 +208,24 @@ def _player_defenders_cached() -> pd.DataFrame:
     )
 
 
+@lru_cache(maxsize=1)
+def _player_bio_cached() -> dict[int, dict[str, Any]]:
+    path = ARTIFACTS / "player_bio.csv"
+    if not path.exists():
+        return {}
+    frame = pd.read_csv(path)
+    return {
+        int(row.player_id): {
+            "player_name": str(row.player_name),
+            "team": str(row.team).upper().strip(),
+            "height_inches": _rounded(row.height_inches, 1),
+            "weight": _rounded(row.weight, 1),
+        }
+        for row in frame.itertuples(index=False)
+        if not pd.isna(row.player_id)
+    }
+
+
 def _artifact() -> dict:
     try:
         return _artifact_cached()
@@ -266,6 +284,10 @@ def _player_history() -> pd.DataFrame:
 
 def _player_defenders() -> pd.DataFrame:
     return _player_defenders_cached().copy()
+
+
+def _player_bio() -> dict[int, dict[str, Any]]:
+    return _player_bio_cached()
 
 
 # ---------------------------------------------------------------------------
@@ -614,6 +636,193 @@ def _history_game_payload(row: Any, team_ids: dict[str, int]) -> dict[str, Any]:
         "usage": _rounded(getattr(row, "usage", None), 3),
         "tov": _rounded(row.tov),
         "pra": _rounded(row.pra),
+    }
+
+
+def _row_value(row: Any, key: str) -> Any:
+    if row is None:
+        return None
+    if isinstance(row, pd.Series):
+        return row.get(key)
+    return getattr(row, key, None)
+
+
+def _role_group(
+    reb: Any,
+    ast: Any,
+    fg3a: Any,
+    height_inches: Any = None,
+) -> str | None:
+    """Agrupa por altura; si falta, usa el perfil estadistico."""
+    height = _rounded(height_inches, 1)
+    if height is not None and height > 0:
+        if height >= 82:
+            return "big"
+        if height <= 77:
+            return "guard"
+        return "wing"
+    rebounds = _rounded(reb, 3)
+    assists = _rounded(ast, 3)
+    threes = _rounded(fg3a, 3)
+    if rebounds is None:
+        return None
+    if rebounds >= 7.0 and (threes is None or threes <= 3.5):
+        return "big"
+    if (assists is not None and assists >= 5.0) or (
+        threes is not None and threes >= 5.0 and rebounds < 5.5
+    ):
+        return "guard"
+    return "wing"
+
+
+def _season_profile(
+    row: Any | None,
+    bio: dict[int, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    gp = _row_value(row, "gp")
+    player_id = _row_value(row, "player_id")
+    height = None
+    if bio is not None and player_id is not None and not pd.isna(player_id):
+        height = bio.get(int(player_id), {}).get("height_inches")
+    return {
+        "gp": int(gp) if gp is not None and not pd.isna(gp) else None,
+        "min": _rounded(_row_value(row, "min")),
+        "pts": _rounded(_row_value(row, "pts")),
+        "reb": _rounded(_row_value(row, "reb")),
+        "ast": _rounded(_row_value(row, "ast")),
+        "stl": _rounded(_row_value(row, "stl")),
+        "blk": _rounded(_row_value(row, "blk")),
+        "role": _role_group(
+            _row_value(row, "reb"),
+            _row_value(row, "ast"),
+            _row_value(row, "fg3a"),
+            height,
+        ),
+    }
+
+
+def _likely_defender_payload(
+    player_id: int,
+    opponent: str,
+    defender_groups: pd.DataFrame,
+    pergame: pd.DataFrame,
+    target_row: Any | None,
+    team_names: dict[str, str],
+    team_ids: dict[str, int],
+    bio: dict[int, dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Posible defensor del proximo rival, sin presentarlo como asignacion oficial."""
+    opponent = opponent.upper().strip()
+    season_rows = {
+        int(row.player_id): row
+        for row in pergame.itertuples(index=False)
+        if not pd.isna(row.player_id)
+    }
+
+    if not defender_groups.empty and "team" in defender_groups.columns:
+        candidates = defender_groups[
+            defender_groups["team"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+            .eq(opponent)
+        ].copy()
+        if not candidates.empty:
+            candidate = candidates.sort_values(
+                "matchup_min", ascending=False
+            ).iloc[0]
+            defender_id = int(candidate["def_player_id"])
+            profile = _season_profile(season_rows.get(defender_id), bio)
+            matched_games = max(1.0, float(candidate["gp"]))
+            fga = float(candidate["matchup_fga"])
+            matchup_min = float(candidate["matchup_min"])
+            confidence = (
+                "media"
+                if matchup_min >= 10
+                and (profile["min"] is None or profile["min"] >= 12)
+                else "baja"
+            )
+            return {
+                "player_id": defender_id,
+                "player_name": str(candidate["def_player_name"]),
+                "team": opponent,
+                "team_name": team_names.get(opponent, opponent),
+                "team_logo_url": _team_logo_url(team_ids.get(opponent)),
+                "headshot_url": (
+                    "https://cdn.nba.com/headshots/nba/latest/260x190/"
+                    f"{defender_id}.png"
+                ),
+                "basis": "historial",
+                "confidence": confidence,
+                "is_historical": True,
+                "matchup_gp": int(candidate["gp"]),
+                "matchup_min": _rounded(matchup_min, 1),
+                "matchup_min_pg": _rounded(
+                    matchup_min / matched_games, 1
+                ),
+                "player_pts_pg": _rounded(
+                    float(candidate["player_pts"]) / matched_games, 1
+                ),
+                "fg_pct": _rounded(
+                    float(candidate["matchup_fgm"]) / fga, 3
+                )
+                if fga
+                else None,
+                **profile,
+            }
+
+    if pergame.empty:
+        return None
+    roster = pergame[
+        pergame["team"].astype(str).str.upper().str.strip().eq(opponent)
+    ].copy()
+    if roster.empty:
+        return None
+    roster["_gp"] = pd.to_numeric(roster["gp"], errors="coerce").fillna(0)
+    roster["_min"] = pd.to_numeric(roster["min"], errors="coerce").fillna(0)
+    roster = roster[(roster["_gp"] >= 1) & (roster["_min"] >= 10)].copy()
+    if roster.empty:
+        return None
+    target_role = _role_group(
+        _row_value(target_row, "reb"),
+        _row_value(target_row, "ast"),
+        _row_value(target_row, "fg3a"),
+        bio.get(player_id, {}).get("height_inches"),
+    )
+    roster["_role"] = [
+        _role_group(
+            row.reb,
+            row.ast,
+            row.fg3a,
+            bio.get(int(row.player_id), {}).get("height_inches"),
+        )
+        for row in roster.itertuples(index=False)
+    ]
+    if target_role is not None:
+        same_role = roster[roster["_role"].eq(target_role)]
+        if not same_role.empty:
+            roster = same_role
+    row = roster.sort_values("_min", ascending=False).iloc[0]
+    profile = _season_profile(row, bio)
+    return {
+        "player_id": int(row.player_id),
+        "player_name": str(row.player_name),
+        "team": opponent,
+        "team_name": team_names.get(opponent, opponent),
+        "team_logo_url": _team_logo_url(team_ids.get(opponent)),
+        "headshot_url": (
+            "https://cdn.nba.com/headshots/nba/latest/260x190/"
+            f"{int(row.player_id)}.png"
+        ),
+        "basis": "rol",
+        "confidence": "baja",
+        "is_historical": False,
+        "matchup_gp": None,
+        "matchup_min": None,
+        "matchup_min_pg": None,
+        "player_pts_pg": None,
+        "fg_pct": None,
+        **profile,
     }
 
 
@@ -1442,6 +1651,7 @@ def player_card(
     schedule = _schedule()
     history = _player_history()
     pergame = _players("2026-27", "pergame")
+    bio = _player_bio()
     day = _today(today)
 
     state_rows = player_state[player_state["player_id"].astype(int).eq(player_id)]
@@ -1640,6 +1850,7 @@ def player_card(
     ]
 
     h2h = None
+    likely_defender = None
     defenders: list[dict[str, Any]] = []
     if upcoming:
         opponent = str(upcoming["opponent"]).upper().strip()
@@ -1681,6 +1892,7 @@ def player_card(
             ],
         }
 
+        defender_groups = pd.DataFrame()
         defender_frame = _player_defenders()
         if not defender_frame.empty:
             defender_rows = defender_frame[
@@ -1704,7 +1916,7 @@ def player_card(
                     defender_rows[column] = pd.to_numeric(
                         defender_rows[column], errors="coerce"
                     ).fillna(0)
-                grouped = (
+                defender_groups = (
                     defender_rows.groupby(
                         ["def_player_id", "def_player_name"], as_index=False
                     )
@@ -1724,8 +1936,8 @@ def player_card(
                         matchup_fta=("matchup_fta", "sum"),
                     )
                     .sort_values("matchup_min", ascending=False)
-                    .head(5)
                 )
+                grouped = defender_groups.head(5)
                 for row in grouped.itertuples(index=False):
                     def_team = None if pd.isna(row.team) else str(row.team).upper()
                     fga = float(row.matchup_fga)
@@ -1777,6 +1989,17 @@ def player_card(
                         }
                     )
 
+        likely_defender = _likely_defender_payload(
+            player_id,
+            opponent,
+            defender_groups,
+            pergame,
+            pg_row,
+            names,
+            team_ids,
+            bio,
+        )
+
     last_state = pd.to_datetime(player_state["last_game_date"]).max().normalize()
     player = {
         "player_id": player_id,
@@ -1799,6 +2022,7 @@ def player_card(
             "efficiency": efficiency,
             "upcoming": upcoming,
             "h2h": h2h,
+            "likely_defender": likely_defender,
             "defenders": defenders,
             "games": games,
             "teammates": teammates,

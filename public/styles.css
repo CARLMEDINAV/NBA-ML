@@ -1311,6 +1311,80 @@ body.modal-open { overflow: hidden; }
 .pd-h2h-line small { display: block; margin-top: 1px; color: var(--faint); font-size: 0.58rem; }
 .pd-h2h-card .pd-empty { padding: 14px 6px 4px; font-size: 0.68rem; }
 
+.pd-likely {
+  margin-top: 9px;
+  padding: 9px;
+  border: 1px solid rgba(255, 155, 84, 0.32);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 155, 84, 0.1), rgba(255, 155, 84, 0.025));
+}
+.pd-likely-top { display: flex; align-items: center; gap: 8px; }
+.pd-likely-avatar {
+  position: relative;
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #182238;
+}
+.pd-likely-avatar span { color: var(--muted); font-size: 0.66rem; font-weight: 900; }
+.pd-likely-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pd-likely-main { flex: 1 1 auto; min-width: 0; }
+.pd-likely-main strong {
+  display: block;
+  overflow: hidden;
+  color: #f5e9dd;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pd-likely-main small { display: block; margin-top: 1px; color: #d8b99e; font-size: 0.58rem; }
+.pd-likely-badge {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: var(--faint);
+  font-size: 0.5rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.pd-likely-badge.is-medium {
+  border-color: rgba(255, 155, 84, 0.35);
+  background: rgba(255, 155, 84, 0.1);
+  color: #ffd8b8;
+}
+.pd-likely-badge.is-low { background: rgba(255, 255, 255, 0.035); }
+.pd-likely-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 7px;
+}
+.pd-likely-stat {
+  padding: 5px 3px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(5, 10, 20, 0.45);
+  text-align: center;
+}
+.pd-likely-stat small { display: block; color: var(--faint); font-size: 0.52rem; font-weight: 850; }
+.pd-likely-stat b { display: block; margin-top: 1px; color: #f2e6da; font-size: 0.75rem; font-weight: 900; }
+.pd-likely-reason { margin-top: 6px; color: #c9a98f; font-size: 0.55rem; line-height: 1.4; }
+.pd-defenders-sep {
+  margin: 10px 0 5px;
+  color: var(--faint);
+  font-size: 0.55rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .pd-defenders { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
 .pd-defender {
   display: grid;

@@ -22,7 +22,9 @@ ARTIFACTS = ROOT / "artifacts"
 ARTIFACT = ARTIFACTS / "player_defenders_recent.csv"
 CURRENT_SEASON = "2026-27"
 PRIOR_SEASON = "2025-26"
-TOP_DEFENDERS = 8
+# Se muestran 5; guardamos 30 para poder encontrar un posible defensor del
+# proximo rival aunque no este entre los primeros de la muestra historica.
+TOP_DEFENDERS = 30
 
 COLUMNS = [
     "season",
