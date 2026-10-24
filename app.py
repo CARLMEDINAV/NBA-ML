@@ -47,6 +47,29 @@ from nba_ml.models.results import add_over_under, summarize_results
 AVAILABLE_SEASONS = ("2025-26", "2026-27")
 PLAYER_MODES = {"pergame": "pergame", "totals": "totals"}
 SORT_COLUMNS = {"pra", "pts", "reb", "ast", "min", "gp"}
+PLAYER_HISTORY_COLUMNS = [
+    "season",
+    "player_id",
+    "player_name",
+    "team",
+    "game_id",
+    "game_date",
+    "matchup",
+    "opponent",
+    "is_home",
+    "wl",
+    "min",
+    "pts",
+    "reb",
+    "ast",
+    "stl",
+    "blk",
+    "fg3m",
+    "fga",
+    "fta",
+    "tov",
+    "pra",
+]
 LEAN_OVER = 0.55
 LEAN_UNDER = 0.45
 NBA_ET = ZoneInfo("America/New_York")
@@ -134,6 +157,18 @@ def _player_state_cached() -> pd.DataFrame:
     return load_player_state(ARTIFACTS / "player_state.csv")
 
 
+@lru_cache(maxsize=1)
+def _player_history_cached() -> pd.DataFrame:
+    path = ARTIFACTS / "player_game_logs_recent.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=PLAYER_HISTORY_COLUMNS)
+    return pd.read_csv(
+        path,
+        dtype={"player_id": int, "game_id": str},
+        parse_dates=["game_date"],
+    )
+
+
 def _artifact() -> dict:
     try:
         return _artifact_cached()
@@ -184,6 +219,10 @@ def _player_state() -> pd.DataFrame:
         return _player_state_cached().copy()
     except (FileNotFoundError, ValueError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+def _player_history() -> pd.DataFrame:
+    return _player_history_cached().copy()
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +472,26 @@ def _team_names(state: pd.DataFrame) -> dict[str, str]:
         str(row.team_abbreviation): str(row.team_name)
         for row in state.itertuples(index=False)
     }
+
+
+def _team_ids(state: pd.DataFrame) -> dict[str, int]:
+    return {
+        str(row.team_abbreviation): int(row.team_id)
+        for row in state.itertuples(index=False)
+        if not pd.isna(row.team_id)
+    }
+
+
+def _team_logo_url(team_id: Any) -> str | None:
+    if team_id is None or pd.isna(team_id):
+        return None
+    return f"https://cdn.nba.com/logos/nba/{int(team_id)}/global/L/logo.svg"
+
+
+def _rounded(value: Any, digits: int = 1) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return round(float(value), digits)
 
 
 def _espn_price(block: dict[str, Any] | None) -> Any:
@@ -1244,6 +1303,224 @@ def player_props(
                 "consejo de apuestas."
             ),
             "games": payload_games,
+        }
+    )
+
+
+@app.get("/api/player-card")
+def player_card(
+    player_id: int = Query(..., ge=1),
+    today: str | None = None,
+) -> JSONResponse:
+    """Ficha visual de un jugador: proyeccion, ultimos partidos y companeros."""
+    artifact = _player_props()
+    player_state = _player_state()
+    team_state = _state()
+    schedule = _schedule()
+    history = _player_history()
+    pergame = _players("2026-27", "pergame")
+    day = _today(today)
+
+    state_rows = player_state[player_state["player_id"].astype(int).eq(player_id)]
+    if state_rows.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No hay estado de props para el jugador {player_id}",
+        )
+    state_row = state_rows.iloc[0]
+    team = str(state_row["team"]).upper().strip()
+
+    names = _team_names(team_state)
+    team_ids = _team_ids(team_state)
+    team_name = names.get(team, team)
+
+    pg_rows = pergame[pergame["player_id"].astype(int).eq(player_id)]
+    pg_row = pg_rows.iloc[0] if not pg_rows.empty else None
+    if pg_row is not None:
+        gp = int(pg_row["gp"])
+        averages = {
+            "min": _rounded(pg_row.get("min")),
+            "pts": _rounded(pg_row.get("pts")),
+            "reb": _rounded(pg_row.get("reb")),
+            "ast": _rounded(pg_row.get("ast")),
+            "pra": _rounded(pg_row.get("pra")),
+            "stl": _rounded(pg_row.get("stl")),
+            "blk": _rounded(pg_row.get("blk")),
+            "fg3m": _rounded(pg_row.get("fg3m")),
+            "fga": _rounded(pg_row.get("fga")),
+            "fta": _rounded(pg_row.get("fta")),
+            "tov": _rounded(pg_row.get("tov")),
+        }
+    else:
+        gp = int(state_row["gp_season"])
+        pts = _rounded(state_row.get("pts_roll10")) or 0.0
+        reb = _rounded(state_row.get("reb_roll10")) or 0.0
+        ast = _rounded(state_row.get("ast_roll10")) or 0.0
+        averages = {
+            "min": _rounded(state_row.get("min_roll10")),
+            "pts": pts,
+            "reb": reb,
+            "ast": ast,
+            "pra": round(pts + reb + ast, 1),
+            "stl": None,
+            "blk": None,
+            "fg3m": None,
+            "fga": None,
+            "fta": None,
+            "tov": None,
+        }
+
+    dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
+    mask = (
+        schedule["status"].eq(1)
+        & dates.ge(day)
+        & (schedule["home"].eq(team) | schedule["away"].eq(team))
+    )
+    team_games = schedule.loc[mask].sort_values(
+        ["game_date", "game_time_et", "game_id"]
+    )
+
+    upcoming = None
+    teammates: list[dict[str, Any]] = []
+    if not team_games.empty:
+        game = team_games.iloc[0]
+        home = str(game["home"]).upper()
+        away = str(game["away"]).upper()
+        game_date = pd.Timestamp(game["game_date"])
+        predictions = predict_player_props(
+            artifact,
+            player_state,
+            team_state,
+            home=home,
+            away=away,
+            game_date=game_date,
+            limit=80,
+        )
+        projection = None
+        found = next(
+            (item for item in predictions if int(item["player_id"]) == player_id),
+            None,
+        )
+        if found:
+            projection = {
+                "min": found.get("projected_min"),
+                "pts": found.get("projected_pts"),
+                "reb": found.get("projected_reb"),
+                "ast": found.get("projected_ast"),
+                "pra": found.get("projected_pra"),
+            }
+        teammates = [
+            {
+                **item,
+                "team_logo_url": _team_logo_url(team_ids.get(str(item["team"]).upper())),
+                "recent_pra": None,
+            }
+            for item in predictions
+            if str(item["team"]).upper() == team
+            and int(item["player_id"]) != player_id
+        ][:5]
+        upcoming = {
+            "game_id": str(game["game_id"]),
+            "date": game_date.strftime("%Y-%m-%d"),
+            "time_et": None
+            if pd.isna(game["game_time_et"])
+            else str(game["game_time_et"]),
+            "home": home,
+            "away": away,
+            "home_name": names.get(home, home),
+            "away_name": names.get(away, away),
+            "opponent": away if home == team else home,
+            "opponent_logo_url": _team_logo_url(
+                team_ids.get(away if home == team else home)
+            ),
+            "is_home": home == team,
+            "projection": projection,
+        }
+
+    if not teammates:
+        peers = player_state[
+            player_state["team"].astype(str).str.upper().eq(team)
+            & player_state["player_id"].astype(int).ne(player_id)
+        ].sort_values("pra_roll5", ascending=False).head(5)
+        teammates = [
+            {
+                "player_id": int(row.player_id),
+                "player_name": str(row.player_name),
+                "team": str(row.team).upper(),
+                "projected_pra": None,
+                "projected_pts": None,
+                "recent_pra": _rounded(row.pra_roll5),
+                "headshot_url": (
+                    "https://cdn.nba.com/headshots/nba/latest/260x190/"
+                    f"{int(row.player_id)}.png"
+                ),
+                "team_logo_url": _team_logo_url(team_ids.get(team)),
+            }
+            for row in peers.itertuples(index=False)
+        ]
+
+    player_games = history[
+        history["player_id"].astype(int).eq(player_id)
+    ].sort_values(["game_date", "game_id"], ascending=False).head(15)
+    games: list[dict[str, Any]] = []
+    for row in player_games.itertuples(index=False):
+        opponent = str(row.opponent).upper().strip()
+        row_team = str(row.team).upper().strip()
+        games.append(
+            {
+                "game_id": str(row.game_id),
+                "season": str(row.season),
+                "date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
+                "team": row_team,
+                "team_logo_url": _team_logo_url(team_ids.get(row_team)),
+                "opponent": opponent,
+                "opponent_logo_url": _team_logo_url(team_ids.get(opponent)),
+                "is_home": bool(row.is_home),
+                "wl": None if pd.isna(row.wl) else str(row.wl),
+                "min": _rounded(row.min),
+                "pts": _rounded(row.pts),
+                "reb": _rounded(row.reb),
+                "ast": _rounded(row.ast),
+                "stl": _rounded(row.stl),
+                "blk": _rounded(row.blk),
+                "fg3m": _rounded(row.fg3m),
+                "fga": _rounded(row.fga),
+                "fta": _rounded(row.fta),
+                "tov": _rounded(row.tov),
+                "pra": _rounded(row.pra),
+            }
+        )
+
+    last_state = pd.to_datetime(player_state["last_game_date"]).max().normalize()
+    player = {
+        "player_id": player_id,
+        "player_name": str(state_row["player_name"]),
+        "team": team,
+        "team_name": team_name,
+        "team_logo_url": _team_logo_url(team_ids.get(team)),
+        "headshot_url": (
+            "https://cdn.nba.com/headshots/nba/latest/260x190/"
+            f"{player_id}.png"
+        ),
+        "season": "2026-27",
+        "gp": gp,
+        "averages": averages,
+    }
+    return _ok(
+        {
+            "season": "2026-27",
+            "player": player,
+            "upcoming": upcoming,
+            "games": games,
+            "teammates": teammates,
+            "model_name": artifact.get("model_name"),
+            "player_state_date": last_state.strftime("%Y-%m-%d"),
+            "note": (
+                "Las barras verdes superan la linea y las rojas no. La fila "
+                "PROX. es una proyeccion del modelo; el resto son partidos "
+                "reales. No incluye lesiones, alineaciones ni cuotas de props; "
+                "no es consejo de apuestas."
+            ),
         }
     )
 

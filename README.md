@@ -73,7 +73,10 @@ la suma de las tres proyecciones. Validación temporal con el tramo final de
 | PRA | 6.15 | 7.92 | 0.534 | 9.33 |
 
 Sin lesiones, alineaciones ni cuotas de props. La pestaña **Props** muestra los
-jugadores con minutos en 2026-27 ordenados por PRA proyectado.
+jugadores con minutos en 2026-27 ordenados por PRA proyectado. Al hacer clic en
+un jugador se abre una ficha con sus últimos partidos, la línea ajustable, el
+acierto histórico, el próximo partido y sus compañeros. Las barras comparan cada
+partido con la línea; la fila **PRÓX.** es una proyección, no un resultado.
 
 ---
 
@@ -115,6 +118,7 @@ nba-ml/
 ├── models/model.joblib       # modelo de totales + features + residuos
 ├── models/player_props.joblib # modelo de props + métricas
 ├── artifacts/player_state.csv # foto reciente de jugadores para props
+├── artifacts/player_game_logs_recent.csv # últimos partidos por jugador (ficha)
 └── reports/                  # metrics.md, eda.md, figuras, predicciones test
 ```
 
@@ -200,7 +204,9 @@ y **Props**; estas son las secciones principales:
   `data/raw/player_stats_<temporada>_<modo>.csv`.
 - **Props** (solo web): proyecciones de puntos, rebotes, asistencias y PRA por
   jugador para los próximos partidos, con filtros por días, equipo y número de
-  jugadores por partido. No incluye lesiones ni alineaciones.
+  jugadores por partido. Al abrir un jugador se muestra su ficha con los últimos
+  partidos, línea ajustable, acierto histórico, próximo partido y compañeros.
+  No incluye lesiones, alineaciones ni cuotas de props.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, margen, puntos proyectados, ganador
   probable, hándicap del modelo, comparación de Elo/forma/descanso y gráfico de
@@ -257,9 +263,10 @@ La app pública está pensada para abrirla desde el móvil:
 - **Frontend:** `public/` (HTML, CSS y JavaScript, sin build). Incluye una
   pestaña **Análisis** con la tabla partido a partido: puntos proyectados,
   total, posible ganador, hándicap sugerido y cuotas over/under; y una pestaña
-  **Props** con PTS, REB, AST y PRA proyectados por jugador.
+  **Props** con PTS, REB, AST y PRA proyectados por jugador. Cada jugador tiene
+  una ficha visual con sus últimos partidos, línea ajustable y acierto histórico.
 - **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
-  `/api/players`, `/api/player-props`, `/api/predict`).
+  `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`).
   `/api/upcoming?odds=1&analysis=1` añade hándicap, proyecciones por equipo y
   cuotas de ESPN cuando están disponibles.
 - **Datos:** `artifacts/` contiene una foto del modelo de totales, el modelo de
@@ -279,9 +286,10 @@ La app pública está pensada para abrirla desde el móvil:
   y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
 - **Jugadores y props:** otro workflow
   (`.github/workflows/update-players.yml`) refresca cada 6 horas
-  `player_stats_2026_27_pergame.csv`, `_totals.csv` y `player_state.csv`. Así
-  los equipos actuales (por ejemplo, Giannis en Miami) y las medias móviles de
-  los props llegan a la web sin que Vercel tenga que consultar `stats.nba.com`.
+  `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv` y
+  `player_game_logs_recent.csv`. Así los equipos actuales (por ejemplo, Giannis
+  en Miami), las medias móviles de los props y los últimos partidos de cada
+  ficha llegan a la web sin que Vercel tenga que consultar `stats.nba.com`.
 
 Para probarla en local:
 
@@ -410,8 +418,8 @@ medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
 PRA y caché de jugadores, props por jugador, liquidación over/under y métricas
-de acierto, margen y hándicap, y un test de humo del dashboard y la API pública
-de Vercel (40 en total).
+de acierto, margen y hándicap, la ficha visual de jugador y un test de humo del
+dashboard y la API pública de Vercel (44 en total).
 
 ---
 

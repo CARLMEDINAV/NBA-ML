@@ -25,6 +25,68 @@ from nba_ml.models.player_props import (  # noqa: E402
 ARTIFACTS = ROOT / "artifacts"
 CURRENT_SEASON = "2026-27"
 PRIOR_SEASON = "2025-26"
+HISTORY = ARTIFACTS / "player_game_logs_recent.csv"
+HISTORY_COLUMNS = [
+    "season",
+    "player_id",
+    "player_name",
+    "team",
+    "game_id",
+    "game_date",
+    "matchup",
+    "opponent",
+    "is_home",
+    "wl",
+    "min",
+    "pts",
+    "reb",
+    "ast",
+    "stl",
+    "blk",
+    "fg3m",
+    "fga",
+    "fta",
+    "tov",
+    "pra",
+]
+HISTORY_GAMES = 15
+
+
+def _update_history(current_logs: pd.DataFrame, player_ids: set[int]) -> pd.DataFrame:
+    """Mantiene una foto corta de partidos para la ficha visual del jugador.
+
+    El historico anterior se conserva en el artefacto; solo se reemplazan los
+    partidos de la temporada actual para no descargar 2025-26 en cada workflow.
+    """
+    current = current_logs.copy()
+    current["game_date"] = pd.to_datetime(current["game_date"])
+    current["game_id"] = current["game_id"].astype(str).str.zfill(10)
+
+    if HISTORY.exists():
+        previous = pd.read_csv(
+            HISTORY,
+            dtype={"player_id": int, "game_id": str},
+            parse_dates=["game_date"],
+        )
+        previous = previous[previous["season"].astype(str).ne(CURRENT_SEASON)]
+    else:
+        previous = pd.DataFrame(columns=HISTORY_COLUMNS)
+
+    combined = pd.concat([previous, current], ignore_index=True, sort=False)
+    combined = combined[combined["player_id"].isin(player_ids)].copy()
+    for column in HISTORY_COLUMNS:
+        if column not in combined.columns:
+            combined[column] = None
+    combined = combined[HISTORY_COLUMNS]
+    combined = combined.sort_values(["player_id", "game_date", "game_id"])
+    combined = combined.groupby("player_id", sort=False, group_keys=False).tail(
+        HISTORY_GAMES
+    )
+
+    temporary = HISTORY.with_suffix(".tmp")
+    combined.to_csv(temporary, index=False)
+    temporary.replace(HISTORY)
+    return combined
 
 
 def main() -> int:
@@ -46,11 +108,24 @@ def main() -> int:
             return 0
         return 1
 
+    try:
+        history = _update_history(logs, set(state["player_id"].astype(int)))
+    except Exception as error:  # noqa: BLE001 - la ficha visual no bloquea props
+        print(f"::warning::No se pudo actualizar el historico visual: {error}")
+        if not HISTORY.exists():
+            return 1
+        history = pd.DataFrame()
+
     print(
         f"{destination.relative_to(ROOT)}: {len(state)} jugadores · "
         f"{int(state['gp_season'].max())} partidos maximos · "
         f"ultimo {state['last_game_date'].max().date()}"
     )
+    if not history.empty:
+        print(
+            f"{HISTORY.relative_to(ROOT)}: {len(history)} partidos recientes "
+            f"para {history['player_id'].nunique()} jugadores"
+        )
     return 0
 
 

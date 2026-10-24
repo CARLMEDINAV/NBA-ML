@@ -256,6 +256,45 @@ def test_player_props_team_filter():
             assert player["team"] in {game["home"], game["away"]}
 
 
+def test_player_card_detail():
+    response = client.get(
+        "/api/player-card",
+        params={"player_id": 203507, "today": "2026-10-22"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    player = payload["player"]
+    assert player["player_name"] == "Giannis Antetokounmpo"
+    assert player["team"] == "MIA"
+    assert player["gp"] >= 1
+    assert player["headshot_url"].startswith(
+        "https://cdn.nba.com/headshots/nba/latest/260x190/"
+    )
+    assert abs(
+        player["averages"]["pra"]
+        - (
+            player["averages"]["pts"]
+            + player["averages"]["reb"]
+            + player["averages"]["ast"]
+        )
+    ) < 0.2
+    assert payload["games"]
+    game = payload["games"][0]
+    assert game["opponent"]
+    assert game["date"]
+    assert game["pra"] is not None
+    assert payload["upcoming"] is not None
+    assert payload["upcoming"]["opponent"]
+    assert payload["upcoming"]["projection"]["pra"] > 0
+    assert payload["teammates"]
+    assert payload["note"]
+
+
+def test_player_card_unknown_player():
+    response = client.get("/api/player-card", params={"player_id": 999999})
+    assert response.status_code == 404
+
+
 def test_results_backtest_2025_26():
     response = client.get(
         "/api/results",
@@ -302,6 +341,8 @@ def test_static_frontend_is_served():
     assert "Jugadores" in response.text
     assert "Props" in response.text
     assert "Predicciones de jugadores" in response.text
+    assert 'id="playerDetail"' in response.text
+    assert "VER ANÁLISIS DEL PARTIDO" in response.text
 
 
 def test_static_javascript_includes_player_headshots():
@@ -310,4 +351,6 @@ def test_static_javascript_includes_player_headshots():
     assert "player-headshot" in response.text
     assert "cdn.nba.com/headshots" in response.text
     assert "/api/player-props" in response.text
+    assert "/api/player-card" in response.text
     assert "loadProps" in response.text
+    assert "openPlayerDetail" in response.text

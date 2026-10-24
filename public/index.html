@@ -350,6 +350,78 @@
     </footer>
   </div>
 
+  <div id="playerDetail" class="pd-overlay" hidden>
+    <div class="pd-modal" role="dialog" aria-modal="true" aria-labelledby="pdName">
+      <button class="pd-close" type="button" id="pdClose" aria-label="Cerrar ficha">×</button>
+      <div id="pdLoading" class="pd-loading"><span class="spinner"></span>Cargando ficha…</div>
+      <div id="pdContent" hidden>
+        <header class="pd-hero" id="pdHero"></header>
+        <div id="pdNotice" class="notice" hidden></div>
+        <nav class="pd-tabs" id="pdTabs" role="tablist" aria-label="Estadística"></nav>
+        <div class="pd-layout">
+          <aside class="pd-card pd-games-panel">
+            <div class="pd-segmented" role="group" aria-label="Vista">
+              <button class="is-active" type="button" id="pdGamesTab">Partidos</button>
+              <button type="button" disabled title="Datos de lesiones no disponibles">Lesiones <span aria-hidden="true">🔒</span></button>
+            </div>
+            <div class="pd-segmented pd-segmented-small" id="pdVenueFilter" role="group" aria-label="Condición">
+              <button class="is-active" data-venue="all" type="button">Todos</button>
+              <button data-venue="home" type="button">Local</button>
+              <button data-venue="away" type="button">Visita</button>
+            </div>
+            <div class="pd-game-list" id="pdGameList"></div>
+          </aside>
+
+          <section class="pd-card pd-chart-card">
+            <div class="pd-chart-head">
+              <span>LÍNEA: <b id="pdChartLine">—</b></span>
+              <span id="pdChartRange" class="pd-muted"></span>
+            </div>
+            <div class="pd-chart" id="pdChart"></div>
+          </section>
+
+          <aside class="pd-side">
+            <section class="pd-card pd-line-card">
+              <div class="pd-kicker">Línea</div>
+              <div class="pd-line-input">
+                <button type="button" id="pdLineDown" aria-label="Bajar línea">−</button>
+                <input id="pdLineInput" type="number" min="0" max="200" step="0.5" inputmode="decimal" aria-label="Línea de la estadística">
+                <button type="button" id="pdLineUp" aria-label="Subir línea">+</button>
+              </div>
+              <div class="pd-line-meta" id="pdLineMeta"></div>
+            </section>
+
+            <section class="pd-card pd-hit-card">
+              <div class="pd-kicker">Acierto histórico</div>
+              <div class="pd-hit" id="pdHitRate">—</div>
+              <div class="pd-hit-sub" id="pdHitSub"></div>
+            </section>
+
+            <button class="pd-cta" type="button" id="pdAnalysis">VER ANÁLISIS DEL PARTIDO</button>
+
+            <section class="pd-card pd-quick-card">
+              <div class="pd-kicker">Vistas rápidas</div>
+              <div class="pd-quick" id="pdQuickViews">
+                <button data-range="5" type="button">Últimos 5</button>
+                <button data-range="10" class="is-active" type="button">Últimos 10</button>
+                <button data-range="all" type="button">Todos</button>
+              </div>
+            </section>
+
+            <section class="pd-card pd-team-card">
+              <div class="pd-card-head">
+                <div class="pd-kicker">Compañeros</div>
+                <span class="pd-muted" id="pdTeamName"></span>
+              </div>
+              <div class="pd-teammates" id="pdTeammates"></div>
+            </section>
+          </aside>
+        </div>
+        <p class="pd-note" id="pdNote"></p>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="/app.js" defer></script>
 </body>

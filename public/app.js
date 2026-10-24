@@ -25,7 +25,33 @@ const state = {
     q: "",
   },
   props: { days: 7, team: "", limit: 8 },
+  detail: {
+    playerId: null,
+    data: null,
+    stat: "pts",
+    line: null,
+    range: 10,
+    venue: "all",
+    opener: null,
+    requestId: 0,
+  },
 };
+
+const DETAIL_STATS = [
+  { key: "pts", label: "PTS" },
+  { key: "reb", label: "REB" },
+  { key: "ast", label: "AST" },
+  { key: "pts_ast", label: "PTS+AST" },
+  { key: "pts_reb", label: "PTS+REB" },
+  { key: "reb_ast", label: "REB+AST" },
+  { key: "pra", label: "P+R+A" },
+  { key: "stl", label: "STL" },
+  { key: "blk", label: "BLK" },
+  { key: "fg3m", label: "3PM" },
+  { key: "stl_blk", label: "STL+BLK" },
+  { key: "dd", label: "DD" },
+  { key: "td", label: "TD" },
+];
 
 function esc(value) {
   return String(value ?? "")
@@ -83,6 +109,120 @@ function initials(name) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function dayMonth(value) {
+  if (!value) return "—";
+  const date = new Date(`${value}T12:00:00`);
+  return date
+    .toLocaleDateString("es-ES", { day: "numeric", month: "short" })
+    .replace(".", "");
+}
+
+function pdNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function pdStatValue(game, key) {
+  const pts = pdNumber(game.pts);
+  const reb = pdNumber(game.reb);
+  const ast = pdNumber(game.ast);
+  const stl = pdNumber(game.stl);
+  const blk = pdNumber(game.blk);
+  switch (key) {
+    case "pts_ast":
+      return pts + ast;
+    case "pts_reb":
+      return pts + reb;
+    case "reb_ast":
+      return reb + ast;
+    case "pra":
+      return Number.isFinite(Number(game.pra)) ? Number(game.pra) : pts + reb + ast;
+    case "stl_blk":
+      return stl + blk;
+    case "dd":
+      return [pts, reb, ast].filter((value) => value >= 10).length >= 2 ? 1 : 0;
+    case "td":
+      return [pts, reb, ast].filter((value) => value >= 10).length >= 3 ? 1 : 0;
+    default:
+      return pdNumber(game[key]);
+  }
+}
+
+function pdAverageFor(data, key) {
+  const averages = data.player?.averages || {};
+  const value = (() => {
+    switch (key) {
+      case "pts_ast":
+        return Number(averages.pts) + Number(averages.ast);
+      case "pts_reb":
+        return Number(averages.pts) + Number(averages.reb);
+      case "reb_ast":
+        return Number(averages.reb) + Number(averages.ast);
+      case "pra":
+        return Number(averages.pra);
+      case "stl_blk":
+        return Number(averages.stl) + Number(averages.blk);
+      case "dd":
+      case "td":
+        return null;
+      default:
+        return averages[key];
+    }
+  })();
+  return Number.isFinite(Number(value)) && value !== null ? Number(value) : null;
+}
+
+function pdProjectionFor(data, key) {
+  const projection = data.upcoming?.projection;
+  if (!projection) return null;
+  const pts = Number(projection.pts);
+  const reb = Number(projection.reb);
+  const ast = Number(projection.ast);
+  const value = (() => {
+    switch (key) {
+      case "pts_ast":
+        return pts + ast;
+      case "pts_reb":
+        return pts + reb;
+      case "reb_ast":
+        return reb + ast;
+      case "pra":
+        return Number(projection.pra);
+      default:
+        return projection[key];
+    }
+  })();
+  return Number.isFinite(Number(value)) && value !== null ? Number(value) : null;
+}
+
+function pdDefaultLine(data, key) {
+  if (key === "dd" || key === "td") return 0.5;
+  const projection = pdProjectionFor(data, key);
+  const average = pdAverageFor(data, key);
+  const value = projection ?? average;
+  if (value !== null) return Math.max(0.5, Math.round(value * 2) / 2);
+  const values = (data.games || []).map((game) => pdStatValue(game, key));
+  if (!values.length) return 0.5;
+  const mean = values.reduce((sum, item) => sum + item, 0) / values.length;
+  return Math.max(0.5, Math.round(mean * 2) / 2);
+}
+
+function detailGames(data) {
+  const games = data.games || [];
+  if (state.detail.venue === "home") return games.filter((game) => game.is_home);
+  if (state.detail.venue === "away") return games.filter((game) => !game.is_home);
+  return games;
+}
+
+function detailVisibleGames(data) {
+  const games = detailGames(data);
+  return state.detail.range === "all" ? games : games.slice(0, state.detail.range);
+}
+
+function detailStatLabel() {
+  return DETAIL_STATS.find((item) => item.key === state.detail.stat)?.label || "PTS";
 }
 
 function leanPill(lean) {
@@ -533,7 +673,7 @@ async function loadPlayers() {
             ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png`
             : "");
         return `
-        <tr>
+        <tr data-player-id="${esc(player.player_id)}" class="is-clickable" title="Abrir ficha del jugador">
           <td class="na">${index + 1}</td>
           <td>
             <div class="player-cell">
@@ -545,7 +685,7 @@ async function loadPlayers() {
                     : ""
                 }
               </span>
-              <strong class="player-name">${esc(player.player_name)}</strong>
+              <button class="player-link" type="button" data-player-id="${esc(player.player_id)}">${esc(player.player_name)}</button>
             </div>
           </td>
           <td>${esc(player.team)}</td>
@@ -627,7 +767,7 @@ async function loadProps(silent = false) {
             : "");
         const time = game.time_et ? `${game.time_et} ET` : "Hora por confirmar";
         return `
-        <tr>
+        <tr data-player-id="${esc(player.player_id)}" data-game-id="${esc(game.game_id)}" class="is-clickable" title="Abrir ficha del jugador">
           <td>${esc(shortDate(game.date))}</td>
           <td>
             <div class="matchup">${esc(game.away)} @ ${esc(game.home)}<small>${esc(time)}</small></div>
@@ -642,7 +782,7 @@ async function loadProps(silent = false) {
                     : ""
                 }
               </span>
-              <strong class="player-name">${esc(player.player_name)}</strong>
+              <button class="player-link" type="button" data-player-id="${esc(player.player_id)}">${esc(player.player_name)}</button>
             </div>
           </td>
           <td>${esc(player.team)}</td>
@@ -672,6 +812,341 @@ async function loadProps(silent = false) {
   } finally {
     setBusy(button, false);
   }
+}
+
+function formatDetailValue(value) {
+  const digits = state.detail.stat === "dd" || state.detail.stat === "td" ? 0 : 1;
+  return num(value, digits);
+}
+
+function pdHeaderStat(label, value) {
+  return `<span class="pd-stat">${label} <b>${value === null || value === undefined ? "—" : num(value)}</b></span>`;
+}
+
+async function openPlayerDetail(playerId, options = {}) {
+  const numericId = Number(playerId);
+  if (!Number.isFinite(numericId) || numericId <= 0) return;
+  const overlay = $("#playerDetail");
+  const loading = $("#pdLoading");
+  const content = $("#pdContent");
+  const requestId = ++state.detail.requestId;
+  const wasOpen = !overlay.hidden;
+
+  state.detail.playerId = numericId;
+  state.detail.data = null;
+  state.detail.stat = options.stat || "pts";
+  state.detail.line = null;
+  state.detail.range = 10;
+  state.detail.venue = "all";
+  if (!wasOpen) {
+    state.detail.opener = options.opener || document.activeElement;
+  }
+
+  overlay.hidden = false;
+  document.body.classList.add("modal-open");
+  content.hidden = true;
+  loading.hidden = false;
+  loading.innerHTML = '<span class="spinner"></span>Cargando ficha…';
+  notice($("#pdNotice"), "");
+  window.setTimeout(() => $("#pdClose").focus(), 0);
+
+  try {
+    const data = await api("/api/player-card", { player_id: numericId });
+    if (requestId !== state.detail.requestId) return;
+    state.detail.data = data;
+    state.detail.stat = DETAIL_STATS.some((item) => item.key === options.stat)
+      ? options.stat
+      : "pts";
+    state.detail.line = pdDefaultLine(data, state.detail.stat);
+    renderPlayerDetail();
+    loading.hidden = true;
+    content.hidden = false;
+  } catch (error) {
+    if (requestId !== state.detail.requestId) return;
+    loading.innerHTML = `<div class="pd-empty">No se pudo cargar la ficha.<br><small>${esc(error.message)}</small></div>`;
+    showToast(error.message);
+  }
+}
+
+function closePlayerDetail() {
+  const overlay = $("#playerDetail");
+  if (!overlay || overlay.hidden) return;
+  state.detail.requestId += 1;
+  overlay.hidden = true;
+  document.body.classList.remove("modal-open");
+  state.detail.data = null;
+  state.detail.playerId = null;
+  if (window.location.hash.startsWith("#ficha/")) {
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${window.location.search}`
+    );
+  }
+  const opener = state.detail.opener;
+  state.detail.opener = null;
+  if (opener && typeof opener.focus === "function") opener.focus();
+}
+
+function renderPlayerDetail() {
+  const data = state.detail.data;
+  if (!data) return;
+  renderDetailHero(data);
+  renderDetailTabs(data);
+  renderDetailGames(data);
+  renderDetailChart(data);
+  renderDetailSide(data);
+
+  const notes = [];
+  if (!data.upcoming) {
+    notes.push("No hay un próximo partido programado; la línea se apoya en partidos recientes.");
+  }
+  if (!data.games?.length) {
+    notes.push("No hay partidos recientes en la foto actual del jugador.");
+  }
+  notice($("#pdNotice"), notes.join(" "));
+  $("#pdNote").textContent =
+    "Barras verdes: el partido supera la línea; rojas: no la alcanza. " +
+    "La fila PRÓX. es una proyección, no un resultado. " +
+    `Foto de jugadores: ${data.player_state_date}. ` +
+    "No incluye lesiones, alineaciones ni cuotas de props; no es consejo de apuestas.";
+}
+
+function renderDetailHero(data) {
+  const player = data.player;
+  const averages = player.averages || {};
+  const avatar = player.headshot_url
+    ? `<img class="pd-headshot" src="${esc(player.headshot_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+    : "";
+  const teamLogo = player.team_logo_url
+    ? `<span class="pd-team-badge"><img src="${esc(player.team_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement.remove()"></span>`
+    : "";
+  $("#pdHero").innerHTML = `
+    <div class="pd-avatar">
+      <span class="pd-headshot-fallback" aria-hidden="true">${esc(initials(player.player_name))}</span>
+      ${avatar}
+      ${teamLogo}
+    </div>
+    <div class="pd-id">
+      <div class="pd-name-row">
+        <h2 id="pdName">${esc(player.player_name)}</h2>
+        <span class="pd-chip">${esc(player.team)}</span>
+        <span class="pd-chip pd-chip-soft">${esc(player.season)} · ${esc(player.gp)} PJ</span>
+      </div>
+      <div class="pd-stats">
+        ${pdHeaderStat("PTS", averages.pts)}
+        ${pdHeaderStat("REB", averages.reb)}
+        ${pdHeaderStat("AST", averages.ast)}
+        ${pdHeaderStat("MIN", averages.min)}
+        ${pdHeaderStat("PRA", averages.pra)}
+        ${pdHeaderStat("PJ", player.gp)}
+      </div>
+    </div>`;
+}
+
+function renderDetailTabs() {
+  $("#pdTabs").innerHTML = DETAIL_STATS.map((item) => {
+    const active = item.key === state.detail.stat;
+    const modeled = ["pts", "reb", "ast", "pts_ast", "pts_reb", "reb_ast", "pra"].includes(item.key);
+    return `<button class="pd-tab${active ? " is-active" : ""}" type="button" role="tab" aria-selected="${active}" data-stat="${item.key}" title="${modeled ? "Proyección del modelo" : "Media histórica; sin proyección del modelo"}">${item.label}</button>`;
+  }).join("");
+}
+
+function renderDetailGames(data) {
+  const games = detailVisibleGames(data);
+  const rows = [];
+  if (data.upcoming) {
+    const projection = pdProjectionFor(data, state.detail.stat);
+    const value = projection === null ? "—" : formatDetailValue(projection);
+    const logos = [
+      data.player.team_logo_url
+        ? `<img src="${esc(data.player.team_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+        : "",
+      data.upcoming.opponent_logo_url
+        ? `<img src="${esc(data.upcoming.opponent_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+        : "",
+    ].join("");
+    rows.push(`
+      <button class="pd-game is-next" type="button" data-game="next" title="Ver análisis del partido">
+        <span class="pd-game-logos">${logos}</span>
+        <span class="pd-game-main">
+          <strong>${data.upcoming.is_home ? "vs" : "@"} ${esc(data.upcoming.opponent)}</strong>
+          <small>PRÓX. · ${dayMonth(data.upcoming.date)}${data.upcoming.time_et ? ` · ${esc(data.upcoming.time_et)} ET` : ""}</small>
+        </span>
+        <span class="pd-game-value">${value}</span>
+      </button>`);
+  }
+
+  games.forEach((game) => {
+    const value = pdStatValue(game, state.detail.stat);
+    const over = value >= state.detail.line;
+    const logos = [
+      game.team_logo_url
+        ? `<img src="${esc(game.team_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+        : "",
+      game.opponent_logo_url
+        ? `<img src="${esc(game.opponent_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+        : "",
+    ].join("");
+    rows.push(`
+      <button class="pd-game" type="button" data-game-id="${esc(game.game_id)}" title="Usar este valor como línea">
+        <span class="pd-game-logos">${logos}</span>
+        <span class="pd-game-main">
+          <strong>${game.is_home ? "vs" : "@"} ${esc(game.opponent)}</strong>
+          <small>${dayMonth(game.date)}${game.wl ? ` · ${esc(game.wl)}` : ""}</small>
+        </span>
+        <span class="pd-game-value ${over ? "is-over" : "is-under"}">${formatDetailValue(value)}</span>
+      </button>`);
+  });
+
+  $("#pdGameList").innerHTML = rows.length
+    ? rows.join("")
+    : '<div class="pd-empty">Sin partidos con ese filtro.</div>';
+}
+
+function renderDetailChart(data) {
+  const games = detailVisibleGames(data);
+  const projection = pdProjectionFor(data, state.detail.stat);
+  const values = games.map((game) => pdStatValue(game, state.detail.stat));
+  if (projection !== null) values.push(projection);
+  values.push(state.detail.line);
+
+  if (!games.length && projection === null) {
+    $("#pdChart").innerHTML =
+      '<div class="pd-empty">Sin partidos para dibujar. Prueba a cambiar el filtro.</div>';
+    $("#pdChartLine").textContent = num(state.detail.line);
+    $("#pdChartRange").textContent = "Sin partidos";
+    return;
+  }
+
+  const max = Math.max(1, ...values) * 1.12;
+  const linePct = Math.max(0, Math.min(100, (state.detail.line / max) * 100));
+  const rows = [];
+  if (projection !== null && data.upcoming) {
+    const over = projection >= state.detail.line;
+    const width = Math.max(0, Math.min(100, (projection / max) * 100));
+    rows.push(`
+      <div class="pd-chart-row is-projected">
+        <span class="pd-chart-date">PRÓX.</span>
+        <span class="pd-chart-opp">
+          ${data.upcoming.opponent_logo_url ? `<img src="${esc(data.upcoming.opponent_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+          ${esc(data.upcoming.opponent)}
+        </span>
+        <span class="pd-bar-track"><span class="pd-bar-fill ${over ? "is-over" : ""}" style="width:${width}%"></span></span>
+        <span class="pd-chart-value">${formatDetailValue(projection)}</span>
+      </div>`);
+  }
+
+  games.forEach((game) => {
+    const value = pdStatValue(game, state.detail.stat);
+    const over = value >= state.detail.line;
+    const width = Math.max(0, Math.min(100, (value / max) * 100));
+    rows.push(`
+      <div class="pd-chart-row">
+        <span class="pd-chart-date">${dayMonth(game.date)}</span>
+        <span class="pd-chart-opp">
+          ${game.opponent_logo_url ? `<img src="${esc(game.opponent_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+          ${esc(game.opponent)}
+        </span>
+        <span class="pd-bar-track"><span class="pd-bar-fill ${over ? "is-over" : ""}" style="width:${width}%"></span></span>
+        <span class="pd-chart-value">${formatDetailValue(value)}</span>
+      </div>`);
+  });
+
+  $("#pdChart").innerHTML = `<div class="pd-chart-rows" style="--line-pct:${linePct}%">${rows.join("")}</div>`;
+  $("#pdChartLine").textContent = num(state.detail.line);
+  const rangeText = state.detail.range === "all" ? `${games.length} partidos` : `últimos ${games.length}`;
+  const venueText =
+    state.detail.venue === "home" ? " · local" : state.detail.venue === "away" ? " · visita" : "";
+  $("#pdChartRange").textContent = `${rangeText}${venueText}`;
+}
+
+function renderDetailSide(data) {
+  const stat = state.detail.stat;
+  const label = detailStatLabel();
+  const line = state.detail.line;
+  const games = detailVisibleGames(data);
+  const values = games.map((game) => pdStatValue(game, stat));
+  const hits = values.filter((value) => value >= line).length;
+  const total = values.length;
+  const rate = total ? hits / total : null;
+
+  $("#pdLineInput").value = line.toFixed(1);
+  $("#pdHitRate").innerHTML = total
+    ? `${hits}<span>/${total} · ${pct(rate)}</span>`
+    : "—";
+  $("#pdHitSub").textContent = total
+    ? `Línea ${num(line)} · ${total} partidos reales`
+    : "Sin partidos para comparar.";
+
+  const projection = pdProjectionFor(data, stat);
+  const average = pdAverageFor(data, stat);
+  let meta;
+  if (stat === "dd" || stat === "td") {
+    meta =
+      stat === "dd"
+        ? "Cuenta partidos con 10+ en al menos dos de PTS, REB o AST."
+        : "Cuenta partidos con 10+ en PTS, REB y AST.";
+  } else if (projection !== null) {
+    meta = `Proyección del modelo para el próximo partido: ${num(projection)} ${label}.`;
+  } else if (average !== null) {
+    meta = `Media ${data.player.season}: ${num(average)} ${label}. Sin proyección del modelo para esta estadística.`;
+  } else {
+    meta = "Ajusta la línea para comparar los partidos recientes.";
+  }
+  $("#pdLineMeta").textContent = meta;
+
+  $$("#pdQuickViews button").forEach((button) => {
+    const value = button.dataset.range;
+    const active = value === "all" ? state.detail.range === "all" : Number(value) === state.detail.range;
+    button.classList.toggle("is-active", active);
+  });
+  $$("#pdVenueFilter button").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.venue === state.detail.venue);
+  });
+
+  $("#pdTeamName").textContent = data.player.team;
+  const teammates = data.teammates || [];
+  $("#pdTeammates").innerHTML = teammates.length
+    ? teammates
+        .map((teammate) => {
+          const score = teammate.projected_pra ?? teammate.recent_pra;
+          const scoreLabel = teammate.projected_pra != null ? "PRA proy." : "PRA reciente";
+          return `
+            <button class="pd-teammate" type="button" data-player-id="${esc(teammate.player_id)}" title="Abrir ficha de ${esc(teammate.player_name)}">
+              <span class="pd-teammate-top">
+                ${teammate.headshot_url ? `<img src="${esc(teammate.headshot_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+                <span>
+                  <strong>${esc(teammate.player_name)}</strong>
+                  <small>${esc(teammate.team)} · ${scoreLabel}</small>
+                </span>
+              </span>
+              <span class="pd-teammate-score">${score != null ? num(score) : "—"}</span>
+            </button>`;
+        })
+        .join("")
+    : '<div class="pd-empty">Sin compañeros disponibles.</div>';
+
+  const cta = $("#pdAnalysis");
+  cta.disabled = !data.upcoming;
+  cta.textContent = data.upcoming ? "VER ANÁLISIS DEL PARTIDO" : "SIN PRÓXIMO PARTIDO";
+}
+
+function adjustDetailLine(delta) {
+  const line = Math.max(0, Math.round((Number(state.detail.line) + delta) * 2) / 2);
+  state.detail.line = line;
+  renderPlayerDetail();
+}
+
+function openAnalysisForTeam(team) {
+  closePlayerDetail();
+  const select = $("#analysisTeam");
+  if (select && team && Array.from(select.options).some((option) => option.value === team)) {
+    select.value = team;
+    state.analysis.team = team;
+  }
+  state.loaded.analysis = false;
+  activateTab("analysis");
 }
 
 async function submitPrediction(event) {
@@ -838,6 +1313,80 @@ function bindEvents() {
     loadProps();
   });
 
+  $("#pdClose").addEventListener("click", closePlayerDetail);
+  $("#playerDetail").addEventListener("click", (event) => {
+    if (event.target === $("#playerDetail")) closePlayerDetail();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("#playerDetail").hidden) closePlayerDetail();
+  });
+  $("#pdTabs").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-stat]");
+    if (!button || !state.detail.data) return;
+    state.detail.stat = button.dataset.stat;
+    state.detail.line = pdDefaultLine(state.detail.data, state.detail.stat);
+    renderPlayerDetail();
+  });
+  $("#pdLineDown").addEventListener("click", () => adjustDetailLine(-0.5));
+  $("#pdLineUp").addEventListener("click", () => adjustDetailLine(0.5));
+  $("#pdLineInput").addEventListener("change", (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 0) return;
+    state.detail.line = Math.round(value * 2) / 2;
+    renderPlayerDetail();
+  });
+  $("#pdQuickViews").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-range]");
+    if (!button) return;
+    state.detail.range =
+      button.dataset.range === "all" ? "all" : Number(button.dataset.range);
+    renderPlayerDetail();
+  });
+  $("#pdVenueFilter").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-venue]");
+    if (!button) return;
+    state.detail.venue = button.dataset.venue;
+    renderPlayerDetail();
+  });
+  $("#pdGameList").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-game]");
+    if (!button || !state.detail.data) return;
+    if (button.dataset.game === "next") {
+      openAnalysisForTeam(state.detail.data.player.team);
+      return;
+    }
+    const game = (state.detail.data.games || []).find(
+      (item) => String(item.game_id) === String(button.dataset.gameId)
+    );
+    if (!game) return;
+    state.detail.line = Math.max(
+      0.5,
+      Math.round(pdStatValue(game, state.detail.stat) * 2) / 2
+    );
+    renderPlayerDetail();
+  });
+  $("#pdTeammates").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-player-id]");
+    if (!button) return;
+    openPlayerDetail(button.dataset.playerId, { opener: button });
+  });
+  $("#pdAnalysis").addEventListener("click", () => {
+    if (state.detail.data?.player?.team) {
+      openAnalysisForTeam(state.detail.data.player.team);
+    }
+  });
+
+  ["#playersBody", "#propsBody"].forEach((selector) => {
+    const body = $(selector);
+    if (!body) return;
+    body.addEventListener("click", (event) => {
+      const row = event.target.closest("[data-player-id]");
+      if (!row) return;
+      const opener = row.querySelector?.(".player-link") || row;
+      openPlayerDetail(row.dataset.playerId, { opener });
+    });
+  });
+
   $("#predictForm").addEventListener("submit", submitPrediction);
 
   // Refresco silencioso: la NBA actualiza el marcador y los finales aparecen solos.
@@ -892,6 +1441,8 @@ async function init() {
     }
 
     await loadUpcoming();
+    const detailMatch = window.location.hash.match(/^#ficha\/(\d+)$/);
+    if (detailMatch) openPlayerDetail(detailMatch[1]);
   } catch (error) {
     $("#statusBadge").textContent = "API no disponible";
     showToast(error.message);
