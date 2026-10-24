@@ -90,6 +90,39 @@ def test_upcoming_filters_by_date_and_status():
     assert lal["home"].tolist() == ["LAL"]
 
 
+def test_load_schedule_retries_after_timeout(monkeypatch, tmp_path):
+    import nba_api.stats.endpoints.scheduleleaguev2 as endpoint_module
+
+    import nba_ml.data.schedule as schedule_module
+
+    calls = []
+
+    class FakeSchedule:
+        def __init__(self, season, timeout):
+            calls.append((season, timeout))
+            if len(calls) == 1:
+                raise TimeoutError("timeout")
+
+        def get_data_frames(self):
+            return [_raw_schedule()]
+
+    monkeypatch.setattr(endpoint_module, "ScheduleLeagueV2", FakeSchedule)
+    monkeypatch.setattr(
+        schedule_module,
+        "schedule_path",
+        lambda season: tmp_path / "schedule.csv",
+    )
+    monkeypatch.setattr(schedule_module.time, "sleep", lambda seconds: None)
+
+    frame = schedule_module.load_schedule(
+        "2026-27", refresh=True, timeout=1, retries=2
+    )
+
+    assert len(calls) == 2
+    assert len(frame) == 2
+    assert (tmp_path / "schedule.csv").exists()
+
+
 def test_current_season_and_cache_path():
     assert current_season("2026-10-21") == "2026-27"
     assert current_season("2026-09-01") == "2026-27"

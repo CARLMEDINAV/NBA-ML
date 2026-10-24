@@ -7,11 +7,15 @@ red en cada visita.
 
 from __future__ import annotations
 
+import logging
+import time
 from pathlib import Path
 
 import pandas as pd
 
 from ..config import RAW_DIR
+
+LOG = logging.getLogger(__name__)
 
 # Solo temporada regular: los game_id de pretemporada empiezan por 001 y los de
 # playoffs por 004.
@@ -104,9 +108,14 @@ def normalize_schedule(raw: pd.DataFrame) -> pd.DataFrame:
 def load_schedule(
     season: str,
     refresh: bool = False,
-    timeout: int = 60,
+    timeout: int = 120,
+    retries: int = 3,
 ) -> pd.DataFrame:
-    """Lee el calendario cacheado o lo descarga si no existe / se pide refresco."""
+    """Lee el calendario cacheado o lo descarga si no existe / se pide refresco.
+
+    stats.nba.com puede tardar o cortar la conexión; se reintenta con espera
+    creciente para que un timeout aislado no rompa el workflow de resultados.
+    """
     path = schedule_path(season)
     if path.exists() and not refresh:
         return pd.read_csv(
@@ -118,16 +127,37 @@ def load_schedule(
     # Import perezoso: el resto del proyecto no necesita nba_api para leer cache.
     from nba_api.stats.endpoints import scheduleleaguev2
 
-    raw = scheduleleaguev2.ScheduleLeagueV2(
-        season=season, timeout=timeout
-    ).get_data_frames()[0]
-    frame = normalize_schedule(raw)
-    if frame.empty:
-        raise ValueError(f"El calendario de {season} no devolvio partidos de temporada regular")
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(path, index=False)
-    return frame
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            raw = scheduleleaguev2.ScheduleLeagueV2(
+                season=season, timeout=timeout
+            ).get_data_frames()[0]
+            frame = normalize_schedule(raw)
+            if frame.empty:
+                raise ValueError(
+                    f"El calendario de {season} no devolvio partidos de temporada regular"
+                )
+            path.parent.mkdir(parents=True, exist_ok=True)
+            frame.to_csv(path, index=False)
+            return frame
+        except Exception as error:  # noqa: BLE001 - la API falla de formas variadas
+            last_error = error
+            wait = 2 * attempt
+            LOG.warning(
+                "Error descargando calendario %s (intento %s/%s): %s. "
+                "Reintento en %ss",
+                season,
+                attempt,
+                retries,
+                error,
+                wait,
+            )
+            if attempt < retries:
+                time.sleep(wait)
+    raise RuntimeError(
+        f"No se pudo descargar el calendario de {season} tras {retries} intentos"
+    ) from last_error
 
 
 def upcoming_games(

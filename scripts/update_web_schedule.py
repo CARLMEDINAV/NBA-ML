@@ -44,7 +44,16 @@ def _finals(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> int:
-    frame = load_schedule(SEASON, refresh=True)
+    try:
+        frame = load_schedule(SEASON, refresh=True)
+    except Exception as error:  # noqa: BLE001 - no romper el workflow por un timeout
+        message = f"No se pudo actualizar el calendario: {error}"
+        print(f"::warning::{message}")
+        if DESTINATION.exists():
+            print("Se conserva el calendario/resultados anterior.")
+            return 0
+        return 1
+
     source = schedule_path(SEASON)
     finals = int((frame["status"] == 3).sum())
     live = int((frame["status"] == 2).sum())
