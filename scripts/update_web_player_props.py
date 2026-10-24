@@ -43,13 +43,83 @@ HISTORY_COLUMNS = [
     "ast",
     "stl",
     "blk",
-    "fg3m",
+    "fgm",
     "fga",
+    "fg_pct",
+    "fg3m",
+    "fg3a",
+    "fg3_pct",
+    "ftm",
     "fta",
+    "ft_pct",
+    "efg_pct",
+    "ts_pct",
+    "usage",
     "tov",
     "pra",
 ]
-HISTORY_GAMES = 15
+HISTORY_GAMES = 40
+
+
+def _ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
+    """Division segura: deja nulo cuando no hay intentos o minutos."""
+    result = numerator.div(denominator)
+    return result.where(denominator.gt(0))
+
+
+def _enrich_history(logs: pd.DataFrame) -> pd.DataFrame:
+    """Agrega efectividad de tiro y uso estimado a los game logs.
+
+    El uso sigue la formula de la NBA: porcentaje de posesiones del equipo que
+    termina el jugador mientras esta en cancha. Se calcula con los totales del
+    equipo en ese partido, reconstruidos a partir de todos los jugadores.
+    """
+    frame = logs.copy()
+    frame["game_id"] = frame["game_id"].astype(str).str.zfill(10)
+    frame["team"] = frame["team"].astype(str).str.upper().str.strip()
+    numeric = [
+        "min",
+        "pts",
+        "fgm",
+        "fga",
+        "fg3m",
+        "fg3a",
+        "ftm",
+        "fta",
+        "tov",
+    ]
+    for column in numeric:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+
+    team = (
+        frame.groupby(["game_id", "team"], as_index=False)
+        .agg(
+            team_fga=("fga", "sum"),
+            team_fta=("fta", "sum"),
+            team_tov=("tov", "sum"),
+            team_min=("min", "sum"),
+        )
+    )
+    frame = frame.merge(team, on=["game_id", "team"], how="left")
+
+    frame["fg_pct"] = _ratio(frame["fgm"], frame["fga"])
+    frame["fg3_pct"] = _ratio(frame["fg3m"], frame["fg3a"])
+    frame["ft_pct"] = _ratio(frame["ftm"], frame["fta"])
+    frame["efg_pct"] = _ratio(frame["fgm"] + 0.5 * frame["fg3m"], frame["fga"])
+    frame["ts_pct"] = _ratio(
+        frame["pts"],
+        2 * (frame["fga"] + 0.44 * frame["fta"]),
+    )
+
+    possessions = frame["fga"] + 0.44 * frame["fta"] + frame["tov"]
+    team_possessions = (
+        frame["team_fga"] + 0.44 * frame["team_fta"] + frame["team_tov"]
+    )
+    frame["usage"] = _ratio(
+        possessions * (frame["team_min"] / 5),
+        frame["min"] * team_possessions,
+    ).clip(upper=1.0)
+    return frame
 
 
 def _update_history(current_logs: pd.DataFrame, player_ids: set[int]) -> pd.DataFrame:
@@ -58,9 +128,8 @@ def _update_history(current_logs: pd.DataFrame, player_ids: set[int]) -> pd.Data
     El historico anterior se conserva en el artefacto; solo se reemplazan los
     partidos de la temporada actual para no descargar 2025-26 en cada workflow.
     """
-    current = current_logs.copy()
+    current = _enrich_history(current_logs)
     current["game_date"] = pd.to_datetime(current["game_date"])
-    current["game_id"] = current["game_id"].astype(str).str.zfill(10)
 
     if HISTORY.exists():
         previous = pd.read_csv(

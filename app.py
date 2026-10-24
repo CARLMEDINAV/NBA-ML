@@ -64,11 +64,39 @@ PLAYER_HISTORY_COLUMNS = [
     "ast",
     "stl",
     "blk",
-    "fg3m",
+    "fgm",
     "fga",
+    "fg_pct",
+    "fg3m",
+    "fg3a",
+    "fg3_pct",
+    "ftm",
     "fta",
+    "ft_pct",
+    "efg_pct",
+    "ts_pct",
+    "usage",
     "tov",
     "pra",
+]
+PLAYER_DEFENDER_COLUMNS = [
+    "season",
+    "off_player_id",
+    "def_player_id",
+    "def_player_name",
+    "def_team",
+    "gp",
+    "matchup_min",
+    "player_pts",
+    "matchup_ast",
+    "matchup_tov",
+    "matchup_blk",
+    "matchup_fgm",
+    "matchup_fga",
+    "matchup_fg3m",
+    "matchup_fg3a",
+    "matchup_ftm",
+    "matchup_fta",
 ]
 LEAN_OVER = 0.55
 LEAN_UNDER = 0.45
@@ -95,7 +123,7 @@ app = FastAPI(
         "Prediccion de totales, handicap y props de jugadores "
         "(PTS, REB, AST y PRA)."
     ),
-    version="0.4.0",
+    version="0.5.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -169,6 +197,17 @@ def _player_history_cached() -> pd.DataFrame:
     )
 
 
+@lru_cache(maxsize=1)
+def _player_defenders_cached() -> pd.DataFrame:
+    path = ARTIFACTS / "player_defenders_recent.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=PLAYER_DEFENDER_COLUMNS)
+    return pd.read_csv(
+        path,
+        dtype={"off_player_id": int, "def_player_id": int},
+    )
+
+
 def _artifact() -> dict:
     try:
         return _artifact_cached()
@@ -223,6 +262,10 @@ def _player_state() -> pd.DataFrame:
 
 def _player_history() -> pd.DataFrame:
     return _player_history_cached().copy()
+
+
+def _player_defenders() -> pd.DataFrame:
+    return _player_defenders_cached().copy()
 
 
 # ---------------------------------------------------------------------------
@@ -492,6 +535,86 @@ def _rounded(value: Any, digits: int = 1) -> float | None:
     if value is None or pd.isna(value):
         return None
     return round(float(value), digits)
+
+
+def _mean_value(frame: pd.DataFrame, column: str, digits: int = 3) -> float | None:
+    if frame is None or frame.empty or column not in frame.columns:
+        return None
+    values = pd.to_numeric(frame[column], errors="coerce").dropna()
+    if values.empty:
+        return None
+    return _rounded(values.mean(), digits)
+
+
+def _sum_value(frame: pd.DataFrame, column: str) -> float:
+    if frame is None or frame.empty or column not in frame.columns:
+        return 0.0
+    return float(pd.to_numeric(frame[column], errors="coerce").fillna(0).sum())
+
+
+def _shooting_from_box(frame: pd.DataFrame) -> dict[str, Any]:
+    """Efectividad agregada a partir de tiros convertidos/intentados."""
+    fgm = _sum_value(frame, "fgm")
+    fga = _sum_value(frame, "fga")
+    fg3m = _sum_value(frame, "fg3m")
+    fg3a = _sum_value(frame, "fg3a")
+    ftm = _sum_value(frame, "ftm")
+    fta = _sum_value(frame, "fta")
+    pts = _sum_value(frame, "pts")
+    return {
+        "fgm": _rounded(fgm),
+        "fga": _rounded(fga),
+        "fg_pct": _rounded(fgm / fga, 3) if fga else None,
+        "fg3m": _rounded(fg3m),
+        "fg3a": _rounded(fg3a),
+        "fg3_pct": _rounded(fg3m / fg3a, 3) if fg3a else None,
+        "ftm": _rounded(ftm),
+        "fta": _rounded(fta),
+        "ft_pct": _rounded(ftm / fta, 3) if fta else None,
+        "efg_pct": _rounded((fgm + 0.5 * fg3m) / fga, 3) if fga else None,
+        "ts_pct": _rounded(
+            pts / (2 * (fga + 0.44 * fta)),
+            3,
+        )
+        if fga or fta
+        else None,
+    }
+
+
+def _history_game_payload(row: Any, team_ids: dict[str, int]) -> dict[str, Any]:
+    opponent = str(row.opponent).upper().strip()
+    row_team = str(row.team).upper().strip()
+    return {
+        "game_id": str(row.game_id),
+        "season": str(row.season),
+        "date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
+        "team": row_team,
+        "team_logo_url": _team_logo_url(team_ids.get(row_team)),
+        "opponent": opponent,
+        "opponent_logo_url": _team_logo_url(team_ids.get(opponent)),
+        "is_home": bool(row.is_home),
+        "wl": None if pd.isna(row.wl) else str(row.wl),
+        "min": _rounded(row.min),
+        "pts": _rounded(row.pts),
+        "reb": _rounded(row.reb),
+        "ast": _rounded(row.ast),
+        "stl": _rounded(row.stl),
+        "blk": _rounded(row.blk),
+        "fgm": _rounded(getattr(row, "fgm", None)),
+        "fga": _rounded(getattr(row, "fga", None)),
+        "fg_pct": _rounded(getattr(row, "fg_pct", None), 3),
+        "fg3m": _rounded(getattr(row, "fg3m", None)),
+        "fg3a": _rounded(getattr(row, "fg3a", None)),
+        "fg3_pct": _rounded(getattr(row, "fg3_pct", None), 3),
+        "ftm": _rounded(getattr(row, "ftm", None)),
+        "fta": _rounded(getattr(row, "fta", None)),
+        "ft_pct": _rounded(getattr(row, "ft_pct", None), 3),
+        "efg_pct": _rounded(getattr(row, "efg_pct", None), 3),
+        "ts_pct": _rounded(getattr(row, "ts_pct", None), 3),
+        "usage": _rounded(getattr(row, "usage", None), 3),
+        "tov": _rounded(row.tov),
+        "pra": _rounded(row.pra),
+    }
 
 
 def _espn_price(block: dict[str, Any] | None) -> Any:
@@ -1336,8 +1459,32 @@ def player_card(
 
     pg_rows = pergame[pergame["player_id"].astype(int).eq(player_id)]
     pg_row = pg_rows.iloc[0] if not pg_rows.empty else None
+    player_history = history[
+        history["player_id"].astype(int).eq(player_id)
+    ].sort_values(["game_date", "game_id"], ascending=False)
+    current_history = player_history[
+        player_history["season"].astype(str).eq("2026-27")
+    ]
+    usage_sample = current_history if not current_history.empty else player_history
+    usage = _mean_value(usage_sample, "usage")
+    usage_gp = int(len(usage_sample))
     if pg_row is not None:
         gp = int(pg_row["gp"])
+        season_fgm = _rounded(pg_row.get("fgm"), 3) or 0.0
+        season_fga = _rounded(pg_row.get("fga"), 3) or 0.0
+        season_fg3m = _rounded(pg_row.get("fg3m"), 3) or 0.0
+        season_fta = _rounded(pg_row.get("fta"), 3) or 0.0
+        season_pts = _rounded(pg_row.get("pts"), 3) or 0.0
+        season_ts = (
+            season_pts / (2 * (season_fga + 0.44 * season_fta))
+            if season_fga or season_fta
+            else None
+        )
+        season_efg = (
+            (season_fgm + 0.5 * season_fg3m) / season_fga
+            if season_fga
+            else None
+        )
         averages = {
             "min": _rounded(pg_row.get("min")),
             "pts": _rounded(pg_row.get("pts")),
@@ -1350,6 +1497,12 @@ def player_card(
             "fga": _rounded(pg_row.get("fga")),
             "fta": _rounded(pg_row.get("fta")),
             "tov": _rounded(pg_row.get("tov")),
+            "fg_pct": _rounded(pg_row.get("fg_pct"), 3),
+            "fg3_pct": _rounded(pg_row.get("fg3_pct"), 3),
+            "ft_pct": _rounded(pg_row.get("ft_pct"), 3),
+            "ts_pct": _rounded(season_ts, 3),
+            "efg_pct": _rounded(season_efg, 3),
+            "usage": usage,
         }
     else:
         gp = int(state_row["gp_season"])
@@ -1368,7 +1521,29 @@ def player_card(
             "fga": None,
             "fta": None,
             "tov": None,
+            "fg_pct": None,
+            "fg3_pct": None,
+            "ft_pct": None,
+            "ts_pct": None,
+            "efg_pct": None,
+            "usage": usage,
         }
+
+    efficiency = {
+        "fg_pct": averages.get("fg_pct"),
+        "fg3_pct": averages.get("fg3_pct"),
+        "ft_pct": averages.get("ft_pct"),
+        "ts_pct": averages.get("ts_pct"),
+        "efg_pct": averages.get("efg_pct"),
+        "usage": usage,
+        "usage_gp": usage_gp,
+        "fgm": _rounded(pg_row.get("fgm"), 3) if pg_row is not None else None,
+        "fga": _rounded(pg_row.get("fga"), 3) if pg_row is not None else None,
+        "fg3m": _rounded(pg_row.get("fg3m"), 3) if pg_row is not None else None,
+        "fg3a": _rounded(pg_row.get("fg3a"), 3) if pg_row is not None else None,
+        "ftm": _rounded(pg_row.get("ftm"), 3) if pg_row is not None else None,
+        "fta": _rounded(pg_row.get("fta"), 3) if pg_row is not None else None,
+    }
 
     dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
     mask = (
@@ -1459,37 +1634,148 @@ def player_card(
             for row in peers.itertuples(index=False)
         ]
 
-    player_games = history[
-        history["player_id"].astype(int).eq(player_id)
-    ].sort_values(["game_date", "game_id"], ascending=False).head(15)
-    games: list[dict[str, Any]] = []
-    for row in player_games.itertuples(index=False):
-        opponent = str(row.opponent).upper().strip()
-        row_team = str(row.team).upper().strip()
-        games.append(
-            {
-                "game_id": str(row.game_id),
-                "season": str(row.season),
-                "date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
-                "team": row_team,
-                "team_logo_url": _team_logo_url(team_ids.get(row_team)),
-                "opponent": opponent,
-                "opponent_logo_url": _team_logo_url(team_ids.get(opponent)),
-                "is_home": bool(row.is_home),
-                "wl": None if pd.isna(row.wl) else str(row.wl),
-                "min": _rounded(row.min),
-                "pts": _rounded(row.pts),
-                "reb": _rounded(row.reb),
-                "ast": _rounded(row.ast),
-                "stl": _rounded(row.stl),
-                "blk": _rounded(row.blk),
-                "fg3m": _rounded(row.fg3m),
-                "fga": _rounded(row.fga),
-                "fta": _rounded(row.fta),
-                "tov": _rounded(row.tov),
-                "pra": _rounded(row.pra),
-            }
-        )
+    games = [
+        _history_game_payload(row, team_ids)
+        for row in player_history.head(15).itertuples(index=False)
+    ]
+
+    h2h = None
+    defenders: list[dict[str, Any]] = []
+    if upcoming:
+        opponent = str(upcoming["opponent"]).upper().strip()
+        h2h_rows = player_history[
+            player_history["opponent"].astype(str).str.upper().str.strip().eq(opponent)
+        ].sort_values(["game_date", "game_id"], ascending=False)
+        h2h_shooting = _shooting_from_box(h2h_rows)
+        h2h_games = int(len(h2h_rows))
+        wins = int(
+            h2h_rows["wl"].astype(str).str.upper().eq("W").sum()
+        ) if h2h_games else 0
+        losses = int(
+            h2h_rows["wl"].astype(str).str.upper().eq("L").sum()
+        ) if h2h_games else 0
+        h2h = {
+            "opponent": opponent,
+            "opponent_name": names.get(opponent, opponent),
+            "opponent_logo_url": upcoming.get("opponent_logo_url"),
+            "is_home": upcoming.get("is_home"),
+            "games": h2h_games,
+            "wins": wins,
+            "losses": losses,
+            "sample_size": int(len(player_history)),
+            "averages": {
+                "min": _mean_value(h2h_rows, "min"),
+                "pts": _mean_value(h2h_rows, "pts"),
+                "reb": _mean_value(h2h_rows, "reb"),
+                "ast": _mean_value(h2h_rows, "ast"),
+                "pra": _mean_value(h2h_rows, "pra"),
+                "usage": _mean_value(h2h_rows, "usage"),
+                "fg_pct": h2h_shooting["fg_pct"],
+                "fg3_pct": h2h_shooting["fg3_pct"],
+                "ft_pct": h2h_shooting["ft_pct"],
+                "ts_pct": h2h_shooting["ts_pct"],
+            },
+            "meetings": [
+                _history_game_payload(row, team_ids)
+                for row in h2h_rows.head(5).itertuples(index=False)
+            ],
+        }
+
+        defender_frame = _player_defenders()
+        if not defender_frame.empty:
+            defender_rows = defender_frame[
+                defender_frame["off_player_id"].astype(int).eq(player_id)
+            ].copy()
+            if not defender_rows.empty:
+                for column in [
+                    "gp",
+                    "matchup_min",
+                    "player_pts",
+                    "matchup_ast",
+                    "matchup_tov",
+                    "matchup_blk",
+                    "matchup_fgm",
+                    "matchup_fga",
+                    "matchup_fg3m",
+                    "matchup_fg3a",
+                    "matchup_ftm",
+                    "matchup_fta",
+                ]:
+                    defender_rows[column] = pd.to_numeric(
+                        defender_rows[column], errors="coerce"
+                    ).fillna(0)
+                grouped = (
+                    defender_rows.groupby(
+                        ["def_player_id", "def_player_name"], as_index=False
+                    )
+                    .agg(
+                        team=("def_team", "first"),
+                        gp=("gp", "sum"),
+                        matchup_min=("matchup_min", "sum"),
+                        player_pts=("player_pts", "sum"),
+                        matchup_ast=("matchup_ast", "sum"),
+                        matchup_tov=("matchup_tov", "sum"),
+                        matchup_blk=("matchup_blk", "sum"),
+                        matchup_fgm=("matchup_fgm", "sum"),
+                        matchup_fga=("matchup_fga", "sum"),
+                        matchup_fg3m=("matchup_fg3m", "sum"),
+                        matchup_fg3a=("matchup_fg3a", "sum"),
+                        matchup_ftm=("matchup_ftm", "sum"),
+                        matchup_fta=("matchup_fta", "sum"),
+                    )
+                    .sort_values("matchup_min", ascending=False)
+                    .head(5)
+                )
+                for row in grouped.itertuples(index=False):
+                    def_team = None if pd.isna(row.team) else str(row.team).upper()
+                    fga = float(row.matchup_fga)
+                    fg3a = float(row.matchup_fg3a)
+                    fta = float(row.matchup_fta)
+                    gp_value = max(1.0, float(row.gp))
+                    defenders.append(
+                        {
+                            "player_id": int(row.def_player_id),
+                            "player_name": str(row.def_player_name),
+                            "team": def_team,
+                            "team_name": names.get(def_team, def_team)
+                            if def_team
+                            else None,
+                            "team_logo_url": _team_logo_url(
+                                team_ids.get(def_team)
+                            )
+                            if def_team
+                            else None,
+                            "headshot_url": (
+                                "https://cdn.nba.com/headshots/nba/latest/260x190/"
+                                f"{int(row.def_player_id)}.png"
+                            ),
+                            "gp": int(row.gp),
+                            "matchup_min": _rounded(row.matchup_min, 1),
+                            "matchup_min_pg": _rounded(
+                                row.matchup_min / gp_value, 1
+                            ),
+                            "player_pts": _rounded(row.player_pts, 1),
+                            "player_pts_pg": _rounded(
+                                row.player_pts / gp_value, 1
+                            ),
+                            "fg_pct": _rounded(
+                                row.matchup_fgm / fga, 3
+                            )
+                            if fga
+                            else None,
+                            "fg3_pct": _rounded(
+                                row.matchup_fg3m / fg3a, 3
+                            )
+                            if fg3a
+                            else None,
+                            "ft_pct": _rounded(
+                                row.matchup_ftm / fta, 3
+                            )
+                            if fta
+                            else None,
+                            "is_next_opponent": def_team == opponent,
+                        }
+                    )
 
     last_state = pd.to_datetime(player_state["last_game_date"]).max().normalize()
     player = {
@@ -1510,7 +1796,10 @@ def player_card(
         {
             "season": "2026-27",
             "player": player,
+            "efficiency": efficiency,
             "upcoming": upcoming,
+            "h2h": h2h,
+            "defenders": defenders,
             "games": games,
             "teammates": teammates,
             "model_name": artifact.get("model_name"),
@@ -1518,8 +1807,10 @@ def player_card(
             "note": (
                 "Las barras verdes superan la linea y las rojas no. La fila "
                 "PROX. es una proyeccion del modelo; el resto son partidos "
-                "reales. No incluye lesiones, alineaciones ni cuotas de props; "
-                "no es consejo de apuestas."
+                "reales. El H2H y los defensores usan la muestra reciente; no "
+                "son una asignacion defensiva para el proximo partido. No "
+                "incluye lesiones, alineaciones ni cuotas de props; no es "
+                "consejo de apuestas."
             ),
         }
     )

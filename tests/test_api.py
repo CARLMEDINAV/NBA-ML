@@ -283,9 +283,31 @@ def test_player_card_detail():
     assert game["opponent"]
     assert game["date"]
     assert game["pra"] is not None
+    assert game["min"] is not None
+    assert game["fgm"] is not None
+    assert game["fga"] is not None
+    assert game["usage"] is not None
     assert payload["upcoming"] is not None
     assert payload["upcoming"]["opponent"]
     assert payload["upcoming"]["projection"]["pra"] > 0
+    assert payload["upcoming"]["projection"]["min"] > 0
+    efficiency = payload["efficiency"]
+    assert 0 <= efficiency["fg_pct"] <= 1
+    assert 0 <= efficiency["fg3_pct"] <= 1
+    assert 0 <= efficiency["ft_pct"] <= 1
+    assert 0 <= efficiency["ts_pct"] <= 2
+    assert 0 <= efficiency["usage"] <= 1
+    assert efficiency["usage_gp"] >= 1
+    h2h = payload["h2h"]
+    assert h2h["opponent"] == payload["upcoming"]["opponent"]
+    assert h2h["games"] >= 1
+    assert h2h["meetings"]
+    assert h2h["averages"]["usage"] is not None
+    assert payload["defenders"]
+    defender = payload["defenders"][0]
+    assert defender["player_name"]
+    assert defender["matchup_min_pg"] is not None
+    assert defender["player_pts_pg"] is not None
     assert payload["teammates"]
     assert payload["note"]
 
@@ -342,6 +364,9 @@ def test_static_frontend_is_served():
     assert "Props" in response.text
     assert "Predicciones de jugadores" in response.text
     assert 'id="playerDetail"' in response.text
+    assert 'id="pdEfficiency"' in response.text
+    assert 'id="pdH2H"' in response.text
+    assert 'id="pdDefenders"' in response.text
     assert "VER ANÁLISIS DEL PARTIDO" in response.text
 
 
@@ -354,3 +379,7 @@ def test_static_javascript_includes_player_headshots():
     assert "/api/player-card" in response.text
     assert "loadProps" in response.text
     assert "openPlayerDetail" in response.text
+    assert "renderDetailEfficiency" in response.text
+    assert "renderDetailH2H" in response.text
+    assert "renderDetailDefenders" in response.text
+    assert 'label: "MIN"' in response.text

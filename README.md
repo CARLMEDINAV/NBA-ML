@@ -75,8 +75,11 @@ la suma de las tres proyecciones. Validación temporal con el tramo final de
 Sin lesiones, alineaciones ni cuotas de props. La pestaña **Props** muestra los
 jugadores con minutos en 2026-27 ordenados por PRA proyectado. Al hacer clic en
 un jugador se abre una ficha con sus últimos partidos, la línea ajustable, el
-acierto histórico, el próximo partido y sus compañeros. Las barras comparan cada
-partido con la línea; la fila **PRÓX.** es una proyección, no un resultado.
+acierto histórico, el próximo partido y sus compañeros. Incluye minutos,
+efectividad de tiro (FG%, 3P%, FT%, TS% y eFG%), uso estimado, H2H contra el
+próximo rival y los defensores que más lo marcaron según los datos de matchup
+de la NBA. Las barras comparan cada partido con la línea; la fila **PRÓX.** es
+una proyección, no un resultado.
 
 ---
 
@@ -118,7 +121,8 @@ nba-ml/
 ├── models/model.joblib       # modelo de totales + features + residuos
 ├── models/player_props.joblib # modelo de props + métricas
 ├── artifacts/player_state.csv # foto reciente de jugadores para props
-├── artifacts/player_game_logs_recent.csv # últimos partidos por jugador (ficha)
+├── artifacts/player_game_logs_recent.csv # hasta 40 partidos por jugador (ficha/H2H)
+├── artifacts/player_defenders_recent.csv # defensores con más minutos de matchup
 └── reports/                  # metrics.md, eda.md, figuras, predicciones test
 ```
 
@@ -206,7 +210,12 @@ y **Props**; estas son las secciones principales:
   jugador para los próximos partidos, con filtros por días, equipo y número de
   jugadores por partido. Al abrir un jugador se muestra su ficha con los últimos
   partidos, línea ajustable, acierto histórico, próximo partido y compañeros.
-  No incluye lesiones, alineaciones ni cuotas de props.
+  Añade minutos como estadística seleccionable, FG%, 3P%, FT%, TS%, eFG% y uso
+  estimado, un resumen H2H contra el próximo rival y los defensores que más
+  minutos de matchup acumularon. El uso se estima con los totales del equipo
+  en cada box score; los defensores son datos de matchup de la NBA, no una
+  asignación defensiva del próximo partido. No incluye lesiones, alineaciones
+  ni cuotas de props.
 - **Predicción**: selectores de local/visitante, fecha y línea; total previsto,
   intervalo 80%, probabilidad de over, margen, puntos proyectados, ganador
   probable, hándicap del modelo, comparación de Elo/forma/descanso y gráfico de
@@ -264,7 +273,8 @@ La app pública está pensada para abrirla desde el móvil:
   pestaña **Análisis** con la tabla partido a partido: puntos proyectados,
   total, posible ganador, hándicap sugerido y cuotas over/under; y una pestaña
   **Props** con PTS, REB, AST y PRA proyectados por jugador. Cada jugador tiene
-  una ficha visual con sus últimos partidos, línea ajustable y acierto histórico.
+  una ficha visual con sus últimos partidos, línea ajustable, acierto histórico,
+  minutos, efectividad, uso, H2H y defensores.
 - **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
   `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`).
   `/api/upcoming?odds=1&analysis=1` añade hándicap, proyecciones por equipo y
@@ -286,10 +296,12 @@ La app pública está pensada para abrirla desde el móvil:
   y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
 - **Jugadores y props:** otro workflow
   (`.github/workflows/update-players.yml`) refresca cada 6 horas
-  `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv` y
-  `player_game_logs_recent.csv`. Así los equipos actuales (por ejemplo, Giannis
-  en Miami), las medias móviles de los props y los últimos partidos de cada
-  ficha llegan a la web sin que Vercel tenga que consultar `stats.nba.com`.
+  `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv`,
+  `player_game_logs_recent.csv` y `player_defenders_recent.csv`. Así los equipos
+  actuales (por ejemplo, Giannis en Miami), las medias móviles de los props, los
+  últimos partidos, la efectividad/uso y los defensores de cada ficha llegan a
+  la web sin que Vercel tenga que consultar `stats.nba.com`. Los artefactos de
+  historial y defensores conservan los datos anteriores si la descarga falla.
 
 Para probarla en local:
 

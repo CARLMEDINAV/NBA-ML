@@ -45,6 +45,7 @@ const DETAIL_STATS = [
   { key: "pts_reb", label: "PTS+REB" },
   { key: "reb_ast", label: "REB+AST" },
   { key: "pra", label: "P+R+A" },
+  { key: "min", label: "MIN" },
   { key: "stl", label: "STL" },
   { key: "blk", label: "BLK" },
   { key: "fg3m", label: "3PM" },
@@ -830,6 +831,10 @@ function pdHeaderStat(label, value) {
   return `<span class="pd-stat">${label} <b>${value === null || value === undefined ? "—" : num(value)}</b></span>`;
 }
 
+function pdHeaderPct(label, value) {
+  return `<span class="pd-stat">${label} <b>${pct(value)}</b></span>`;
+}
+
 async function openPlayerDetail(playerId, options = {}) {
   const numericId = Number(playerId);
   if (!Number.isFinite(numericId) || numericId <= 0) return;
@@ -903,6 +908,9 @@ function renderPlayerDetail() {
   renderDetailGames(data);
   renderDetailChart(data);
   renderDetailLinePanel(data);
+  renderDetailEfficiency(data);
+  renderDetailH2H(data);
+  renderDetailDefenders(data);
   renderDetailTeammates(data);
 
   const notes = [];
@@ -924,6 +932,7 @@ function renderPlayerDetail() {
 function renderDetailHero(data) {
   const player = data.player;
   const averages = player.averages || {};
+  const efficiency = data.efficiency || {};
   const avatar = player.headshot_url
     ? `<img class="pd-headshot" src="${esc(player.headshot_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
     : "";
@@ -948,7 +957,7 @@ function renderDetailHero(data) {
         ${pdHeaderStat("AST", averages.ast)}
         ${pdHeaderStat("MIN", averages.min)}
         ${pdHeaderStat("PRA", averages.pra)}
-        ${pdHeaderStat("PJ", player.gp)}
+        ${pdHeaderPct("USO", efficiency.usage)}
       </div>
     </div>`;
 }
@@ -956,7 +965,7 @@ function renderDetailHero(data) {
 function renderDetailTabs() {
   $("#pdTabs").innerHTML = DETAIL_STATS.map((item) => {
     const active = item.key === state.detail.stat;
-    const modeled = ["pts", "reb", "ast", "pts_ast", "pts_reb", "reb_ast", "pra"].includes(item.key);
+    const modeled = ["pts", "reb", "ast", "pts_ast", "pts_reb", "reb_ast", "pra", "min"].includes(item.key);
     return `<button class="pd-tab${active ? " is-active" : ""}" type="button" role="tab" aria-selected="${active}" data-stat="${item.key}" title="${modeled ? "Proyección del modelo" : "Media histórica; sin proyección del modelo"}">${item.label}</button>`;
   }).join("");
 }
@@ -980,7 +989,7 @@ function renderDetailGames(data) {
         <span class="pd-game-logos">${logos}</span>
         <span class="pd-game-main">
           <strong>${data.upcoming.is_home ? "vs" : "@"} ${esc(data.upcoming.opponent)}</strong>
-          <small>PRÓX. · ${dayMonth(data.upcoming.date)}${data.upcoming.time_et ? ` · ${esc(data.upcoming.time_et)} ET` : ""}</small>
+          <small>PRÓX. · ${dayMonth(data.upcoming.date)}${data.upcoming.time_et ? ` · ${esc(data.upcoming.time_et)} ET` : ""}${state.detail.stat !== "min" && data.upcoming.projection?.min != null ? ` · ${num(data.upcoming.projection.min)} min proy.` : ""}</small>
         </span>
         <span class="pd-game-value">${value}</span>
       </button>`);
@@ -1002,7 +1011,7 @@ function renderDetailGames(data) {
         <span class="pd-game-logos">${logos}</span>
         <span class="pd-game-main">
           <strong>${game.is_home ? "vs" : "@"} ${esc(game.opponent)}</strong>
-          <small>${dayMonth(game.date)}${game.wl ? ` · ${esc(game.wl)}` : ""}</small>
+          <small>${dayMonth(game.date)}${game.wl ? ` · ${esc(game.wl)}` : ""}${state.detail.stat !== "min" && game.min != null ? ` · ${num(game.min)} min` : ""}</small>
         </span>
         <span class="pd-game-value ${over ? "is-over" : "is-under"}">${formatDetailValue(value)}</span>
       </button>`);
@@ -1117,6 +1126,145 @@ function renderDetailLinePanel(data) {
   const cta = $("#pdAnalysis");
   cta.disabled = !data.upcoming;
   cta.textContent = data.upcoming ? "VER ANÁLISIS DEL PARTIDO" : "SIN PRÓXIMO PARTIDO";
+}
+
+function renderDetailEfficiency(data) {
+  const efficiency = data.efficiency || {};
+  const sample = efficiency.usage_gp
+    ? `${data.player.season} · ${efficiency.usage_gp} PJ`
+    : data.player.season;
+  $("#pdEfficiencySample").textContent = sample;
+  const items = [
+    { label: "FG%", value: efficiency.fg_pct, title: "Tiros de campo" },
+    { label: "3P%", value: efficiency.fg3_pct, title: "Triples" },
+    { label: "FT%", value: efficiency.ft_pct, title: "Tiros libres" },
+    { label: "TS%", value: efficiency.ts_pct, title: "True shooting" },
+    { label: "eFG%", value: efficiency.efg_pct, title: "Effective field goal" },
+    { label: "USO", value: efficiency.usage, title: "Uso estimado" },
+  ];
+  $("#pdEfficiency").innerHTML = items
+    .map(
+      (item) => `
+        <div class="pd-eff-item" title="${esc(item.title)}">
+          <span>${esc(item.label)}</span>
+          <b>${pct(item.value)}</b>
+        </div>`
+    )
+    .join("");
+  $("#pdEfficiencyVolume").textContent =
+    efficiency.fgm == null
+      ? "Sin volumen de tiro disponible."
+      : `Por partido: ${num(efficiency.fgm)}/${num(efficiency.fga)} FG · ${num(efficiency.fg3m)}/${num(efficiency.fg3a)} 3P · ${num(efficiency.ftm)}/${num(efficiency.fta)} FT`;
+}
+
+function renderDetailH2H(data) {
+  const h2h = data.h2h;
+  const meta = $("#pdH2HMeta");
+  const body = $("#pdH2H");
+  const note = $("#pdH2HNote");
+  if (!h2h) {
+    meta.textContent = "";
+    body.innerHTML =
+      '<div class="pd-empty">Sin próximo partido para calcular un H2H.</div>';
+    note.textContent = "";
+    return;
+  }
+
+  meta.textContent = `${h2h.is_home ? "vs" : "@"} ${h2h.opponent}`;
+  note.textContent = `Muestra: últimos ${h2h.sample_size} partidos del jugador.`;
+  const logo = h2h.opponent_logo_url
+    ? `<img src="${esc(h2h.opponent_logo_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+    : "";
+  if (!h2h.games) {
+    body.innerHTML = `
+      <div class="pd-h2h-top">
+        <span class="pd-h2h-logo">${logo}</span>
+        <span class="pd-h2h-name"><strong>${esc(h2h.opponent_name)}</strong><small>0 PJ en la muestra</small></span>
+        <span class="pd-h2h-record">—</span>
+      </div>
+      <div class="pd-empty">Sin cruces recientes contra ${esc(h2h.opponent)}.</div>`;
+    return;
+  }
+
+  const averages = h2h.averages || {};
+  const stats = [
+    ["PTS", averages.pts],
+    ["REB", averages.reb],
+    ["AST", averages.ast],
+    ["MIN", averages.min],
+    ["FG%", averages.fg_pct, true],
+    ["USO", averages.usage, true],
+  ];
+  const meetings = (h2h.meetings || [])
+    .slice(0, 3)
+    .map((game) => {
+      const result = game.wl || "—";
+      const resultClass =
+        result === "W" ? "is-win" : result === "L" ? "is-loss" : "";
+      return `
+        <div class="pd-h2h-meeting">
+          <span class="pd-h2h-date">${dayMonth(game.date)}</span>
+          <span class="pd-h2h-result ${resultClass}">${esc(result)}</span>
+          <span class="pd-h2h-line">
+            <b>${num(game.pts, 0)}</b> PTS · <b>${num(game.reb, 0)}</b> REB · <b>${num(game.ast, 0)}</b> AST
+            <small>${num(game.min)} min · ${pct(game.fg_pct)} FG</small>
+          </span>
+        </div>`;
+    })
+    .join("");
+
+  body.innerHTML = `
+    <div class="pd-h2h-top">
+      <span class="pd-h2h-logo">${logo}</span>
+      <span class="pd-h2h-name"><strong>${esc(h2h.opponent_name)}</strong><small>${h2h.games} PJ</small></span>
+      <span class="pd-h2h-record">${h2h.wins}-${h2h.losses}</span>
+    </div>
+    <div class="pd-h2h-stats">
+      ${stats
+        .map(
+          ([label, value, isPct]) => `
+            <span class="pd-h2h-stat">
+              <small>${label}</small>
+              <b>${isPct ? pct(value) : num(value)}</b>
+            </span>`
+        )
+        .join("")}
+    </div>
+    <div class="pd-h2h-meetings">${meetings}</div>`;
+}
+
+function renderDetailDefenders(data) {
+  const defenders = data.defenders || [];
+  $("#pdDefendersTeam").textContent = "muestra reciente";
+  $("#pdDefenders").innerHTML = defenders.length
+    ? defenders
+        .slice(0, 4)
+        .map((defender) => {
+          const teamText = defender.team ? `${esc(defender.team)} · ` : "";
+          const nextClass = defender.is_next_opponent ? " is-next" : "";
+          return `
+            <div class="pd-defender${nextClass}">
+              <span class="pd-defender-avatar" aria-hidden="true">
+                <span>${esc(initials(defender.player_name))}</span>
+                ${
+                  defender.headshot_url
+                    ? `<img src="${esc(defender.headshot_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+                    : ""
+                }
+              </span>
+              <span class="pd-defender-main">
+                <strong>${esc(defender.player_name)}</strong>
+                <small>${teamText}${num(defender.matchup_min_pg)} min/partido · ${num(defender.gp, 0)} PJ${defender.is_next_opponent ? " · próximo rival" : ""}</small>
+              </span>
+              <span class="pd-defender-stats">
+                <b>${num(defender.player_pts_pg)}</b>
+                <small>PTS/part.</small>
+                <small>${pct(defender.fg_pct)} FG perm.</small>
+              </span>
+            </div>`;
+        })
+        .join("")
+    : '<div class="pd-empty">Sin datos de defensores para este jugador.</div>';
 }
 
 function renderDetailTeammates(data) {
