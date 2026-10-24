@@ -47,6 +47,39 @@ def test_normalize_requires_core_columns():
         normalize_player_stats(pd.DataFrame({"PLAYER_ID": [1]}))
 
 
+def test_load_player_stats_retries_after_timeout(monkeypatch, tmp_path):
+    import nba_api.stats.endpoints.leaguedashplayerstats as endpoint_module
+
+    import nba_ml.data.players as players_module
+
+    calls = []
+
+    class FakeStats:
+        def __init__(self, season, per_mode_detailed, timeout):
+            calls.append((season, per_mode_detailed, timeout))
+            if len(calls) == 1:
+                raise TimeoutError("timeout")
+
+        def get_data_frames(self):
+            return [_raw_stats()]
+
+    monkeypatch.setattr(endpoint_module, "LeagueDashPlayerStats", FakeStats)
+    monkeypatch.setattr(
+        players_module,
+        "player_stats_path",
+        lambda season, per_mode: tmp_path / "players.csv",
+    )
+    monkeypatch.setattr(players_module.time, "sleep", lambda seconds: None)
+
+    frame = players_module.load_player_stats(
+        "2026-27", per_mode="PerGame", refresh=True, timeout=1, retries=2
+    )
+
+    assert len(calls) == 2
+    assert len(frame) == 2
+    assert (tmp_path / "players.csv").exists()
+
+
 def test_player_stats_cache_path():
     assert (
         player_stats_path("2025-26", "PerGame").name

@@ -19,14 +19,35 @@ SEASON = "2026-27"
 MODES = {"PerGame": "pergame", "Totals": "totals"}
 
 
+def _destinations() -> list[Path]:
+    return [
+        ROOT / "artifacts" / f"player_stats_{SEASON.replace('-', '_')}_{suffix}.csv"
+        for suffix in MODES.values()
+    ]
+
+
 def main() -> int:
+    frames = {}
+    for per_mode in MODES:
+        try:
+            frames[per_mode] = load_player_stats(
+                SEASON,
+                per_mode=per_mode,
+                refresh=True,
+                timeout=120,
+            )
+        except Exception as error:  # noqa: BLE001 - no romper el workflow por un timeout
+            print(
+                f"::warning::No se pudieron actualizar las estadisticas "
+                f"({per_mode}) de {SEASON}: {error}"
+            )
+            if all(path.exists() for path in _destinations()):
+                print("Se conservan las estadisticas de jugadores anteriores.")
+                return 0
+            return 1
+
     for per_mode, suffix in MODES.items():
-        frame = load_player_stats(
-            SEASON,
-            per_mode=per_mode,
-            refresh=True,
-            timeout=90,
-        )
+        frame = frames[per_mode]
         source = player_stats_path(SEASON, per_mode)
         destination = (
             ROOT / "artifacts" / f"player_stats_{SEASON.replace('-', '_')}_{suffix}.csv"

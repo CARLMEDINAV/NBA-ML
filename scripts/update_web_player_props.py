@@ -28,14 +28,24 @@ PRIOR_SEASON = "2025-26"
 
 
 def main() -> int:
-    logs = load_player_logs([CURRENT_SEASON], refresh=True)
-    prior_stats = pd.read_csv(
-        ARTIFACTS / f"player_stats_{PRIOR_SEASON.replace('-', '_')}_pergame.csv"
-    )
-    prior_averages = build_prior_averages(prior_stats)
-    state = build_player_state(logs, prior_averages)
     destination = ARTIFACTS / "player_state.csv"
-    state.to_csv(destination, index=False)
+    try:
+        logs = load_player_logs([CURRENT_SEASON], refresh=True)
+        prior_stats = pd.read_csv(
+            ARTIFACTS / f"player_stats_{PRIOR_SEASON.replace('-', '_')}_pergame.csv"
+        )
+        prior_averages = build_prior_averages(prior_stats)
+        state = build_player_state(logs, prior_averages)
+        temporary = destination.with_suffix(".tmp")
+        state.to_csv(temporary, index=False)
+        temporary.replace(destination)
+    except Exception as error:  # noqa: BLE001 - no romper el workflow por un timeout
+        print(f"::warning::No se pudo actualizar el estado de props: {error}")
+        if destination.exists():
+            print("Se conserva el estado de props anterior.")
+            return 0
+        return 1
+
     print(
         f"{destination.relative_to(ROOT)}: {len(state)} jugadores · "
         f"{int(state['gp_season'].max())} partidos maximos · "

@@ -7,11 +7,15 @@ Descarga ``LeagueDashPlayerStats`` y cachea el resultado en
 
 from __future__ import annotations
 
+import logging
+import time
 from pathlib import Path
 
 import pandas as pd
 
 from ..config import RAW_DIR
+
+LOG = logging.getLogger(__name__)
 
 PER_MODES = {"PerGame": "pergame", "Totals": "totals"}
 
@@ -139,24 +143,51 @@ def load_player_stats(
     season: str,
     per_mode: str = "PerGame",
     refresh: bool = False,
-    timeout: int = 60,
+    timeout: int = 120,
+    retries: int = 3,
 ) -> pd.DataFrame:
-    """Lee las estadisticas cacheadas o las descarga desde stats.nba.com."""
+    """Lee las estadisticas cacheadas o las descarga desde stats.nba.com.
+
+    stats.nba.com puede cortar la conexión; se reintenta con espera creciente
+    para que un timeout aislado no deje sin actualizar la web.
+    """
     path = player_stats_path(season, per_mode)
     if path.exists() and not refresh:
         return pd.read_csv(path, dtype={"player_id": int})
 
     from nba_api.stats.endpoints import leaguedashplayerstats
 
-    raw = leaguedashplayerstats.LeagueDashPlayerStats(
-        season=season,
-        per_mode_detailed=per_mode,
-        timeout=timeout,
-    ).get_data_frames()[0]
-    frame = normalize_player_stats(raw)
-    if frame.empty:
-        raise ValueError(f"Sin estadisticas de jugadores para {season} ({per_mode})")
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(path, index=False)
-    return frame
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            raw = leaguedashplayerstats.LeagueDashPlayerStats(
+                season=season,
+                per_mode_detailed=per_mode,
+                timeout=timeout,
+            ).get_data_frames()[0]
+            frame = normalize_player_stats(raw)
+            if frame.empty:
+                raise ValueError(
+                    f"Sin estadisticas de jugadores para {season} ({per_mode})"
+                )
+            path.parent.mkdir(parents=True, exist_ok=True)
+            frame.to_csv(path, index=False)
+            return frame
+        except Exception as error:  # noqa: BLE001 - la API falla de formas variadas
+            last_error = error
+            wait = 2 * attempt
+            LOG.warning(
+                "Error descargando stats de jugadores %s/%s (intento %s/%s): %s. "
+                "Reintento en %ss",
+                season,
+                per_mode,
+                attempt,
+                retries,
+                error,
+                wait,
+            )
+            if attempt < retries:
+                time.sleep(wait)
+    raise RuntimeError(
+        f"No se pudieron descargar stats de jugadores de {season} ({per_mode})"
+    ) from last_error
