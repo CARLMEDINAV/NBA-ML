@@ -665,6 +665,7 @@ async function loadPlayers() {
       })
       .join("");
 
+    const canOpenDetail = data.season === (state.meta?.current_season || "2026-27");
     tbody.innerHTML = players
       .map((player, index) => {
         const headshotUrl =
@@ -672,8 +673,14 @@ async function loadPlayers() {
           (player.player_id
             ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png`
             : "");
+        const rowAttrs = canOpenDetail
+          ? ` data-player-id="${esc(player.player_id)}" class="is-clickable" title="Abrir ficha del jugador"`
+          : "";
+        const nameMarkup = canOpenDetail
+          ? `<button class="player-link" type="button" data-player-id="${esc(player.player_id)}">${esc(player.player_name)}</button>`
+          : `<strong class="player-name">${esc(player.player_name)}</strong>`;
         return `
-        <tr data-player-id="${esc(player.player_id)}" class="is-clickable" title="Abrir ficha del jugador">
+        <tr${rowAttrs}>
           <td class="na">${index + 1}</td>
           <td>
             <div class="player-cell">
@@ -685,7 +692,7 @@ async function loadPlayers() {
                     : ""
                 }
               </span>
-              <button class="player-link" type="button" data-player-id="${esc(player.player_id)}">${esc(player.player_name)}</button>
+              ${nameMarkup}
             </div>
           </td>
           <td>${esc(player.team)}</td>
