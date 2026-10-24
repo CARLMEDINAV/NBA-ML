@@ -895,7 +895,8 @@ function renderPlayerDetail() {
   renderDetailTabs(data);
   renderDetailGames(data);
   renderDetailChart(data);
-  renderDetailSide(data);
+  renderDetailLinePanel(data);
+  renderDetailTeammates(data);
 
   const notes = [];
   if (!data.upcoming) {
@@ -907,6 +908,7 @@ function renderPlayerDetail() {
   notice($("#pdNotice"), notes.join(" "));
   $("#pdNote").textContent =
     "Barras verdes: el partido supera la línea; rojas: no la alcanza. " +
+    "El acierto cuenta los partidos iguales o superiores a la línea. " +
     "La fila PRÓX. es una proyección, no un resultado. " +
     `Foto de jugadores: ${data.player_state_date}. ` +
     "No incluye lesiones, alineaciones ni cuotas de props; no es consejo de apuestas.";
@@ -1061,7 +1063,7 @@ function renderDetailChart(data) {
   $("#pdChartRange").textContent = `${rangeText}${venueText}`;
 }
 
-function renderDetailSide(data) {
+function renderDetailLinePanel(data) {
   const stat = state.detail.stat;
   const label = detailStatLabel();
   const line = state.detail.line;
@@ -1105,6 +1107,12 @@ function renderDetailSide(data) {
     button.classList.toggle("is-active", button.dataset.venue === state.detail.venue);
   });
 
+  const cta = $("#pdAnalysis");
+  cta.disabled = !data.upcoming;
+  cta.textContent = data.upcoming ? "VER ANÁLISIS DEL PARTIDO" : "SIN PRÓXIMO PARTIDO";
+}
+
+function renderDetailTeammates(data) {
   $("#pdTeamName").textContent = data.player.team;
   const teammates = data.teammates || [];
   $("#pdTeammates").innerHTML = teammates.length
@@ -1126,16 +1134,20 @@ function renderDetailSide(data) {
         })
         .join("")
     : '<div class="pd-empty">Sin compañeros disponibles.</div>';
+}
 
-  const cta = $("#pdAnalysis");
-  cta.disabled = !data.upcoming;
-  cta.textContent = data.upcoming ? "VER ANÁLISIS DEL PARTIDO" : "SIN PRÓXIMO PARTIDO";
+function renderDetailDynamic() {
+  const data = state.detail.data;
+  if (!data) return;
+  renderDetailGames(data);
+  renderDetailChart(data);
+  renderDetailLinePanel(data);
 }
 
 function adjustDetailLine(delta) {
   const line = Math.max(0, Math.round((Number(state.detail.line) + delta) * 2) / 2);
   state.detail.line = line;
-  renderPlayerDetail();
+  renderDetailDynamic();
 }
 
 function openAnalysisForTeam(team) {
@@ -1325,7 +1337,8 @@ function bindEvents() {
     if (!button || !state.detail.data) return;
     state.detail.stat = button.dataset.stat;
     state.detail.line = pdDefaultLine(state.detail.data, state.detail.stat);
-    renderPlayerDetail();
+    renderDetailTabs(state.detail.data);
+    renderDetailDynamic();
   });
   $("#pdLineDown").addEventListener("click", () => adjustDetailLine(-0.5));
   $("#pdLineUp").addEventListener("click", () => adjustDetailLine(0.5));
@@ -1333,20 +1346,20 @@ function bindEvents() {
     const value = Number(event.target.value);
     if (!Number.isFinite(value) || value < 0) return;
     state.detail.line = Math.round(value * 2) / 2;
-    renderPlayerDetail();
+    renderDetailDynamic();
   });
   $("#pdQuickViews").addEventListener("click", (event) => {
     const button = event.target.closest("[data-range]");
     if (!button) return;
     state.detail.range =
       button.dataset.range === "all" ? "all" : Number(button.dataset.range);
-    renderPlayerDetail();
+    renderDetailDynamic();
   });
   $("#pdVenueFilter").addEventListener("click", (event) => {
     const button = event.target.closest("[data-venue]");
     if (!button) return;
     state.detail.venue = button.dataset.venue;
-    renderPlayerDetail();
+    renderDetailDynamic();
   });
   $("#pdGameList").addEventListener("click", (event) => {
     const button = event.target.closest("[data-game]");
@@ -1363,7 +1376,7 @@ function bindEvents() {
       0.5,
       Math.round(pdStatValue(game, state.detail.stat) * 2) / 2
     );
-    renderPlayerDetail();
+    renderDetailDynamic();
   });
   $("#pdTeammates").addEventListener("click", (event) => {
     const button = event.target.closest("[data-player-id]");
