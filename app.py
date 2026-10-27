@@ -27,6 +27,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / "artifacts"
@@ -36,6 +37,20 @@ PUBLIC_DIR = ROOT / "public"
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
+from nba_ml.betting import (
+    american_to_decimal,
+    combine_independent,
+    expected_value,
+    fair_decimal_odds,
+    handicap_side_probability,
+    potential_return,
+    team_total_side_probability,
+    total_side_probability,
+    validate_decimal_odds,
+    validate_probability,
+    validate_stake,
+    winner_side_probability,
+)
 from nba_ml.models.player_props import (
     load_player_props_artifact,
     load_player_state,
@@ -117,6 +132,21 @@ ESPN_TO_NBA = {
     "WSH": "WAS",
 }
 
+
+class BetBuilderSelectionIn(BaseModel):
+    event_id: str = Field(..., min_length=1, max_length=64)
+    market: str = Field(..., min_length=1, max_length=32)
+    side: str = Field(..., min_length=1, max_length=8)
+    line: float | None = Field(None, ge=-100, le=400)
+    event_date: str | None = Field(None, max_length=10)
+
+
+class BetBuilderAnalyzeIn(BaseModel):
+    selections: list[BetBuilderSelectionIn] = Field(default_factory=list, max_length=20)
+    stake: float = Field(10.0, gt=0, le=1_000_000.0)
+    decimal_odds: float | None = Field(None, gt=1.0, le=1000.0)
+
+
 app = FastAPI(
     title="NBA ML API",
     description=(
@@ -128,7 +158,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -1216,11 +1246,743 @@ def _prediction_warning(result: dict[str, Any], as_of: pd.Timestamp) -> str | No
     gap = (as_of - oldest).days
     if gap > 14:
         return (
-            f"El ultimo partido de uno de los equipos fue hace {gap} dias. "
-            "El estado de los equipos esta desactualizado; la prediccion "
+            f"El último partido de uno de los equipos fue hace {gap} días. "
+            "El estado de los equipos está desactualizado; la predicción "
             "asume descanso maximo."
         )
     return None
+
+
+# ---------------------------------------------------------------------------
+# Bet Builder: mercados y probabilidades
+# ---------------------------------------------------------------------------
+
+BET_BUILDER_LIMITATIONS = [
+    (
+        "Las probabilidades se derivan de los residuos históricos del modelo "
+        "Ridge existente. Son estimaciones del modelo, no probabilidades "
+        "calibradas como cuotas de una casa de apuestas."
+    ),
+    (
+        "La probabilidad conjunta solo se calcula cuando todas las selecciones "
+        "pertenecen a partidos distintos. En ese caso se aplica el supuesto "
+        "explícito de independencia; no se modela correlación por lesiones, "
+        "noticias, alineaciones o contexto de partido."
+    ),
+    (
+        "Las selecciones del mismo partido se muestran con su probabilidad "
+        "individual, pero la probabilidad conjunta queda no disponible porque "
+        "no existe un modelo de dependencia validado."
+    ),
+    (
+        "Las líneas personalizadas las introduce el usuario. No son líneas de "
+        "mercado y se identifican como tales en el ticket y en el análisis. "
+        "Con líneas enteras, el empate (push) no se modela; se recomienda usar "
+        "líneas terminadas en .5."
+    ),
+    (
+        "Los mercados de jugador están deshabilitados: el modelo de props tiene "
+        "proyecciones y confianza, pero no líneas de mercado ni una "
+        "distribución calibrada por línea."
+    ),
+]
+
+BET_BUILDER_PLAYER_MARKETS = {
+    "available": False,
+    "label": "Mercados de jugador",
+    "stats": ["Puntos", "Rebotes", "Asistencias", "PRA", "Triples"],
+    "reason": (
+        "El modelo de props entrega proyecciones por jugador, pero el proyecto "
+        "no dispone de líneas de mercado de props ni de probabilidades "
+        "calibradas para una línea concreta. Para no inventar líneas ni "
+        "probabilidades, estos mercados no se pueden añadir al ticket."
+    ),
+    "next_step": (
+        "Integrar una fuente de líneas de props y calibrar la probabilidad de "
+        "cada mercado contra su línea."
+    ),
+}
+
+
+def _bb_market_number(
+    market: dict[str, Any] | pd.Series | None, key: str
+) -> float | None:
+    if market is None:
+        return None
+    try:
+        value = market.get(key)
+    except AttributeError:
+        return None
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _bb_source(provider: Any) -> str:
+    if provider is None or pd.isna(provider):
+        return "ESPN"
+    return f"ESPN / {provider}"
+
+
+def _bb_option(
+    label: str,
+    side: str,
+    probability: float | None = None,
+    american_odds: Any = None,
+) -> dict[str, Any]:
+    decimal = None
+    if american_odds is not None and not pd.isna(american_odds):
+        try:
+            decimal = american_to_decimal(float(american_odds))
+        except ValueError:
+            decimal = None
+    return {
+        "side": side,
+        "label": label,
+        "probability": _rounded(probability, 6),
+        "american_odds": None if american_odds is None else american_odds,
+        "decimal_odds": _rounded(decimal, 6),
+    }
+
+
+def _bb_total_market(
+    artifact: dict,
+    result: dict[str, Any],
+    market: dict[str, Any] | pd.Series | None,
+    provider: Any,
+) -> dict[str, Any]:
+    projected = float(result["predicted_total"])
+    market_line = _bb_market_number(market, "market_total")
+    if market_line is not None:
+        over = total_side_probability(artifact, projected, market_line, "OVER")
+        under = total_side_probability(artifact, projected, market_line, "UNDER")
+        over_odds = _bb_market_number(market, "over_odds")
+        under_odds = _bb_market_number(market, "under_odds")
+        options = [
+            _bb_option("Over", "OVER", over, over_odds),
+            _bb_option("Under", "UNDER", under, under_odds),
+        ]
+        available = over is not None and under is not None
+        return {
+            "id": "total",
+            "type": "game_total",
+            "label": "Total del partido",
+            "line": _rounded(market_line, 2),
+            "line_source": "market",
+            "requires_line": False,
+            "available": available,
+            "projected": _rounded(projected, 1),
+            "method": "empirical_residuals",
+            "provider": None if provider is None else str(provider),
+            "source": _bb_source(provider),
+            "note": (
+                f"Línea de mercado {market_line:.1f}. Las cuotas son "
+                "informativas y pueden cambiar."
+            ),
+            "reason": None if available else "No hay residuos suficientes para calcular la probabilidad.",
+            "options": options,
+        }
+
+    return {
+        "id": "total",
+        "type": "game_total",
+        "label": "Total del partido",
+        "line": None,
+        "line_source": "custom",
+        "requires_line": True,
+        "available": True,
+        "projected": _rounded(projected, 1),
+        "method": "empirical_residuals",
+        "provider": None,
+        "source": "Modelo Ridge + línea personalizada",
+        "note": (
+            "No hay línea de mercado para este partido. Introduce una línea "
+            "personalizada; la probabilidad se calcula con los residuos del "
+            "modelo y no se presenta como cuota de mercado."
+        ),
+        "reason": None,
+        "options": [
+            _bb_option("Over", "OVER"),
+            _bb_option("Under", "UNDER"),
+        ],
+    }
+
+
+def _bb_winner_market(result: dict[str, Any], home_name: str, away_name: str) -> dict[str, Any]:
+    home_probability = result.get("home_win_probability")
+    if home_probability is None or pd.isna(home_probability):
+        home_probability = None
+    home = winner_side_probability(home_probability, "HOME")
+    away = winner_side_probability(home_probability, "AWAY")
+    available = home is not None and away is not None
+    return {
+        "id": "winner",
+        "type": "winner",
+        "label": "Ganador del partido",
+        "line": None,
+        "line_source": "model",
+        "requires_line": False,
+        "available": available,
+        "projected": None,
+        "method": "margin_residuals",
+        "provider": None,
+        "source": "Modelo Ridge / residuos de margen",
+        "note": "Probabilidad estimada por el modelo; sin cuota de mercado.",
+        "reason": None if available else "El modelo no dispone de probabilidad de ganador.",
+        "options": [
+            _bb_option(home_name, "HOME", home),
+            _bb_option(away_name, "AWAY", away),
+        ],
+    }
+
+
+def _bb_handicap_market(
+    result: dict[str, Any],
+    market: dict[str, Any] | pd.Series | None,
+    handicap_info: dict[str, Any],
+    home_name: str,
+    away_name: str,
+    provider: Any,
+) -> dict[str, Any]:
+    spread = _bb_market_number(market, "market_spread")
+    home_cover = result.get("home_cover_probability")
+    if home_cover is None or pd.isna(home_cover):
+        home_cover = None
+    home = handicap_side_probability(home_cover, "HOME")
+    away = handicap_side_probability(home_cover, "AWAY")
+    available = spread is not None and home is not None and away is not None
+    label = handicap_info.get("market_handicap")
+    if not label and spread is not None:
+        if spread < 0:
+            label = f"{home_name} -{abs(spread):.1f}"
+        elif spread > 0:
+            label = f"{away_name} -{abs(spread):.1f}"
+        else:
+            label = "Pick'em"
+    return {
+        "id": "handicap",
+        "type": "handicap",
+        "label": "Hándicap",
+        "line": _rounded(spread, 2) if spread is not None else None,
+        "line_source": "market",
+        "requires_line": False,
+        "available": available,
+        "projected": _rounded(result.get("model_home_spread"), 1),
+        "method": "margin_residuals",
+        "provider": None if provider is None else str(provider),
+        "source": _bb_source(provider) if spread is not None else "Modelo Ridge",
+        "note": (
+            f"Hándicap de mercado: {label}. No se incluye cuota de hándicap."
+            if label
+            else "Sin línea de hándicap de mercado."
+        ),
+        "reason": (
+            None
+            if available
+            else "Sin línea de hándicap de mercado; el modelo no inventa una línea."
+        ),
+        "options": [
+            _bb_option(f"{home_name} cubre", "HOME", home),
+            _bb_option(f"{away_name} cubre", "AWAY", away),
+        ],
+    }
+
+
+def _bb_team_total_market(
+    market_id: str,
+    label: str,
+    venue: str,
+    team_name: str,
+    projected: Any,
+) -> dict[str, Any]:
+    projection = None
+    if projected is not None and not pd.isna(projected):
+        projection = float(projected)
+    return {
+        "id": market_id,
+        "type": "team_total",
+        "label": label,
+        "line": None,
+        "line_source": "custom",
+        "requires_line": True,
+        "available": projection is not None,
+        "projected": _rounded(projection, 1),
+        "method": "paired_residuals",
+        "provider": None,
+        "source": "Modelo Ridge / residuos emparejados + línea personalizada",
+        "note": (
+            f"Introduce una línea para {team_name}. No es una línea de mercado; "
+            "la probabilidad se calcula con los residuos históricos del modelo."
+        ),
+        "reason": (
+            None
+            if projection is not None
+            else "El modelo no dispone de proyección para este equipo."
+        ),
+        "venue": venue,
+        "team": team_name,
+        "options": [
+            _bb_option("Over", "OVER"),
+            _bb_option("Under", "UNDER"),
+        ],
+    }
+
+
+def _bb_event_payload(
+    game: Any,
+    result: dict[str, Any],
+    market: dict[str, Any] | pd.Series | None,
+    names: dict[str, str],
+    state_date: pd.Timestamp | None,
+    odds_as_of: str | None,
+    artifact: dict,
+) -> dict[str, Any]:
+    home_name = names.get(str(game.home), str(game.home))
+    away_name = names.get(str(game.away), str(game.away))
+    provider = market.get("market_provider") if market is not None else None
+    handicap_info = _handicap_fields(result, home_name, away_name, market)
+    markets = [
+        _bb_total_market(artifact, result, market, provider),
+        _bb_winner_market(result, home_name, away_name),
+        _bb_handicap_market(
+            result, market, handicap_info, home_name, away_name, provider
+        ),
+        _bb_team_total_market(
+            "team_total_home",
+            f"Total local · {home_name}",
+            "home",
+            home_name,
+            result.get("projected_home_score"),
+        ),
+        _bb_team_total_market(
+            "team_total_away",
+            f"Total visitante · {away_name}",
+            "away",
+            away_name,
+            result.get("projected_away_score"),
+        ),
+    ]
+    low, high = result["interval_80"]
+    event_date = pd.Timestamp(game.game_date)
+    return {
+        "event_id": str(game.game_id),
+        "event_label": f"{away_name} @ {home_name}",
+        "date": event_date.strftime("%Y-%m-%d"),
+        "time_et": None if pd.isna(game.game_time_et) else str(game.game_time_et),
+        "status": "Programado",
+        "away": str(game.away),
+        "home": str(game.home),
+        "away_name": away_name,
+        "home_name": home_name,
+        "arena": getattr(game, "arena", None),
+        "predicted_total": _rounded(result["predicted_total"], 1),
+        "interval_low": _rounded(low, 1),
+        "interval_high": _rounded(high, 1),
+        "projected_home_score": _rounded(result.get("projected_home_score"), 1),
+        "projected_away_score": _rounded(result.get("projected_away_score"), 1),
+        "predicted_margin": _rounded(result.get("predicted_margin"), 1),
+        "home_win_probability": _rounded(result.get("home_win_probability"), 6),
+        "home_rest": result.get("home_rest"),
+        "away_rest": result.get("away_rest"),
+        "data_state_date": None if state_date is None else state_date.strftime("%Y-%m-%d"),
+        "odds_as_of": odds_as_of if any(
+            item.get("decimal_odds") is not None
+            for item in markets[0].get("options", [])
+        ) else None,
+        "data_warning": _prediction_warning(result, event_date),
+        "market_source": _bb_source(provider),
+        "selectable_markets": sum(
+            1
+            for item in markets
+            if item.get("available") and not item.get("requires_line")
+        ),
+        "custom_markets": sum(
+            1
+            for item in markets
+            if item.get("available") and item.get("requires_line")
+        ),
+        "markets": markets,
+    }
+
+
+def _bb_state_date(state: pd.DataFrame) -> pd.Timestamp | None:
+    dates = pd.to_datetime(state["last_game_date"], errors="coerce").dropna()
+    if dates.empty:
+        return None
+    return dates.max().normalize()
+
+
+def _bb_events(
+    start: pd.Timestamp,
+    days: int,
+    schedule: pd.DataFrame,
+    artifact: dict,
+    state: pd.DataFrame,
+) -> tuple[list[dict[str, Any]], int, pd.Timestamp | None, str | None]:
+    end = start + pd.Timedelta(days=days - 1)
+    dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
+    mask = dates.between(start, end) & schedule["status"].eq(1)
+    games = schedule.loc[mask].sort_values(["game_date", "game_time_et", "game_id"])
+    market_frame = pd.DataFrame()
+    if not games.empty:
+        market_frame = _odds_for_dates(list(games["game_date"]), schedule)
+        if not market_frame.empty:
+            market_frame = market_frame.set_index("game_id")
+    names = _team_names(state)
+    state_date = _bb_state_date(state)
+    odds_as_of = pd.Timestamp.now(tz=NBA_ET).strftime("%Y-%m-%d %H:%M ET")
+    events: list[dict[str, Any]] = []
+    skipped = 0
+    for game in games.itertuples(index=False):
+        market = None
+        if not market_frame.empty and game.game_id in market_frame.index:
+            market = market_frame.loc[game.game_id]
+        market_total = _bb_market_number(market, "market_total")
+        spread = _bb_market_number(market, "market_spread")
+        reference_line = market_total if market_total is not None else 225.5
+        try:
+            result = predict_game(
+                artifact,
+                state,
+                home=game.home,
+                away=game.away,
+                as_of=pd.Timestamp(game.game_date),
+                line=reference_line,
+                handicap=spread,
+                warn_stale=False,
+            )
+        except ValueError:
+            skipped += 1
+            continue
+        events.append(
+            _bb_event_payload(
+                game, result, market, names, state_date, odds_as_of, artifact
+            )
+        )
+    return events, skipped, state_date, odds_as_of
+
+
+def _bb_line_limits(market_id: str) -> tuple[float, float]:
+    if market_id == "total":
+        return 100.0, 350.0
+    if market_id in {"team_total_home", "team_total_away"}:
+        return 40.0, 220.0
+    return -80.0, 80.0
+
+
+def _bb_valid_line(
+    line: float | None, market_id: str
+) -> tuple[float | None, str | None]:
+    if line is None:
+        return None, "Falta la línea del mercado o una línea personalizada."
+    try:
+        value = float(line)
+    except (TypeError, ValueError):
+        return None, "La línea no es numérica."
+    if not math.isfinite(value):
+        return None, "La línea no es finita."
+    low, high = _bb_line_limits(market_id)
+    if value < low or value > high:
+        return None, f"La línea debe estar entre {low:g} y {high:g}."
+    return value, None
+
+
+def _bb_selection_payload(
+    event: dict[str, Any],
+    selection: BetBuilderSelectionIn,
+    artifact: dict,
+    schedule_row: pd.Series | None,
+) -> dict[str, Any]:
+    market_id = str(selection.market).strip().lower()
+    side = str(selection.side).strip().upper()
+    selection_line = selection.line
+    event_id = str(selection.event_id)
+    base = {
+        "event_id": event_id,
+        "event_date": event.get("date"),
+        "event_label": event.get("event_label"),
+        "market": market_id,
+        "market_label": None,
+        "side": side,
+        "side_label": None,
+        "line": None,
+        "line_source": None,
+        "probability": None,
+        "probability_source": None,
+        "decimal_odds": None,
+        "american_odds": None,
+        "data_source": None,
+        "data_as_of": event.get("data_state_date"),
+        "odds_as_of": None,
+        "status": "ok",
+        "stale_reason": None,
+        "warning": None,
+        "is_custom_line": False,
+        "selection_id": None,
+    }
+
+    if schedule_row is None:
+        base["status"] = "stale"
+        base["stale_reason"] = "El partido ya no existe en el calendario."
+        return base
+    if int(schedule_row.get("status", 0)) != 1:
+        base["status"] = "stale"
+        base["stale_reason"] = "El partido ya no está próximo o está finalizado."
+        return base
+
+    market = next(
+        (item for item in event.get("markets", []) if item.get("id") == market_id),
+        None,
+    )
+    if market is None:
+        base["status"] = "invalid"
+        base["stale_reason"] = "Mercado desconocido."
+        return base
+    if not market.get("available"):
+        base["status"] = "invalid"
+        base["market_label"] = market.get("label")
+        base["stale_reason"] = market.get("reason") or "Mercado no disponible."
+        return base
+    base["market_label"] = market.get("label")
+    base["data_source"] = market.get("source")
+    market_line = market.get("line")
+    line = selection_line
+    line_error = None
+
+    if market_id == "total":
+        if market_line is not None:
+            if line is None:
+                line = float(market_line)
+            else:
+                line, line_error = _bb_valid_line(line, market_id)
+                if line is None:
+                    base["status"] = "invalid"
+                    base["stale_reason"] = line_error
+                    return base
+                if abs(line - float(market_line)) > 1e-9:
+                    base["status"] = "stale"
+                    base["stale_reason"] = (
+                        f"La línea de mercado cambió de {line:.1f} a "
+                        f"{float(market_line):.1f}. Elimina y vuelve a añadir la selección."
+                    )
+                    base["line"] = _rounded(line, 2)
+                    base["line_source"] = "market"
+                    return base
+            base["line_source"] = "market"
+            option = next(
+                (item for item in market.get("options", []) if item.get("side") == side),
+                None,
+            )
+            if option is None:
+                base["status"] = "invalid"
+                base["stale_reason"] = "El lado debe ser OVER o UNDER."
+                return base
+            base["probability"] = option.get("probability")
+            base["probability_source"] = "empirical_residuals"
+            base["decimal_odds"] = option.get("decimal_odds")
+            base["american_odds"] = option.get("american_odds")
+            base["odds_as_of"] = event.get("odds_as_of")
+            base["side_label"] = option.get("label")
+        else:
+            if side not in {"OVER", "UNDER"}:
+                base["status"] = "invalid"
+                base["stale_reason"] = "El lado debe ser OVER o UNDER."
+                return base
+            line, line_error = _bb_valid_line(line, market_id)
+            if line is None:
+                base["status"] = "invalid"
+                base["stale_reason"] = line_error
+                return base
+            base["is_custom_line"] = True
+            base["line_source"] = "custom"
+            tail = _rounded(line, 2)
+            probability = total_side_probability(
+                artifact, float(event["predicted_total"]), float(line), side
+            )
+            base["probability"] = _rounded(probability, 6)
+            base["probability_source"] = "empirical_residuals"
+            base["data_source"] = "Modelo Ridge + línea personalizada"
+            base["side_label"] = "Over" if side == "OVER" else "Under"
+            base["note"] = f"Línea personalizada {tail:.1f}; no es una línea de mercado."
+    elif market_id in {"team_total_home", "team_total_away"}:
+        if side not in {"OVER", "UNDER"}:
+            base["status"] = "invalid"
+            base["stale_reason"] = "El lado debe ser OVER o UNDER."
+            return base
+        line, line_error = _bb_valid_line(line, market_id)
+        if line is None:
+            base["status"] = "invalid"
+            base["stale_reason"] = line_error
+            return base
+        base["is_custom_line"] = True
+        base["line_source"] = "custom"
+        venue = "home" if market_id == "team_total_home" else "away"
+        probability = team_total_side_probability(
+            artifact,
+            float(event["projected_home_score"]),
+            float(event["projected_away_score"]),
+            float(line),
+            side,
+            venue,
+        )
+        base["probability"] = _rounded(probability, 6)
+        base["probability_source"] = "paired_residuals"
+        base["data_source"] = "Modelo Ridge / residuos emparejados + línea personalizada"
+        base["side_label"] = "Over" if side == "OVER" else "Under"
+        base["note"] = f"Línea personalizada {line:.1f}; no es una línea de mercado."
+    elif market_id == "winner":
+        option = next(
+            (item for item in market.get("options", []) if item.get("side") == side),
+            None,
+        )
+        if option is None:
+            base["status"] = "invalid"
+            base["stale_reason"] = "El lado debe ser HOME o AWAY."
+            return base
+        if line is not None:
+            base["status"] = "invalid"
+            base["stale_reason"] = "El mercado de ganador no usa línea."
+            return base
+        base["side_label"] = option.get("label")
+        base["probability"] = option.get("probability")
+        base["probability_source"] = "margin_residuals"
+        base["line_source"] = "model"
+    elif market_id == "handicap":
+        if market_line is None:
+            base["status"] = "invalid"
+            base["stale_reason"] = "No hay línea de hándicap de mercado."
+            return base
+        if line is None:
+            line = float(market_line)
+        else:
+            line, line_error = _bb_valid_line(line, market_id)
+            if line is None:
+                base["status"] = "invalid"
+                base["stale_reason"] = line_error
+                return base
+            if abs(line - float(market_line)) > 1e-9:
+                base["status"] = "stale"
+                base["stale_reason"] = (
+                    f"El hándicap cambió de {line:.1f} a {float(market_line):.1f}. "
+                    "Elimina y vuelve a añadir la selección."
+                )
+                base["line"] = _rounded(line, 2)
+                base["line_source"] = "market"
+                return base
+        option = next(
+            (item for item in market.get("options", []) if item.get("side") == side),
+            None,
+        )
+        if option is None:
+            base["status"] = "invalid"
+            base["stale_reason"] = "El lado debe ser HOME o AWAY."
+            return base
+        base["line"] = _rounded(line, 2)
+        base["line_source"] = "market"
+        base["side_label"] = option.get("label")
+        base["probability"] = option.get("probability")
+        base["probability_source"] = "margin_residuals"
+        base["data_source"] = market.get("source")
+    else:
+        base["status"] = "invalid"
+        base["stale_reason"] = "Mercado no soportado."
+        return base
+
+    if base["line"] is None and line is not None:
+        base["line"] = _rounded(line, 2)
+    line_key = "" if base["line"] is None else f"{float(base['line']):.2f}"
+    base["selection_id"] = f"{event_id}:{market_id}:{side}:{line_key}"
+    if base["probability"] is None:
+        base["status"] = "invalid"
+        base["stale_reason"] = "No se pudo calcular una probabilidad válida para esta línea."
+        return base
+    try:
+        base["probability"] = validate_probability(base["probability"])
+    except ValueError as error:
+        base["status"] = "invalid"
+        base["stale_reason"] = str(error)
+        return base
+    if base["probability"] is None:
+        base["status"] = "invalid"
+        base["stale_reason"] = "Probabilidad no disponible."
+        return base
+    return base
+
+
+def _bb_same_game_groups(selections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for selection in selections:
+        groups.setdefault(str(selection["event_id"]), []).append(selection)
+    return [
+        {
+            "event_id": event_id,
+            "event_label": items[0].get("event_label"),
+            "count": len(items),
+            "markets": [
+                {
+                    "market": item.get("market_label"),
+                    "side": item.get("side_label"),
+                    "line": item.get("line"),
+                }
+                for item in items
+            ],
+        }
+        for event_id, items in groups.items()
+        if len(items) > 1
+    ]
+
+
+def _bb_mark_problems(selections: list[dict[str, Any]]) -> None:
+    seen: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for selection in selections:
+        key = (
+            selection.get("event_id"),
+            selection.get("market"),
+            selection.get("line"),
+            selection.get("side"),
+        )
+        if key in seen:
+            selection["status"] = "invalid"
+            selection["stale_reason"] = "Selección duplicada."
+            seen[key]["status"] = "invalid"
+            seen[key]["stale_reason"] = "Selección duplicada."
+        else:
+            seen[key] = selection
+
+    by_market: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for selection in selections:
+        key = (
+            selection.get("event_id"),
+            selection.get("market"),
+            selection.get("line"),
+        )
+        by_market.setdefault(key, []).append(selection)
+    for items in by_market.values():
+        sides = {item.get("side") for item in items}
+        if len(sides) > 1:
+            for item in items:
+                item["status"] = "invalid"
+                item["stale_reason"] = (
+                    "Selecciones incompatibles: mismo mercado y línea con lados opuestos."
+                )
+
+
+def _bb_odds_product(selections: list[dict[str, Any]]) -> float | None:
+    if not selections:
+        return None
+    product = 1.0
+    for selection in selections:
+        odds = selection.get("decimal_odds")
+        if odds is None:
+            return None
+        try:
+            product *= validate_decimal_odds(odds)
+        except ValueError:
+            return None
+    return product
 
 
 # ---------------------------------------------------------------------------
@@ -1410,7 +2172,7 @@ def upcoming(
     if stale_days > 7:
         warning = (
             f"El estado de los equipos es del {last_state.date()} "
-            f"({stale_days} dias). Las predicciones no incorporan partidos "
+            f"({stale_days} días). Las predicciones no incorporan partidos "
             "posteriores ni lesiones."
         )
     return _ok(
@@ -1434,6 +2196,343 @@ def upcoming(
                 "informativos y pueden cambiar."
             ),
             "games": rows,
+        }
+    )
+
+
+def _bb_event_lookup(
+    event_ids: list[str],
+    schedule: pd.DataFrame,
+    artifact: dict,
+    state: pd.DataFrame,
+) -> tuple[dict[str, dict[str, Any]], pd.DataFrame]:
+    index = schedule.drop_duplicates(subset=["game_id"], keep="last").set_index("game_id")
+    events: dict[str, dict[str, Any]] = {}
+    day_cache: dict[pd.Timestamp, dict[str, dict[str, Any]]] = {}
+    for event_id in dict.fromkeys(event_ids):
+        if event_id not in index.index:
+            continue
+        row = index.loc[event_id]
+        try:
+            status = int(row.get("status", 0))
+        except (TypeError, ValueError):
+            status = 0
+        if status != 1:
+            continue
+        day = pd.Timestamp(row.get("game_date")).normalize()
+        if day not in day_cache:
+            day_events, _, _, _ = _bb_events(day, 1, schedule, artifact, state)
+            day_cache[day] = {item["event_id"]: item for item in day_events}
+        if event_id in day_cache[day]:
+            events[event_id] = day_cache[day][event_id]
+    return events, index
+
+
+@app.get("/api/bet-builder/events")
+def bet_builder_events(
+    date: str | None = None,
+    days: int = Query(7, ge=1, le=14),
+    q: str | None = None,
+    market: str | None = None,
+) -> JSONResponse:
+    artifact = _artifact()
+    state = _state()
+    schedule = _schedule()
+    start = _today(date)
+    end = start + pd.Timedelta(days=days - 1)
+    events, skipped, state_date, odds_as_of = _bb_events(
+        start, days, schedule, artifact, state
+    )
+    query = (q or "").strip().casefold()
+    if query:
+        events = [
+            event
+            for event in events
+            if query
+            in " ".join(
+                [
+                    str(event.get("event_label") or ""),
+                    str(event.get("home") or ""),
+                    str(event.get("home_name") or ""),
+                    str(event.get("away") or ""),
+                    str(event.get("away_name") or ""),
+                ]
+            ).casefold()
+        ]
+    market_key = (market or "").strip().lower()
+    if market_key in {"game_total", "total"}:
+        for event in events:
+            event["markets"] = [
+                item for item in event["markets"] if item["type"] == "game_total"
+            ]
+        events = [event for event in events if event["markets"]]
+    elif market_key == "winner":
+        for event in events:
+            event["markets"] = [
+                item for item in event["markets"] if item["type"] == "winner"
+            ]
+        events = [event for event in events if event["markets"]]
+    elif market_key == "handicap":
+        for event in events:
+            event["markets"] = [
+                item for item in event["markets"] if item["type"] == "handicap"
+            ]
+        events = [event for event in events if event["markets"]]
+    elif market_key in {"team_total", "team"}:
+        for event in events:
+            event["markets"] = [
+                item for item in event["markets"] if item["type"] == "team_total"
+            ]
+        events = [event for event in events if event["markets"]]
+    elif market_key == "players":
+        events = []
+
+    state_age_days = None
+    state_warning = None
+    if state_date is not None:
+        state_age_days = max(0, (_today() - state_date).days)
+        if state_age_days > 7:
+            state_warning = (
+                f"El estado de los equipos es del {state_date.date()} "
+                f"({state_age_days} días). Las predicciones no incorporan "
+                "partidos posteriores ni lesiones."
+            )
+    market_total_events = sum(
+        1
+        for event in events
+        if any(
+            item["id"] == "total" and item.get("line_source") == "market"
+            for item in event.get("markets", [])
+        )
+    )
+    has_odds = any(
+        any(
+            option.get("decimal_odds") is not None
+            for option in item.get("options", [])
+        )
+        for event in events
+        for item in event.get("markets", [])
+    )
+    return _ok(
+        {
+            "season": _season_for(start),
+            "start": start.strftime("%Y-%m-%d"),
+            "end": end.strftime("%Y-%m-%d"),
+            "count": len(events),
+            "skipped": skipped,
+            "state_date": None if state_date is None else state_date.strftime("%Y-%m-%d"),
+            "state_age_days": state_age_days,
+            "warning": state_warning,
+            "odds_source": "ESPN / DraftKings" if has_odds else None,
+            "odds_as_of": odds_as_of if has_odds else None,
+            "market_total_events": market_total_events,
+            "limitations": BET_BUILDER_LIMITATIONS,
+            "player_markets": BET_BUILDER_PLAYER_MARKETS,
+            "events": events,
+        }
+    )
+
+
+@app.post("/api/bet-builder/analyze")
+def bet_builder_analyze(payload: BetBuilderAnalyzeIn) -> JSONResponse:
+    artifact = _artifact()
+    state = _state()
+    schedule = _schedule()
+    state_date = _bb_state_date(state)
+    event_map, schedule_index = _bb_event_lookup(
+        [selection.event_id for selection in payload.selections],
+        schedule,
+        artifact,
+        state,
+    )
+    selections: list[dict[str, Any]] = []
+    for selection in payload.selections:
+        row = (
+            schedule_index.loc[selection.event_id]
+            if selection.event_id in schedule_index.index
+            else None
+        )
+        event = event_map.get(selection.event_id)
+        if event is None:
+            event = {
+                "event_id": selection.event_id,
+                "date": selection.event_date,
+                "event_label": selection.event_id,
+                "data_state_date": (
+                    None if state_date is None else state_date.strftime("%Y-%m-%d")
+                ),
+                "markets": [],
+            }
+        selections.append(
+            _bb_selection_payload(event, selection, artifact, row)
+        )
+
+    _bb_mark_problems(selections)
+    valid = [selection for selection in selections if selection["status"] == "ok"]
+    same_game_groups = _bb_same_game_groups(valid)
+    if not selections:
+        joint_status = "empty"
+        joint_probability = None
+        joint_reason = "El ticket está vacío."
+    elif len(valid) != len(selections):
+        joint_status = "invalid"
+        joint_probability = None
+        joint_reason = (
+            "No se calcula la probabilidad conjunta porque hay selecciones "
+            "desactualizadas, inválidas o incompatibles."
+        )
+    elif same_game_groups:
+        joint_status = "same_game_dependency"
+        joint_probability = None
+        joint_reason = (
+            "Hay selecciones del mismo partido. No se multiplican como si "
+            "fueran independientes porque no existe un modelo de dependencia "
+            "validado para combinarlas."
+        )
+    else:
+        joint_status = "independence"
+        joint_probability = combine_independent(
+            [selection["probability"] for selection in valid]
+        )
+        joint_reason = (
+            "Se aplica un supuesto explícito de independencia entre partidos "
+            "distintos. No modela correlación por noticias, lesiones o contexto."
+        )
+
+    fair_odds = None
+    if joint_probability is not None and joint_probability > 0:
+        fair_odds = fair_decimal_odds(joint_probability)
+    market_combined_odds = (
+        _bb_odds_product(valid) if joint_status == "independence" else None
+    )
+
+    requested_odds = None
+    warnings: list[str] = []
+    if payload.decimal_odds is not None:
+        try:
+            requested_odds = validate_decimal_odds(payload.decimal_odds)
+        except ValueError as error:
+            warnings.append(str(error))
+    odds_used = requested_odds if requested_odds is not None else market_combined_odds
+    odds_source = (
+        "user"
+        if requested_odds is not None
+        else ("market" if market_combined_odds is not None else None)
+    )
+    stake = validate_stake(payload.stake)
+    potential = (
+        potential_return(stake, odds_used) if odds_used is not None else None
+    )
+    ev = (
+        expected_value(joint_probability, odds_used)
+        if joint_probability is not None and odds_used is not None
+        else None
+    )
+
+    if state_date is not None:
+        state_age_days = max(0, (_today() - state_date).days)
+        if state_age_days > 7:
+            warnings.append(
+                f"El estado de los equipos es del {state_date.date()} "
+                f"({state_age_days} días); la predicción puede estar desactualizada."
+            )
+    else:
+        state_age_days = None
+    for selection in selections:
+        if selection["status"] != "ok":
+            warnings.append(
+                f"{selection.get('event_label') or selection['event_id']}: "
+                f"{selection.get('stale_reason') or 'selección no válida'}"
+            )
+    if same_game_groups:
+        warnings.append(
+            "Probabilidad conjunta no disponible: hay selecciones del mismo "
+            "partido y no se modela su dependencia."
+        )
+    if market_combined_odds is None and valid:
+        warnings.append(
+            "No todas las selecciones tienen cuota de mercado. La cuota "
+            "combinada de mercado y el EV solo se calculan si introduces una "
+            "cuota decimal o si todas las selecciones tienen cuota verificada."
+        )
+    if requested_odds is not None and fair_odds is not None:
+        if requested_odds > fair_odds:
+            warnings.append(
+                "La cuota introducida es mayor que la cuota justa teórica del "
+                "modelo. Esto no garantiza valor positivo: revisa la "
+                "incertidumbre y el margen de la casa."
+            )
+    if (
+        requested_odds is None
+        and market_combined_odds is not None
+        and fair_odds is not None
+        and market_combined_odds > fair_odds
+    ):
+        warnings.append(
+            "La cuota combinada de mercado es mayor que la cuota justa teórica "
+            "del modelo. El EV positivo depende de que las probabilidades del "
+            "modelo sean correctas; no es una garantía de beneficio."
+        )
+
+    odds_as_of = next(
+        (
+            selection.get("odds_as_of")
+            for selection in selections
+            if selection.get("odds_as_of")
+        ),
+        None,
+    )
+    data_quality = {
+        "state_date": None if state_date is None else state_date.strftime("%Y-%m-%d"),
+        "state_age_days": state_age_days,
+        "odds_source": "ESPN / DraftKings" if odds_as_of else None,
+        "odds_as_of": odds_as_of,
+        "selections_with_market_odds": sum(
+            1 for selection in selections if selection.get("decimal_odds") is not None
+        ),
+        "custom_lines": sum(
+            1 for selection in selections if selection.get("is_custom_line")
+        ),
+        "same_game_groups": len(same_game_groups),
+    }
+    assumptions = [
+        "Las probabilidades individuales son frecuencias empíricas de los "
+        "residuos walk-forward del modelo Ridge existente.",
+        (
+            "La combinación usa el supuesto de independencia entre partidos."
+            if joint_status == "independence"
+            else (
+                "No se aplica independencia a selecciones del mismo partido."
+                if joint_status == "same_game_dependency"
+                else "No se calcula una probabilidad conjunta; no se aplica el supuesto de independencia."
+            )
+        ),
+        "No se incluyen lesiones, alineaciones, noticias de última hora ni "
+        "cambios de cuota posteriores a la consulta.",
+    ]
+    return _ok(
+        {
+            "generated_at": pd.Timestamp.now(tz=NBA_ET).strftime("%Y-%m-%d %H:%M ET"),
+            "count": len(selections),
+            "selections": selections,
+            "joint_status": joint_status,
+            "joint_probability": _rounded(joint_probability, 8),
+            "joint_reason": joint_reason,
+            "same_game_groups": same_game_groups,
+            "fair_decimal_odds": _rounded(fair_odds, 6),
+            "market_combined_decimal_odds": _rounded(market_combined_odds, 6),
+            "market_combined_available": market_combined_odds is not None,
+            "decimal_odds": (
+                None if odds_used is None else _rounded(odds_used, 6)
+            ),
+            "decimal_odds_source": odds_source,
+            "stake": _rounded(stake, 2),
+            "potential_return": _rounded(potential, 4),
+            "ev": _rounded(ev, 8),
+            "warnings": warnings,
+            "assumptions": assumptions,
+            "limitations": BET_BUILDER_LIMITATIONS,
+            "data_quality": data_quality,
         }
     )
 
@@ -1605,7 +2704,7 @@ def player_props(
     warning = None
     if stale_days > 7:
         warning = (
-            f"La foto de jugadores es del {last_state.date()} ({stale_days} dias). "
+            f"La foto de jugadores es del {last_state.date()} ({stale_days} días). "
             "Las proyecciones no incorporan partidos posteriores ni lesiones."
         )
     metrics = artifact.get("metrics", {})
@@ -1634,7 +2733,7 @@ def player_props(
             "note": (
                 "Proyecciones por partido con un modelo Ridge entrenado con "
                 "game logs 2023-24 a 2026-27 y validado fuera de muestra en "
-                "2025-26. Usan medias móviles, descanso, localía y contexto "
+                "2025-26. Usan medías móviles, descanso, localía y contexto "
                 "del rival; el contexto de equipo es la última foto disponible. "
                 "No incluyen lesiones, alineaciones ni cuotas de props; no es "
                 "consejo de apuestas."
@@ -1649,7 +2748,7 @@ def player_card(
     player_id: int = Query(..., ge=1),
     today: str | None = None,
 ) -> JSONResponse:
-    """Ficha visual de un jugador: proyeccion, ultimos partidos y companeros."""
+    """Ficha visual de un jugador: proyección, ultimos partidos y companeros."""
     artifact = _player_props()
     player_state = _player_state()
     team_state = _state()
@@ -2034,8 +3133,8 @@ def player_card(
             "model_name": artifact.get("model_name"),
             "player_state_date": last_state.strftime("%Y-%m-%d"),
             "note": (
-                "Las barras verdes superan la linea y las rojas no. La fila "
-                "PROX. es una proyeccion del modelo; el resto son partidos "
+                "Las barras verdes superan la línea y las rojas no. La fila "
+                "PROX. es una proyección del modelo; el resto son partidos "
                 "reales. El H2H y los defensores usan la muestra reciente; no "
                 "son una asignacion defensiva para el proximo partido. No "
                 "incluye lesiones, alineaciones ni cuotas de props; no es "
@@ -2234,8 +3333,8 @@ def results(
             "games": games,
             "live_updated": live_updated,
             "caveat": (
-                "La linea es la referencia introducida por el usuario. nba_api no "
-                "proporciona lineas historicas de casas de apuestas, asi que esto "
+                "La línea es la referencia introducida por el usuario. nba_api no "
+                "proporciona líneas históricas de casas de apuestas, asi que esto "
                 "no evalua el cierre real ni una rentabilidad de apuestas."
             ),
         }

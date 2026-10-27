@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261027-6">
+  <link rel="stylesheet" href="/styles.css?v=20261027-8">
 </head>
 <body>
   <div class="page">
@@ -59,6 +59,7 @@
 
     <nav class="tabs" role="tablist" aria-label="Secciones">
       <button class="tab is-active" role="tab" aria-selected="true" data-tab="upcoming">Próximos</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" aria-selected="false" data-tab="analysis">Análisis</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="results">Resultados</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="players">Jugadores</button>
@@ -337,6 +338,105 @@
         <p class="table-note" id="propsNote"></p>
       </section>
 
+      <section id="tab-betbuilder" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head bb-section-head">
+          <div>
+            <p class="eyebrow">Combinadas</p>
+            <h2>BET BUILDER</h2>
+            <p class="muted">Construye una combinada con los mercados que el modelo y las cuotas disponibles permiten calcular. Las probabilidades son estimaciones del modelo, no cuotas de una casa de apuestas.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="bbRefresh">Actualizar</button>
+        </div>
+
+        <div class="controls-row bb-controls">
+          <label>Fecha
+            <input id="bbDate" type="date">
+          </label>
+          <label>Rango
+            <select id="bbDays">
+              <option value="1" selected>1 día</option>
+              <option value="3">3 días</option>
+              <option value="7">7 días</option>
+              <option value="14">14 días</option>
+            </select>
+          </label>
+          <label class="grow">Buscar
+            <input id="bbSearch" type="search" placeholder="Equipo o ciudad">
+          </label>
+          <label>Mercado
+            <select id="bbMarketFilter">
+              <option value="all" selected>Todos</option>
+              <option value="game_total">Total del partido</option>
+              <option value="winner">Ganador</option>
+              <option value="handicap">Hándicap</option>
+              <option value="team_total">Total por equipo</option>
+              <option value="players">Jugadores</option>
+            </select>
+          </label>
+          <span class="control-note" id="bbRange"></span>
+        </div>
+
+        <div id="bbNotice" class="notice" hidden></div>
+
+        <div class="bb-layout">
+          <section class="panel bb-panel bb-market-panel" aria-label="Mercados disponibles">
+            <div class="bb-panel-head">
+              <div>
+                <p class="eyebrow">Explorar</p>
+                <h3>Partidos y mercados</h3>
+              </div>
+              <div class="bb-market-summary" id="bbMarketSummary"></div>
+            </div>
+            <div id="bbEvents" class="bb-events" aria-live="polite">
+              <div class="bb-empty"><span class="spinner"></span>Cargando mercados…</div>
+            </div>
+            <div id="bbPlayerLocked" class="bb-locked" hidden></div>
+            <p class="bb-panel-note" id="bbMarketNote"></p>
+          </section>
+
+          <aside class="panel bb-panel bb-slip" aria-label="Ticket Bet Builder">
+            <div class="bb-slip-head">
+              <div>
+                <p class="eyebrow">Ticket</p>
+                <h3 id="bbSlipTitle">BET BUILDER · 0 selecciones</h3>
+              </div>
+              <button class="btn btn-ghost btn-small" type="button" id="bbClear">Limpiar</button>
+            </div>
+
+            <div id="bbSlipNotice" class="notice" hidden></div>
+            <div id="bbSelections" class="bb-selections">
+              <div class="bb-empty">Añade una selección desde los mercados de la izquierda.</div>
+            </div>
+
+            <div id="bbTicketSummary" class="bb-ticket-summary"></div>
+
+            <div class="bb-odds-grid">
+              <label>Cuota decimal (opcional)
+                <input id="bbOdds" type="number" min="1.01" max="1000" step="0.01" placeholder="Ej. 3.20" inputmode="decimal">
+              </label>
+              <label>Stake
+                <input id="bbStake" type="number" min="0.01" step="1" value="10" inputmode="decimal">
+              </label>
+            </div>
+
+            <div class="bb-actions">
+              <button class="btn btn-primary" type="button" id="bbAnalyze">Analizar combinada</button>
+              <button class="btn btn-ghost" type="button" id="bbCopy">Copiar</button>
+              <button class="btn btn-ghost" type="button" id="bbExport">Exportar</button>
+            </div>
+
+            <section id="bbAnalysis" class="bb-analysis" aria-live="polite" hidden></section>
+
+            <p class="bb-disclaimer">Las cuotas mostradas son informativas o introducidas por ti. Este módulo no garantiza beneficios ni implica que una combinada esté disponible en una casa de apuestas. Las probabilidades no están calibradas como cuotas de mercado.</p>
+          </aside>
+        </div>
+
+        <button id="bbMobileTicket" class="bb-mobile-ticket" type="button" hidden>
+          <span>Ticket · <b id="bbMobileCount">0</b></span>
+          <span>Ver ticket</span>
+        </button>
+      </section>
+
       <section id="tab-predict" class="tab-panel" role="tabpanel" hidden>
         <div class="section-head">
           <div>
@@ -474,6 +574,7 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261027-6" defer></script>
+  <script src="/app.js?v=20261027-8" defer></script>
+  <script src="/bet-builder.js?v=20261027-8" defer></script>
 </body>
 </html>

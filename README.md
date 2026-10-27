@@ -81,6 +81,71 @@ próximo rival, un posible defensor para ese partido y los defensores que más l
 marcaron según los datos de matchup de la NBA. Las barras comparan cada partido
 con la línea; la fila **PRÓX.** es una proyección, no un resultado.
 
+### Bet Builder
+
+La pestaña **Bet Builder** permite construir una combinada con partidos y
+mercados reales. No entrena un modelo nuevo: reutiliza el artefacto Ridge y sus
+residuos walk-forward.
+
+Mercados operativos:
+
+| Mercado | Línea | Fuente de probabilidad |
+|---|---|---|
+| Total del partido (Over/Under) | Línea de ESPN/DraftKings si existe; si no, línea personalizada | Residuos del total |
+| Ganador del partido | Sin línea | Residuos del margen |
+| Hándicap | Solo si ESPN devuelve una línea; nunca se inventa | Residuos del margen |
+| Total local / visitante | Línea personalizada | Residuos emparejados de total y margen |
+| Jugadores (PTS, REB, AST, PRA, 3PM) | Deshabilitados | Faltan líneas de props y probabilidades calibradas por línea |
+
+Reglas de cálculo:
+
+- Selecciones de **partidos distintos**: probabilidad conjunta =
+  `P1 × P2 × ... × Pn`, con un supuesto explícito de independencia.
+- Selecciones del **mismo partido**: se muestran las probabilidades
+  individuales, pero la conjunta queda como **no disponible** porque no hay un
+  modelo de dependencia validado.
+- La cuota justa teórica es `1 / P(conjunta)`. La cuota combinada de mercado
+  solo aparece si todas las selecciones tienen cuota decimal verificada.
+- El EV se calcula como `p × O − 1` solo con cuota decimal válida. Es una
+  estimación bajo los supuestos del modelo, no una garantía de beneficio.
+- Las líneas personalizadas se etiquetan como tales y no se presentan como
+  líneas de mercado.
+- El ticket se guarda en `localStorage` (`nbaTotalsBetBuilder.v1`) y se
+  revalida contra el calendario, las líneas y las cuotas actuales al abrir la
+  pestaña. Una selección antigua no se muestra como actual.
+
+API:
+
+```text
+GET  /api/bet-builder/events?date=2026-10-27&days=1
+POST /api/bet-builder/analyze
+```
+
+Ejemplo de análisis:
+
+```json
+{
+  "selections": [
+    {
+      "event_id": "401810000",
+      "event_date": "2026-10-27",
+      "market": "total",
+      "side": "OVER",
+      "line": 222.5
+    }
+  ],
+  "stake": 10,
+  "decimal_odds": 1.91
+}
+```
+
+Limitaciones: el modelo está entrenado hasta 2025-26 y no incorpora lesiones,
+alineaciones, noticias ni cambios de cuota posteriores a la consulta. Las
+probabilidades son frecuencias empíricas de residuos históricos, no
+probabilidades calibradas como cuotas de una casa de apuestas. En líneas
+enteras el empate (push) no se modela; se recomienda usar líneas terminadas
+en .5.
+
 ---
 
 ## Estructura
@@ -105,17 +170,22 @@ nba-ml/
 │   │   ├── players.py        # PTS/REB/AST/PRA (LeagueDashPlayerStats)
 │   │   ├── player_logs.py    # game logs por jugador (PlayerGameLogs)
 │   │   └── espn.py           # respaldo de actualización (stats, props y calendario)
+│   ├── betting/
+│   │   ├── probability.py    # validación, cuotas, EV y combinación independiente
+│   │   └── markets.py        # probabilidades empíricas de total, ganador y hándicap
 │   └── models/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
 │       ├── predict.py        # predicción y probabilidad over/under
 │       ├── player_props.py   # PTS/REB/AST/PRA por jugador
 │       └── results.py        # liquidación over/under contra resultados reales
+├── public/bet-builder.js     # explorador de mercados, ticket y análisis
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
 ├── tests/test_schedule.py    # normalización y filtros del calendario
 ├── tests/test_players.py     # cálculo de PRA y caché de jugadores
 ├── tests/test_results.py     # resultado real, acierto y métricas
 ├── tests/test_dashboard.py   # test de humo del dashboard
 ├── tests/test_api.py         # API FastAPI y frontend de Vercel
+├── tests/test_betting_probability.py # matemática de Bet Builder
 ├── data/
 │   ├── raw/                  # game logs, calendario y stats de jugadores (cache)
 │   └── processed/            # games.csv, team_games.csv, team_state.csv
@@ -442,8 +512,10 @@ medias móviles, ausencia de fuga con resultados actuales/futuros, descanso y
 back-to-back, consistencia del estado usado en predicción, contrato de features,
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
 PRA y caché de jugadores, props por jugador, liquidación over/under y métricas
-de acierto, margen y hándicap, la ficha visual de jugador y un test de humo del
-dashboard y la API pública de Vercel (44 en total).
+de acierto, margen y hándicap, la ficha visual de jugador, un test de humo del
+dashboard y la API pública de Vercel, y la matemática del Bet Builder:
+combinaciones independientes, rechazo de probabilidades/cuotas/líneas inválidas,
+selecciones del mismo partido y cálculos de EV (79 en total).
 
 ---
 

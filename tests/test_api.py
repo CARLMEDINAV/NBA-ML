@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
 import app as app_module
@@ -413,3 +414,380 @@ def test_static_styles_reserve_layout_space():
     assert ".skeleton-bar" in response.text
     assert ".control-note" in response.text
     assert "min-height: 1.55em" in response.text
+
+
+def test_bet_builder_events_contract(monkeypatch):
+    app_module.ODDS_CACHE.clear()
+    base = client.get(
+        "/api/upcoming",
+        params={"today": "2027-01-15", "days": 1, "line": 225.5},
+    ).json()
+    assert base["games"]
+    game = base["games"][0]
+    market = pd.DataFrame(
+        [
+            {
+                "game_id": game["game_id"],
+                "market_spread": -4.5,
+                "market_total": 230.5,
+                "market_details": "BOS -4.5",
+                "market_provider": "TestBook",
+                "over_odds": "-110",
+                "under_odds": "-108",
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        app_module, "_fetch_espn_odds", lambda day, schedule: market.copy()
+    )
+    response = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] >= 1
+    assert payload["limitations"]
+    assert payload["player_markets"]["available"] is False
+    event = next(item for item in payload["events"] if item["event_id"] == game["game_id"])
+    markets = {item["id"]: item for item in event["markets"]}
+    assert markets["total"]["line"] == 230.5
+    assert markets["total"]["line_source"] == "market"
+    assert markets["total"]["options"][0]["probability"] is not None
+    assert markets["total"]["options"][0]["decimal_odds"] > 1
+    assert markets["winner"]["available"] is True
+    assert markets["handicap"]["line"] == -4.5
+    assert markets["team_total_home"]["requires_line"] is True
+    assert markets["team_total_home"]["projected"] is not None
+
+
+def test_bet_builder_analyze_independent_and_same_game():
+    events_payload = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 3},
+    ).json()
+    events = events_payload["events"]
+    assert len(events) >= 2
+    first, second = events[0], events[1]
+    first_total = next(item for item in first["markets"] if item["id"] == "total")
+    line = first_total["line"] if first_total["line"] is not None else 220.5
+    selections = [
+        {
+            "event_id": first["event_id"],
+            "event_date": first["date"],
+            "market": "total",
+            "side": "OVER",
+            "line": line,
+        },
+        {
+            "event_id": second["event_id"],
+            "event_date": second["date"],
+            "market": "winner",
+            "side": "HOME",
+            "line": None,
+        },
+    ]
+    response = client.post(
+        "/api/bet-builder/analyze",
+        json={"selections": selections, "stake": 10},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert payload["joint_status"] == "independence"
+    expected = payload["selections"][0]["probability"] * payload["selections"][1]["probability"]
+    assert payload["joint_probability"] == pytest.approx(expected, rel=1e-6)
+    assert payload["fair_decimal_odds"] == pytest.approx(1 / expected, rel=1e-6)
+    assert 0 <= payload["joint_probability"] <= 1
+
+    same_game = [
+        selections[0],
+        {
+            "event_id": first["event_id"],
+            "event_date": first["date"],
+            "market": "winner",
+            "side": "HOME",
+            "line": None,
+        },
+    ]
+    response = client.post(
+        "/api/bet-builder/analyze",
+        json={"selections": same_game, "stake": 10},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["joint_status"] == "same_game_dependency"
+    assert payload["joint_probability"] is None
+    assert payload["fair_decimal_odds"] is None
+    assert payload["same_game_groups"]
+
+
+def test_bet_builder_analyze_market_odds_and_invalid_input(monkeypatch):
+    base = client.get(
+        "/api/upcoming",
+        params={"today": "2027-01-15", "days": 1, "line": 225.5},
+    ).json()
+    games = base["games"][:2]
+    assert len(games) >= 2
+    rows = []
+    for index, game in enumerate(games):
+        rows.append(
+            {
+                "game_id": game["game_id"],
+                "market_spread": -3.5 - index,
+                "market_total": 228.5 + index,
+                "market_details": "Test",
+                "market_provider": "TestBook",
+                "over_odds": "-110",
+                "under_odds": "-110",
+            }
+        )
+    market = pd.DataFrame(rows)
+    app_module.ODDS_CACHE.clear()
+    monkeypatch.setattr(
+        app_module, "_fetch_espn_odds", lambda day, schedule: market.copy()
+    )
+    events_payload = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    ).json()
+    events = events_payload["events"][:2]
+    assert len(events) == 2
+    selections = []
+    for event in events:
+        total = next(item for item in event["markets"] if item["id"] == "total")
+        assert total["line"] is not None
+        selections.append(
+            {
+                "event_id": event["event_id"],
+                "event_date": event["date"],
+                "market": "total",
+                "side": "OVER",
+                "line": total["line"],
+            }
+        )
+    response = client.post(
+        "/api/bet-builder/analyze",
+        json={"selections": selections, "stake": 10, "decimal_odds": 3.4},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["joint_status"] == "independence"
+    assert payload["decimal_odds"] == 3.4
+    assert payload["decimal_odds_source"] == "user"
+    assert payload["market_combined_decimal_odds"] is not None
+    assert payload["market_combined_decimal_odds"] == pytest.approx(
+        (1 + 100 / 110) ** 2, rel=1e-6
+    )
+    assert payload["ev"] == pytest.approx(
+        3.4 * payload["joint_probability"] - 1, rel=1e-6
+    )
+    assert payload["potential_return"] == pytest.approx(34.0, rel=1e-6)
+
+    invalid = client.post(
+        "/api/bet-builder/analyze",
+        json={"selections": selections, "stake": 10, "decimal_odds": 1.0},
+    )
+    assert invalid.status_code == 422
+
+
+def test_bet_builder_custom_line_and_invalid_line():
+    import app as app_module
+
+    # Sin cuotas: los totales deben usar linea personalizada.
+    original = app_module._fetch_espn_odds
+    app_module.ODDS_CACHE.clear()
+    app_module._fetch_espn_odds = lambda day, schedule: pd.DataFrame()
+    try:
+        events_payload = client.get(
+            "/api/bet-builder/events",
+            params={"date": "2027-01-15", "days": 1},
+        ).json()
+    finally:
+        app_module._fetch_espn_odds = original
+    event = events_payload["events"][0]
+    total = next(item for item in event["markets"] if item["id"] == "total")
+    assert total["line"] is None
+    assert total["requires_line"] is True
+
+    custom = client.post(
+        "/api/bet-builder/analyze",
+        json={
+            "selections": [
+                {
+                    "event_id": event["event_id"],
+                    "event_date": event["date"],
+                    "market": "total",
+                    "side": "OVER",
+                    "line": 220.5,
+                }
+            ],
+            "stake": 10,
+        },
+    )
+    assert custom.status_code == 200
+    payload = custom.json()
+    assert payload["selections"][0]["status"] == "ok"
+    assert payload["selections"][0]["is_custom_line"] is True
+    assert payload["selections"][0]["line_source"] == "custom"
+    assert 0 <= payload["selections"][0]["probability"] <= 1
+
+    invalid_line = client.post(
+        "/api/bet-builder/analyze",
+        json={
+            "selections": [
+                {
+                    "event_id": event["event_id"],
+                    "event_date": event["date"],
+                    "market": "total",
+                    "side": "OVER",
+                    "line": 50,
+                }
+            ],
+            "stake": 10,
+        },
+    )
+    assert invalid_line.status_code == 200
+    invalid_payload = invalid_line.json()
+    assert invalid_payload["selections"][0]["status"] == "invalid"
+    assert invalid_payload["joint_status"] == "invalid"
+    assert invalid_payload["joint_probability"] is None
+
+
+def test_bet_builder_duplicate_and_incompatible_selections():
+    events_payload = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    ).json()
+    event = events_payload["events"][0]
+    total = next(item for item in event["markets"] if item["id"] == "total")
+    line = total["line"] if total["line"] is not None else 220.5
+    selection = {
+        "event_id": event["event_id"],
+        "event_date": event["date"],
+        "market": "total",
+        "side": "OVER",
+        "line": line,
+    }
+    duplicate = client.post(
+        "/api/bet-builder/analyze",
+        json={"selections": [selection, selection], "stake": 10},
+    )
+    assert duplicate.status_code == 200
+    duplicate_payload = duplicate.json()
+    assert duplicate_payload["joint_status"] == "invalid"
+    assert all(item["status"] == "invalid" for item in duplicate_payload["selections"])
+    assert any("duplicada" in (item["stale_reason"] or "") for item in duplicate_payload["selections"])
+
+    opposite = dict(selection)
+    opposite["side"] = "UNDER"
+    incompatible = client.post(
+        "/api/bet-builder/analyze",
+        json={"selections": [selection, opposite], "stake": 10},
+    )
+    assert incompatible.status_code == 200
+    incompatible_payload = incompatible.json()
+    assert incompatible_payload["joint_status"] == "invalid"
+    assert all(item["status"] == "invalid" for item in incompatible_payload["selections"])
+
+
+def test_bet_builder_handicap_negative_line(monkeypatch):
+    base = client.get(
+        "/api/upcoming",
+        params={"today": "2027-01-15", "days": 1, "line": 225.5},
+    ).json()
+    game = base["games"][0]
+    market = pd.DataFrame(
+        [
+            {
+                "game_id": game["game_id"],
+                "market_spread": -4.5,
+                "market_total": 230.5,
+                "market_details": "BOS -4.5",
+                "market_provider": "TestBook",
+                "over_odds": "-110",
+                "under_odds": "-110",
+            }
+        ]
+    )
+    app_module.ODDS_CACHE.clear()
+    monkeypatch.setattr(
+        app_module, "_fetch_espn_odds", lambda day, schedule: market.copy()
+    )
+    events_payload = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    ).json()
+    event = next(item for item in events_payload["events"] if item["event_id"] == game["game_id"])
+    handicap = next(item for item in event["markets"] if item["id"] == "handicap")
+    response = client.post(
+        "/api/bet-builder/analyze",
+        json={
+            "selections": [
+                {
+                    "event_id": event["event_id"],
+                    "event_date": event["date"],
+                    "market": "handicap",
+                    "side": "HOME",
+                    "line": handicap["line"],
+                }
+            ],
+            "stake": 10,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["selections"][0]["status"] == "ok"
+    assert payload["selections"][0]["line"] == -4.5
+    assert 0 <= payload["selections"][0]["probability"] <= 1
+
+
+def test_bet_builder_stale_market_line(monkeypatch):
+    base = client.get(
+        "/api/upcoming",
+        params={"today": "2027-01-15", "days": 1, "line": 225.5},
+    ).json()
+    game = base["games"][0]
+    market = pd.DataFrame(
+        [
+            {
+                "game_id": game["game_id"],
+                "market_spread": -4.5,
+                "market_total": 230.5,
+                "market_details": "BOS -4.5",
+                "market_provider": "TestBook",
+                "over_odds": "-110",
+                "under_odds": "-110",
+            }
+        ]
+    )
+    app_module.ODDS_CACHE.clear()
+    monkeypatch.setattr(
+        app_module, "_fetch_espn_odds", lambda day, schedule: market.copy()
+    )
+    events_payload = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    ).json()
+    event = next(item for item in events_payload["events"] if item["event_id"] == game["game_id"])
+    response = client.post(
+        "/api/bet-builder/analyze",
+        json={
+            "selections": [
+                {
+                    "event_id": event["event_id"],
+                    "event_date": event["date"],
+                    "market": "total",
+                    "side": "OVER",
+                    "line": 230.0,
+                }
+            ],
+            "stake": 10,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["selections"][0]["status"] == "stale"
+    assert "cambi" in payload["selections"][0]["stale_reason"]
+    assert payload["joint_status"] == "invalid"
+    assert payload["joint_probability"] is None

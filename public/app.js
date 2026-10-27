@@ -1519,6 +1519,9 @@ function activateTab(name) {
     const active = button.dataset.tab === name;
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
+    if (active) {
+      button.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
   });
   $$(".tab-panel").forEach((panel) => {
     const active = panel.id === `tab-${name}`;
@@ -1530,6 +1533,9 @@ function activateTab(name) {
   if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
+  if (name === "betbuilder") {
+    window.dispatchEvent(new CustomEvent("betbuilder:activate"));
+  }
 }
 
 function bindEvents() {
