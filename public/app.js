@@ -3,6 +3,8 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+const PLAYER_SORT_LABELS = { pra: "PRA", pts: "PTS", reb: "REB", ast: "AST" };
+
 const nf1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
 const nf0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
 const pf = new Intl.NumberFormat("es-ES", { style: "percent", maximumFractionDigits: 1 });
@@ -646,6 +648,8 @@ async function loadPlayers() {
     state.loaded.players = true;
     const players = data.players || [];
     const leader = players[0];
+    const modeLabel = data.mode === "pergame" ? "por partido" : "totales";
+    $("#playersSubtitle").textContent = `PRA = puntos + rebotes + asistencias · ${data.season} · ${modeLabel}.`;
     const average = players.length
       ? players.reduce((sum, player) => sum + Number(player.pra || 0), 0) / players.length
       : null;
@@ -729,7 +733,8 @@ async function loadPlayers() {
       })
       .join("");
     const rosterNote = data.season === "2025-26" ? "equipos de esa temporada" : "equipos actuales";
-    $("#playersNote").textContent = `PRA = PTS + REB + AST · ${data.season} · ${rosterNote} · ${data.count} jugadores con al menos ${state.players.minGp} partidos.`;
+    const sortLabel = PLAYER_SORT_LABELS[state.players.sort] || "PRA";
+    $("#playersNote").textContent = `${data.count} jugadores · ${rosterNote} · ordenado por ${sortLabel} · mínimo ${state.players.minGp} partidos.`;
   } catch (error) {
     emptyRow(tbody, 9, "No se pudieron cargar los jugadores.");
     notice($("#playersNotice"), error.message, true);
@@ -1537,6 +1542,13 @@ function bindEvents() {
   });
 
   $("#playersRefresh").addEventListener("click", loadPlayers);
+  $("#playersFiltersToggle").addEventListener("click", () => {
+    const toggle = $("#playersFiltersToggle");
+    const expanded = toggle.getAttribute("aria-expanded") !== "true";
+    $("#playersAdvanced").hidden = !expanded;
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.querySelector(".filter-toggle-label").textContent = expanded ? "Menos filtros" : "Más filtros";
+  });
   $("#playersSeason").addEventListener("change", (event) => {
     state.players.season = event.target.value;
     state.players.minGp = event.target.value === "2025-26" ? 10 : 1;
