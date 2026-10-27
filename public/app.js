@@ -1502,9 +1502,30 @@ function bindEvents() {
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
-  $$("[data-goto-tab]").forEach((button) => {
-    button.addEventListener("click", () => activateTab(button.dataset.gotoTab));
-  });
+  const statusBadge = $("#statusBadge");
+  const modelMenu = $("#modelMenu");
+  if (statusBadge && modelMenu) {
+    const closeModelMenu = () => {
+      statusBadge.setAttribute("aria-expanded", "false");
+      modelMenu.hidden = true;
+    };
+    statusBadge.addEventListener("click", () => {
+      const expanded = statusBadge.getAttribute("aria-expanded") === "true";
+      statusBadge.setAttribute("aria-expanded", String(!expanded));
+      modelMenu.hidden = expanded;
+    });
+    document.addEventListener("click", (event) => {
+      if (!modelMenu.hidden && !event.target.closest(".model-select")) {
+        closeModelMenu();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !modelMenu.hidden) {
+        closeModelMenu();
+        statusBadge.focus();
+      }
+    });
+  }
 
   $("#lineInput").addEventListener("change", (event) => setLine(event.target.value));
   $("#lineDown").addEventListener("click", () => setLine(state.line - 0.5));
@@ -1691,7 +1712,16 @@ async function init() {
     state.line = Number(meta.default_line || 225.5);
     $("#lineInput").value = state.line.toFixed(1);
     const modelName = String(meta.model_name || "Ridge");
-    $("#statusBadge").textContent = `${modelName.charAt(0).toUpperCase()}${modelName.slice(1)} · hasta ${meta.trained_through}`;
+    const modelLabel = `${modelName.charAt(0).toUpperCase()}${modelName.slice(1)}`;
+    const trainedThrough = meta.trained_through || "-";
+    const statusText = $("#statusBadgeText");
+    if (statusText) statusText.textContent = `${modelLabel} · hasta ${trainedThrough}`;
+    const menuName = $("#modelMenuName");
+    if (menuName) menuName.textContent = modelLabel;
+    const menuThrough = $("#modelMenuThrough");
+    if (menuThrough) menuThrough.textContent = `Datos hasta ${trainedThrough}`;
+    const menuSeason = $("#modelMenuSeason");
+    if (menuSeason) menuSeason.textContent = meta.current_season || "-";
     populateTeams(meta);
 
     if (meta.current_season === "2026-27") {
@@ -1728,7 +1758,8 @@ async function init() {
     const detailMatch = window.location.hash.match(/^#ficha\/(\d+)$/);
     if (detailMatch) openPlayerDetail(detailMatch[1]);
   } catch (error) {
-    $("#statusBadge").textContent = "API no disponible";
+    const statusText = $("#statusBadgeText");
+    if (statusText) statusText.textContent = "API no disponible";
     showToast(error.message);
     const tbody = $("#upcomingBody");
     if (tbody) emptyRow(tbody, 8, "No se pudo conectar con la API.");
