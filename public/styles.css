@@ -817,7 +817,7 @@ tbody tr.is-clickable:focus-visible {
   .predict-form { grid-template-columns: 1fr; }
   .bar-row { grid-template-columns: minmax(90px, 120px) 1fr 48px; gap: 8px; }
   .tabs { gap: 4px; }
-  .tab { min-width: 0; flex: 1 1 0; padding: 10px 6px; font-size: 0.78rem; }
+  .tab { min-width: max-content; flex: 0 0 auto; padding: 10px 10px; font-size: 0.78rem; }
   .analysis-cards { grid-template-columns: 1fr; }
   .analysis-metrics { grid-template-columns: 1fr; }
   .analysis-card { padding: 13px; }
