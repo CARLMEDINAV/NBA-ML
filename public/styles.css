@@ -277,37 +277,6 @@ h1 span {
 
 .controls-row .grow { flex: 1 1 180px; }
 
-.players-controls .grow { flex: 1 1 260px; }
-
-.advanced-filters {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 12px;
-  flex: 2 1 360px;
-}
-
-.filter-toggle {
-  flex: 0 0 auto;
-  color: var(--muted);
-}
-
-.filter-toggle[aria-expanded="true"] {
-  border-color: rgba(255, 155, 84, .45);
-  background: rgba(255, 155, 84, .08);
-  color: var(--orange);
-}
-
-.filter-chevron {
-  display: inline-block;
-  font-size: 1.1rem;
-  line-height: 1;
-  transform: translateY(-1px);
-  transition: transform 160ms ease;
-}
-
-.filter-toggle[aria-expanded="true"] .filter-chevron { transform: rotate(180deg) translateY(1px); }
-
 select, input[type="date"], input[type="search"], input[type="number"] {
   min-height: 40px;
   padding: 9px 11px;
@@ -811,8 +780,6 @@ tbody tr.is-clickable:focus-visible {
   .controls-row { gap: 9px; }
   .controls-row label { min-width: calc(50% - 9px); flex: 1 1 calc(50% - 9px); }
   .controls-row .grow { flex-basis: 100%; }
-  .advanced-filters { flex-basis: 100%; }
-  .filter-toggle { width: 100%; }
   .control-note { width: 100%; margin-left: 0; }
   .predict-form { grid-template-columns: 1fr; }
   .bar-row { grid-template-columns: minmax(90px, 120px) 1fr 48px; gap: 8px; }

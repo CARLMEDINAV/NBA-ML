@@ -1542,13 +1542,6 @@ function bindEvents() {
   });
 
   $("#playersRefresh").addEventListener("click", loadPlayers);
-  $("#playersFiltersToggle").addEventListener("click", () => {
-    const toggle = $("#playersFiltersToggle");
-    const expanded = toggle.getAttribute("aria-expanded") !== "true";
-    $("#playersAdvanced").hidden = !expanded;
-    toggle.setAttribute("aria-expanded", String(expanded));
-    toggle.querySelector(".filter-toggle-label").textContent = expanded ? "Menos filtros" : "Más filtros";
-  });
   $("#playersSeason").addEventListener("change", (event) => {
     state.players.season = event.target.value;
     state.players.minGp = event.target.value === "2025-26" ? 10 : 1;

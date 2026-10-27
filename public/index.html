@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
-  <title>NBA Totals ML · over/under, hándicap y props</title>
+  <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261027-2">
+  <link rel="stylesheet" href="/styles.css?v=20261027-3">
 </head>
 <body>
   <div class="page">
     <header class="hero">
       <div class="hero-copy">
         <p class="eyebrow">NBA · temporada regular</p>
-        <h1>NBA Totals <span>ML</span></h1>
+        <h1>NBA Totals</h1>
         <p class="lead">
         </p>
       </div>
@@ -200,12 +200,18 @@
           </div>
           <button class="btn btn-ghost" type="button" id="playersRefresh">Actualizar</button>
         </div>
-        <div class="controls-row players-controls">
-          <label class="grow">Buscar
-            <input id="playersSearch" type="search" placeholder="Nombre del jugador">
+        <div class="controls-row">
+          <label>Temporada
+            <select id="playersSeason">
+              <option value="2025-26">2025-26 · histórica</option>
+              <option value="2026-27" selected>2026-27 · actual</option>
+            </select>
           </label>
-          <label>Equipo
-            <select id="playersTeam"><option value="">Todos</option></select>
+          <label>Modo
+            <select id="playersMode">
+              <option value="pergame" selected>Por partido</option>
+              <option value="totals">Totales</option>
+            </select>
           </label>
           <label>Orden
             <select id="playersSort">
@@ -215,6 +221,12 @@
               <option value="ast">AST</option>
             </select>
           </label>
+          <label>Equipo
+            <select id="playersTeam"><option value="">Todos</option></select>
+          </label>
+          <label>Mín. PJ
+            <input id="playersMinGp" type="number" min="1" max="82" value="1" inputmode="numeric">
+          </label>
           <label>Filas
             <select id="playersLimit">
               <option value="10">10</option>
@@ -223,27 +235,9 @@
               <option value="100">100</option>
             </select>
           </label>
-          <div class="advanced-filters" id="playersAdvanced" hidden>
-            <label>Temporada
-              <select id="playersSeason">
-                <option value="2025-26">2025-26 · histórica</option>
-                <option value="2026-27" selected>2026-27 · actual</option>
-              </select>
-            </label>
-            <label>Modo
-              <select id="playersMode">
-                <option value="pergame" selected>Por partido</option>
-                <option value="totals">Totales</option>
-              </select>
-            </label>
-            <label>Mín. PJ
-              <input id="playersMinGp" type="number" min="1" max="82" value="1" inputmode="numeric">
-            </label>
-          </div>
-          <button class="btn btn-ghost filter-toggle" type="button" id="playersFiltersToggle" aria-expanded="false" aria-controls="playersAdvanced">
-            <span class="filter-toggle-label">Más filtros</span>
-            <span class="filter-chevron" aria-hidden="true">⌄</span>
-          </button>
+          <label class="grow">Buscar
+            <input id="playersSearch" type="search" placeholder="Nombre del jugador">
+          </label>
         </div>
         <div id="playersNotice" class="notice" hidden></div>
         <div class="summary-grid" id="playersSummary"></div>
@@ -454,6 +448,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261027-2" defer></script>
+  <script src="/app.js?v=20261027-3" defer></script>
 </body>
 </html>
