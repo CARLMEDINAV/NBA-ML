@@ -380,6 +380,9 @@ def test_static_frontend_is_served():
     assert 'id="pdH2H"' in response.text
     assert 'id="pdLikelyDefender"' in response.text
     assert 'id="pdDefenders"' in response.text
+    assert 'id="upcomingSummary" aria-busy="true"' in response.text
+    assert 'class="loading skeleton-row"' in response.text
+    assert "no incorpora partidos posteriores ni lesiones" in response.text
     assert "VER ANÁLISIS DEL PARTIDO" in response.text
 
 
@@ -395,4 +398,15 @@ def test_static_javascript_includes_player_headshots():
     assert "renderDetailEfficiency" in response.text
     assert "renderDetailH2H" in response.text
     assert "renderDetailDefenders" in response.text
+    assert "loadingRows" in response.text
+    assert "skeleton-row" in response.text
     assert 'label: "MIN"' in response.text
+
+
+def test_static_styles_reserve_layout_space():
+    response = client.get("/styles.css")
+    assert response.status_code == 200
+    assert "scrollbar-gutter: stable" in response.text
+    assert ".skeleton-bar" in response.text
+    assert ".control-note" in response.text
+    assert "min-height: 1.55em" in response.text

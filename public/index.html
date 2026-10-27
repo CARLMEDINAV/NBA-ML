@@ -47,7 +47,7 @@
           <div>
             <p class="eyebrow">Calendario</p>
             <h2>Próximos partidos</h2>
-            <p class="muted">Total previsto, intervalo 80% y señal del modelo.</p>
+            <p class="muted">Total previsto, intervalo 80% y señal del modelo. Usa el último estado disponible; no incorpora partidos posteriores ni lesiones.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="upcomingRefresh">Actualizar</button>
         </div>
@@ -66,7 +66,20 @@
           <span class="control-note" id="upcomingRange"></span>
         </div>
         <div id="upcomingNotice" class="notice" hidden></div>
-        <div class="summary-grid" id="upcomingSummary"></div>
+        <div class="summary-grid" id="upcomingSummary" aria-busy="true">
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Partidos</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Línea</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">P(over) media</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Modelo</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -75,7 +88,14 @@
                 <th class="num">Total</th><th>IC 80%</th><th class="num">P(over)</th><th>Señal</th><th>Hándicap</th>
               </tr>
             </thead>
-            <tbody id="upcomingBody"></tbody>
+            <tbody id="upcomingBody">
+              <tr class="loading skeleton-row"><td colspan="8"><span class="spinner"></span>Cargando…</td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
+            </tbody>
           </table>
         </div>
         <p class="table-note" id="upcomingNote"></p>

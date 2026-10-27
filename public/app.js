@@ -270,6 +270,19 @@ function loadingRow(tbody, columns, message = "Cargando…") {
   tbody.innerHTML = `<tr class="loading"><td colspan="${columns}"><span class="spinner"></span>${esc(message)}</td></tr>`;
 }
 
+function loadingRows(tbody, columns, rows = 6, message = "Cargando…") {
+  if (rows <= 1) {
+    loadingRow(tbody, columns, message);
+    return;
+  }
+  tbody.innerHTML = Array.from({ length: rows }, (_, index) => {
+    if (index === 0) {
+      return `<tr class="loading skeleton-row"><td colspan="${columns}"><span class="spinner"></span>${esc(message)}</td></tr>`;
+    }
+    return `<tr class="loading skeleton-row" aria-hidden="true"><td colspan="${columns}"><span class="skeleton-bar"></span></td></tr>`;
+  }).join("");
+}
+
 function emptyRow(tbody, columns, message) {
   tbody.innerHTML = `<tr><td colspan="${columns}"><div class="empty">${esc(message)}</div></td></tr>`;
 }
@@ -357,11 +370,11 @@ async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
-    loadingRow(tbody, 8);
+    loadingRows(tbody, 8, 6);
     setBusy(button, true);
     notice($("#upcomingNotice"), "");
-    $("#upcomingSummary").innerHTML = "";
     $("#upcomingNote").textContent = "";
+    $("#upcomingNote").classList.remove("is-warning");
   }
   try {
     const data = await api("/api/upcoming", {
@@ -382,11 +395,17 @@ async function loadUpcoming(silent = false) {
       summaryCard("P(over) media", pct(average), "si hay señal"),
       summaryCard("Modelo", state.meta?.model_name || "Ridge", `hasta ${state.meta?.trained_through || "—"}`),
     ].join("");
+    $("#upcomingSummary").setAttribute("aria-busy", "false");
 
     if (!data.games.length) {
       emptyRow(tbody, 8, "No hay partidos programados en ese rango para el filtro elegido.");
-      $("#upcomingNote").textContent = "Prueba a ampliar los días o quitar el filtro de equipo.";
-      notice($("#upcomingNotice"), data.warning || "");
+      $("#upcomingNote").textContent = [
+        "Prueba a ampliar los días o quitar el filtro de equipo.",
+        data.warning || "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      $("#upcomingNote").classList.toggle("is-warning", Boolean(data.warning));
       return;
     }
 
@@ -405,8 +424,11 @@ async function loadUpcoming(silent = false) {
         </tr>`
       )
       .join("");
-    $("#upcomingNote").textContent = `${data.count} partidos · línea ${num(data.line, 1)} · P(over) calculada con los residuos fuera de muestra.${data.live_updated ? ` · actualizado ${data.live_updated}` : ""}`;
-    notice($("#upcomingNotice"), data.warning || "");
+    const upcomingNote = `${data.count} partidos · línea ${num(data.line, 1)} · P(over) calculada con los residuos fuera de muestra.${data.live_updated ? ` · actualizado ${data.live_updated}` : ""}`;
+    $("#upcomingNote").textContent = data.warning
+      ? `${upcomingNote} ${data.warning}`
+      : upcomingNote;
+    $("#upcomingNote").classList.toggle("is-warning", Boolean(data.warning));
   } catch (error) {
     if (!silent) {
       emptyRow(tbody, 8, "No se pudieron cargar los próximos partidos.");

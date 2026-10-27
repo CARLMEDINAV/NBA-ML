@@ -123,7 +123,7 @@ app = FastAPI(
         "Prediccion de totales, handicap y props de jugadores "
         "(PTS, REB, AST y PRA)."
     ),
-    version="0.6.0",
+    version="0.6.1",
 )
 app.add_middleware(
     CORSMiddleware,
