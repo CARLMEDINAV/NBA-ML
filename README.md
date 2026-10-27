@@ -3,8 +3,8 @@
 **Demo pública:** https://nba-ml-flax.vercel.app
 
 Predicción del **total de puntos** (over/under), hándicap y **props de jugadores**
-(PTS, REB, AST y PRA) con datos oficiales de `stats.nba.com`, un pipeline
-reproducible y validación temporal estricta.
+(PTS, REB, AST y PRA) con datos NBA (`stats.nba.com` con respaldo de ESPN), un
+pipeline reproducible y validación temporal estricta.
 
 El proyecto descarga 11 temporadas regulares (2015-16 a 2025-26), construye
 features pre-partido sin fuga de información, entrena varios modelos y deja un
@@ -125,6 +125,7 @@ nba-ml/
 ├── artifacts/player_game_logs_recent.csv # hasta 40 partidos por jugador (ficha/H2H)
 ├── artifacts/player_defenders_recent.csv # defensores con más minutos de matchup
 ├── artifacts/player_bio.csv # altura y peso actual para estimar el rol defensivo
+├── artifacts/team_games_recent.csv # historial compacto para el estado de equipos
 └── reports/                  # metrics.md, eda.md, figuras, predicciones test
 ```
 
@@ -297,8 +298,10 @@ La app pública está pensada para abrirla desde el móvil:
 - **Persistencia:** un workflow de GitHub Actions
   (`.github/workflows/update-results.yml`) revisa los marcadores de ESPN cada
   15 minutos y fusiona los finales nuevos en
-  `artifacts/schedule_2026_27.csv`. El calendario completo de la temporada se
-  conserva; solo se actualizan las fechas cercanas a hoy.
+  `artifacts/schedule_2026_27.csv`. Después recalcula `artifacts/team_state.csv`
+  con los boxscores de equipo de ESPN, para que el descanso, los promedios
+  móviles y el Elo no se queden anclados en 2025-26. El calendario completo de la
+  temporada se conserva; solo se actualizan las fechas cercanas a hoy.
 - **Jugadores y props:** otro workflow
   (`.github/workflows/update-players.yml`) refresca cada 6 horas
   `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv`,

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -123,6 +124,61 @@ BOXSCORE_COLUMNS = [
     "pf",
     "plus_minus",
     "pra",
+]
+
+# Esquema de ``data/processed/team_games.csv``. Lo usan el estado de equipos
+# y los promedios moviles que alimentan el modelo.
+TEAM_GAME_COLUMNS = [
+    "season_id",
+    "team_id",
+    "team_abbreviation",
+    "team_name",
+    "game_id",
+    "game_date",
+    "matchup",
+    "wl",
+    "min",
+    "fgm",
+    "fga",
+    "fg_pct",
+    "fg3m",
+    "fg3a",
+    "fg3_pct",
+    "ftm",
+    "fta",
+    "ft_pct",
+    "oreb",
+    "dreb",
+    "reb",
+    "ast",
+    "stl",
+    "blk",
+    "tov",
+    "pf",
+    "pts",
+    "plus_minus",
+    "video_available",
+    "season",
+    "is_home",
+    "opponent_id",
+    "opp_pts",
+    "fga_opp",
+    "fta_opp",
+    "oreb_opp",
+    "tov_opp",
+    "dreb_opp",
+    "pace",
+    "off_rtg",
+    "def_rtg",
+    "fg3a_rate",
+    "fta_rate",
+    "tov_rate",
+    "ts",
+    "oreb_rate",
+    "game_total",
+    "win",
+    "ot_flag",
+    "close_flag",
 ]
 
 _SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
@@ -886,6 +942,303 @@ def _boxscore_rows(
                 }
             )
     return rows
+
+
+def _team_statistics(summary: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Estadisticas de equipo del resumen de ESPN, indexadas por abreviatura."""
+    result: dict[str, dict[str, Any]] = {}
+    for block in summary.get("boxscore", {}).get("teams", []):
+        team = nba_team((block.get("team") or {}).get("abbreviation"))
+        if not team:
+            continue
+        result[team] = {
+            str(item.get("name")): item.get("displayValue")
+            for item in block.get("statistics") or []
+        }
+    return result
+
+
+def _team_game_rows(
+    summary: dict[str, Any],
+    event: dict[str, Any],
+    *,
+    season: str,
+    game_id: str,
+    team_ids: dict[str, int],
+    team_names: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Convierte el boxscore de equipos de ESPN en filas equipo-partido."""
+    game_date = _as_date(event["_date"])
+    home = str(event["_home"])
+    away = str(event["_away"])
+    home_score = pd.to_numeric(event.get("_home_score"), errors="coerce")
+    away_score = pd.to_numeric(event.get("_away_score"), errors="coerce")
+    if pd.isna(home_score) or pd.isna(away_score):
+        return []
+
+    status_text = str(event.get("_status_text") or "")
+    competition = ((summary.get("header") or {}).get("competitions") or [{}])[0]
+    period = int(((competition.get("status") or {}).get("period") or 4))
+    overtime = period > 4 or "OT" in status_text.upper()
+    minutes = 240.0 + (5.0 * max(0, period - 4) if overtime else 0.0)
+    season_id = int(f"2{str(season)[:4]}")
+    summary_names = {
+        nba_team((block.get("team") or {}).get("abbreviation")): str(
+            (block.get("team") or {}).get("displayName") or ""
+        )
+        for block in summary.get("boxscore", {}).get("teams", [])
+    }
+    names = {**{k: v for k, v in summary_names.items() if v}, **(team_names or {})}
+    stats_by_team = _team_statistics(summary)
+    rows: list[dict[str, Any]] = []
+
+    for team, stats in stats_by_team.items():
+        if team not in (home, away) or team not in team_ids:
+            continue
+        is_home = team == home
+        opponent = away if is_home else home
+        pts = float(home_score if is_home else away_score)
+        opp_pts = float(away_score if is_home else home_score)
+        opponent_stats = stats_by_team.get(opponent, {})
+
+        fgm, fga = _parse_made_attempt(
+            stats.get("fieldGoalsMade-fieldGoalsAttempted")
+        )
+        fg3m, fg3a = _parse_made_attempt(
+            stats.get("threePointFieldGoalsMade-threePointFieldGoalsAttempted")
+        )
+        ftm, fta = _parse_made_attempt(
+            stats.get("freeThrowsMade-freeThrowsAttempted")
+        )
+        oreb = _number(stats.get("offensiveRebounds"))
+        dreb = _number(stats.get("defensiveRebounds"))
+        reb = _number(stats.get("totalRebounds")) or oreb + dreb
+        tov = _number(stats.get("turnovers"))
+        pace = fga + 0.44 * fta - oreb + tov
+        if pace <= 0:
+            continue
+
+        # El rival puede no estar en el resumen; se intenta reconstruir con su
+        # propio boxscore, y si no, se deja el ritmo propio como aproximacion.
+        _, opp_fga = _parse_made_attempt(
+            opponent_stats.get("fieldGoalsMade-fieldGoalsAttempted")
+        )
+        _, opp_fta = _parse_made_attempt(
+            opponent_stats.get("freeThrowsMade-freeThrowsAttempted")
+        )
+        opp_oreb = _number(opponent_stats.get("offensiveRebounds"))
+        opp_tov = _number(opponent_stats.get("turnovers"))
+        opp_dreb = _number(opponent_stats.get("defensiveRebounds"))
+        pace_opp = opp_fga + 0.44 * opp_fta - opp_oreb + opp_tov
+        if pace_opp <= 0:
+            pace_opp = pace
+
+        rows.append(
+            {
+                "season_id": season_id,
+                "team_id": team_ids[team],
+                "team_abbreviation": team,
+                "team_name": names.get(team, team),
+                "game_id": str(game_id),
+                "game_date": game_date,
+                "matchup": (
+                    f"{team} vs. {opponent}" if is_home else f"{team} @ {opponent}"
+                ),
+                "wl": "W" if pts > opp_pts else "L",
+                "min": minutes,
+                "fgm": fgm,
+                "fga": fga,
+                "fg_pct": fgm / fga if fga else 0.0,
+                "fg3m": fg3m,
+                "fg3a": fg3a,
+                "fg3_pct": fg3m / fg3a if fg3a else 0.0,
+                "ftm": ftm,
+                "fta": fta,
+                "ft_pct": ftm / fta if fta else 0.0,
+                "oreb": oreb,
+                "dreb": dreb,
+                "reb": reb,
+                "ast": _number(stats.get("assists")),
+                "stl": _number(stats.get("steals")),
+                "blk": _number(stats.get("blocks")),
+                "tov": tov,
+                "pf": _number(stats.get("fouls")),
+                "pts": pts,
+                "plus_minus": pts - opp_pts,
+                "video_available": 1,
+                "season": str(season),
+                "is_home": is_home,
+                "opponent_id": team_ids.get(opponent),
+                "opp_pts": opp_pts,
+                "fga_opp": opp_fga,
+                "fta_opp": opp_fta,
+                "oreb_opp": opp_oreb,
+                "tov_opp": opp_tov,
+                "dreb_opp": opp_dreb,
+                "pace": pace,
+                "off_rtg": 100.0 * pts / pace,
+                "def_rtg": 100.0 * opp_pts / pace_opp,
+                "fg3a_rate": fg3a / fga if fga else np.nan,
+                "fta_rate": fta / fga if fga else np.nan,
+                "tov_rate": tov / pace if pace else np.nan,
+                "ts": pts / (2.0 * (fga + 0.44 * fta)) if fga else np.nan,
+                "oreb_rate": (
+                    oreb / (oreb + opp_dreb) if (oreb + opp_dreb) else np.nan
+                ),
+                "game_total": pts + opp_pts,
+                "win": int(pts > opp_pts),
+                "ot_flag": float(overtime),
+                "close_flag": float(abs(pts - opp_pts) <= 5),
+            }
+        )
+    return rows
+
+
+def fetch_team_boxscore(
+    event: dict[str, Any],
+    *,
+    season: str,
+    game_id: str,
+    artifacts_dir: Path | str = DEFAULT_ARTIFACTS,
+    team_ids: dict[str, int] | None = None,
+    team_names: dict[str, str] | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+    retries: int = DEFAULT_RETRIES,
+) -> pd.DataFrame:
+    """Descarga el boxscore de equipos y lo adapta al esquema historico."""
+    summary = _get_json(
+        f"{ESPN_SITE}/summary",
+        params={"event": str(event["id"])},
+        timeout=timeout,
+        retries=retries,
+    )
+    ids = team_ids or load_team_ids(artifacts_dir)
+    rows = _team_game_rows(
+        summary,
+        event,
+        season=season,
+        game_id=game_id,
+        team_ids=ids,
+        team_names=team_names,
+    )
+    return pd.DataFrame(rows, columns=TEAM_GAME_COLUMNS)
+
+
+def append_recent_team_games(
+    history: pd.DataFrame,
+    schedule: pd.DataFrame | None,
+    season: str,
+    *,
+    today: date | None = None,
+    days_back: int = 14,
+    artifacts_dir: Path | str = DEFAULT_ARTIFACTS,
+    team_names: dict[str, str] | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+    retries: int = DEFAULT_RETRIES,
+) -> pd.DataFrame:
+    """Agrega los partidos finalizados que aun no estan en el historial."""
+    current = today or datetime.now(EASTERN).date()
+    current_logs = history[
+        history.get("season", pd.Series(dtype=str)).astype(str).eq(str(season))
+    ].copy()
+    last_date: date | None = None
+    if not current_logs.empty:
+        parsed = pd.to_datetime(current_logs["game_date"], errors="coerce").dropna()
+        if not parsed.empty:
+            last_date = parsed.max().date()
+
+    start = current - timedelta(days=days_back)
+    if last_date is not None:
+        start = max(start, last_date - timedelta(days=1))
+        start = min(start, current)
+
+    existing = {
+        str(value)
+        for value in current_logs.get("game_id", pd.Series(dtype=str)).tolist()
+    }
+    schedule_ids: set[str] = set()
+    if schedule is not None and not schedule.empty and "status" in schedule.columns:
+        finals = schedule[
+            pd.to_numeric(schedule["status"], errors="coerce").eq(3)
+        ].copy()
+        finals["game_id"] = finals["game_id"].astype(str)
+        schedule_ids = set(finals["game_id"])
+        missing = finals[~finals["game_id"].isin(existing)]
+        if not missing.empty:
+            dates = pd.to_datetime(missing["game_date"], errors="coerce").dropna()
+            if not dates.empty:
+                start = min(start, dates.min().date())
+
+    games = fetch_scoreboard(start, current, timeout=timeout, retries=retries)
+    ids = load_team_ids(artifacts_dir)
+    new_frames: list[pd.DataFrame] = []
+
+    for game in games:
+        if int(game["status"]) != 3:
+            continue
+        event = {
+            "id": game["event_id"],
+            "_date": _as_date(game["game_date"]),
+            "_home": game["home"],
+            "_away": game["away"],
+            "_home_score": game["home_score"],
+            "_away_score": game["away_score"],
+            "_status_text": game["status_text"],
+        }
+        game_id = _event_schedule_id(schedule, event)
+        if game_id in existing:
+            continue
+        # Solo partidos del calendario regular publicado; el scoreboard de ESPN
+        # tambien incluye pretemporada y no debe contaminar el estado.
+        if schedule_ids and game_id not in schedule_ids:
+            continue
+        try:
+            frame = fetch_team_boxscore(
+                event,
+                season=season,
+                game_id=game_id,
+                artifacts_dir=artifacts_dir,
+                team_ids=ids,
+                team_names=team_names,
+                timeout=timeout,
+                retries=retries,
+            )
+        except Exception as error:  # noqa: BLE001 - un boxscore no bloquea el resto
+            LOGGER.warning(
+                "No se pudo descargar el boxscore de equipos %s: %s",
+                game["event_id"],
+                error,
+            )
+            continue
+        if frame.empty:
+            continue
+        new_frames.append(frame)
+        existing.add(game_id)
+
+    if not new_frames:
+        LOGGER.info("ESPN equipos: no hay partidos finalizados nuevos")
+        return history
+
+    added = pd.concat(new_frames, ignore_index=True)
+    combined = pd.concat([history, added], ignore_index=True, sort=False)
+    for column in TEAM_GAME_COLUMNS:
+        if column not in combined.columns:
+            combined[column] = None
+    combined = combined.drop_duplicates(
+        subset=["season", "game_id", "team_id"], keep="last"
+    )
+    combined["game_date"] = pd.to_datetime(
+        combined["game_date"], errors="coerce"
+    )
+    combined = combined.sort_values(
+        ["team_id", "game_date", "game_id"], kind="stable"
+    ).reset_index(drop=True)
+    LOGGER.info(
+        "ESPN equipos: %s partidos y %s filas agregadas",
+        len(new_frames),
+        len(added),
+    )
+    return combined
 
 
 def fetch_boxscore(

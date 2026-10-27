@@ -1217,7 +1217,7 @@ def _prediction_warning(result: dict[str, Any], as_of: pd.Timestamp) -> str | No
     if gap > 14:
         return (
             f"El ultimo partido de uno de los equipos fue hace {gap} dias. "
-            "El estado de los equipos es una foto de 2025-26; la prediccion "
+            "El estado de los equipos esta desactualizado; la prediccion "
             "asume descanso maximo."
         )
     return None

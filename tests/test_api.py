@@ -122,7 +122,7 @@ def test_predict_single_game():
         params={
             "home": "BOS",
             "away": "LAL",
-            "date": "2026-10-22",
+            "date": "2027-01-15",
             "line": 225.5,
         },
     )
@@ -143,7 +143,7 @@ def test_predict_with_handicap_cover_probability():
         params={
             "home": "BOS",
             "away": "LAL",
-            "date": "2026-10-22",
+            "date": "2027-01-15",
             "line": 225.5,
             "handicap": -4.5,
         },

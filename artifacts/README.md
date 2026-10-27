@@ -3,7 +3,8 @@
 Esta carpeta contiene la foto minima que necesita la app publica de Vercel:
 
 - `model.joblib`: modelo Ridge entrenado, lista de features y residuos.
-- `team_state.csv`: ultimo estado conocido de cada equipo.
+- `team_state.csv`: ultimo estado conocido de cada equipo (incluye descanso y Elo actualizados).
+- `team_games_recent.csv`: historial compacto usado para recalcular `team_state.csv`.
 - `schedule_2026_27.csv`: calendario regular y resultados finalizados.
 - `player_stats_<temporada>_<modo>.csv`: PTS/REB/AST/PRA por jugador.
 - `test_predictions.csv`: predicciones fuera de muestra de 2025-26.

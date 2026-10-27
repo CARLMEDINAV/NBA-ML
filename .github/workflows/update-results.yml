@@ -28,15 +28,19 @@ jobs:
         env:
           PYTHONPATH: src
         run: python scripts/update_web_schedule.py
+      - name: Actualizar estado y descanso de equipos
+        env:
+          PYTHONPATH: src
+        run: python scripts/update_web_team_state.py
       - name: Commit si hay cambios
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add artifacts/schedule_2026_27.csv
+          git add artifacts/schedule_2026_27.csv artifacts/team_state.csv artifacts/team_games_recent.csv
           if git diff --cached --quiet; then
             echo "Sin cambios en los resultados."
           else
-            git commit -m "Actualiza resultados NBA"
+            git commit -m "Actualiza resultados y estado de equipos NBA"
             git pull --rebase origin "${GITHUB_REF_NAME}"
             git push
           fi
