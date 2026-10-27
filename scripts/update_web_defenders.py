@@ -11,6 +11,7 @@ rompe por un timeout aislado.
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -175,19 +176,21 @@ def _normalize(raw: pd.DataFrame, season: str, player_ids: set[int]) -> pd.DataF
 def _fetch(season: str, player_ids: set[int]) -> pd.DataFrame:
     from nba_api.stats.endpoints import leagueseasonmatchups
 
+    timeout = int(os.getenv("NBA_STATS_TIMEOUT", "120"))
+    attempts = max(1, int(os.getenv("NBA_STATS_RETRIES", "3")))
     last_error: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(attempts):
         try:
             endpoint = leagueseasonmatchups.LeagueSeasonMatchups(
                 season=season,
                 season_type_playoffs="Regular Season",
                 per_mode_simple="Totals",
-                timeout=120,
+                timeout=timeout,
             )
             return _normalize(endpoint.get_data_frames()[0], season, player_ids)
         except Exception as error:  # noqa: BLE001 - reintentar timeouts de la NBA
             last_error = error
-            if attempt < 2:
+            if attempt + 1 < attempts:
                 time.sleep(4 * (attempt + 1))
     raise RuntimeError(f"No se pudieron descargar los matchups {season}: {last_error}")
 

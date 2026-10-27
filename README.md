@@ -103,7 +103,8 @@ nba-ml/
 │   │   ├── build_dataset.py  # emparejado, features, Elo, estado por equipo
 │   │   ├── schedule.py       # calendario y próximos partidos (ScheduleLeagueV2)
 │   │   ├── players.py        # PTS/REB/AST/PRA (LeagueDashPlayerStats)
-│   │   └── player_logs.py    # game logs por jugador (PlayerGameLogs)
+│   │   ├── player_logs.py    # game logs por jugador (PlayerGameLogs)
+│   │   └── espn.py           # respaldo de actualización (stats, props y calendario)
 │   └── models/
 │       ├── train.py          # tuning, validación, walk-forward, artefacto
 │       ├── predict.py        # predicción y probabilidad over/under
@@ -294,17 +295,22 @@ La app pública está pensada para abrirla desde el móvil:
   cuando están publicadas. Se cachean 5 minutos y se marcan siempre como
   informativas; no hay histórico de líneas de cierre.
 - **Persistencia:** un workflow de GitHub Actions
-  (`.github/workflows/update-results.yml`) revisa el calendario cada 15 minutos
-  y actualiza `artifacts/schedule_2026_27.csv` cuando hay marcadores nuevos.
+  (`.github/workflows/update-results.yml`) revisa los marcadores de ESPN cada
+  15 minutos y fusiona los finales nuevos en
+  `artifacts/schedule_2026_27.csv`. El calendario completo de la temporada se
+  conserva; solo se actualizan las fechas cercanas a hoy.
 - **Jugadores y props:** otro workflow
   (`.github/workflows/update-players.yml`) refresca cada 6 horas
   `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv`,
   `player_game_logs_recent.csv`, `player_defenders_recent.csv` y
-  `player_bio.csv`. Así los equipos actuales (por ejemplo, Giannis en Miami),
-  las medias móviles de los props, los últimos partidos, la efectividad/uso, el
-  posible defensor y el historial de defensores de cada ficha llegan a la web
-  sin que Vercel tenga que consultar `stats.nba.com`. Los artefactos de
-  historial y defensores conservan los datos anteriores si la descarga falla.
+  `player_bio.csv`. Las estadísticas, los boxscores recientes y el calendario
+  salen de ESPN porque los runners de GitHub no alcanzan `stats.nba.com`. Así
+  los equipos actuales (por ejemplo, Giannis en Miami), las medias móviles de
+  los props, los últimos partidos y la efectividad/uso llegan a la web sin que
+  Vercel tenga que consultar `stats.nba.com`. La biografía y los defensores
+  conservan la foto anterior si la NBA no responde; el workflow lo avisa con
+  una anotación de advertencia en lugar de dejar el artefacto obsoleto en
+  silencio.
 
 Para probarla en local:
 

@@ -32,7 +32,7 @@ def test_meta_and_teams():
 def test_upcoming_returns_predictions():
     response = client.get(
         "/api/upcoming",
-        params={"today": "2026-10-22", "days": 3, "line": 225.5},
+        params={"today": "2027-01-15", "days": 3, "line": 225.5},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -55,7 +55,7 @@ def test_upcoming_includes_analysis_text():
     response = client.get(
         "/api/upcoming",
         params={
-            "today": "2026-10-22",
+            "today": "2027-01-15",
             "days": 3,
             "line": 225.5,
             "analysis": 1,
@@ -72,7 +72,7 @@ def test_upcoming_includes_analysis_text():
 def test_upcoming_merges_market_odds(monkeypatch):
     base = client.get(
         "/api/upcoming",
-        params={"today": "2026-10-22", "days": 3, "line": 225.5},
+        params={"today": "2027-01-15", "days": 3, "line": 225.5},
     ).json()
     game = base["games"][0]
     market = pd.DataFrame(
@@ -94,7 +94,7 @@ def test_upcoming_merges_market_odds(monkeypatch):
     response = client.get(
         "/api/upcoming",
         params={
-            "today": "2026-10-22",
+            "today": "2027-01-15",
             "days": 3,
             "line": 225.5,
             "odds": 1,
@@ -211,7 +211,7 @@ def test_players_current_season_uses_current_rosters():
 def test_player_props_projections():
     response = client.get(
         "/api/player-props",
-        params={"today": "2026-10-22", "days": 3, "limit": 5},
+        params={"today": "2027-01-15", "days": 3, "limit": 5},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -245,7 +245,7 @@ def test_player_props_projections():
 def test_player_props_team_filter():
     response = client.get(
         "/api/player-props",
-        params={"today": "2026-10-22", "days": 7, "team": "PHI", "limit": 3},
+        params={"today": "2027-01-15", "days": 7, "team": "PHI", "limit": 3},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -259,7 +259,7 @@ def test_player_props_team_filter():
 def test_player_card_detail():
     response = client.get(
         "/api/player-card",
-        params={"player_id": 203507, "today": "2026-10-22"},
+        params={"player_id": 203507, "today": "2027-01-15"},
     )
     assert response.status_code == 200
     payload = response.json()

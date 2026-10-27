@@ -1,11 +1,16 @@
 """Actualiza las estadisticas de jugadores que consume la web de Vercel.
 
 Se ejecuta desde GitHub Actions unas pocas veces al dia. Vercel no puede
-consultar ``stats.nba.com``, asi que la app publica lee la foto de ``artifacts``.
+consultar ``stats.nba.com`` y los runners de GitHub tampoco lo alcanzan de
+forma fiable, asi que la actualizacion usa ESPN como fuente alternativa.
+
+La foto publicada sigue teniendo el mismo esquema que la descarga original de
+la NBA para que la app no necesite cambios.
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -15,7 +20,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from nba_ml.data.players import load_player_stats, player_stats_path  # noqa: E402
+from nba_ml.data.espn import fetch_player_stats  # noqa: E402
+from nba_ml.data.players import player_stats_path  # noqa: E402
 
 SEASON = "2026-27"
 MODES = {"PerGame": "pergame", "Totals": "totals"}
@@ -30,14 +36,22 @@ def _destinations() -> list[Path]:
 
 
 def _update_bio() -> None:
-    """Altura actual para estimar el rol defensivo sin depender de posiciones."""
+    """Altura actual para estimar el rol defensivo sin depender de posiciones.
+
+    La biografia no tiene equivalente directo en el resumen de ESPN; si la NBA
+    no responde se conserva la foto anterior. En GitHub se omite para no perder
+    minutos esperando un timeout conocido.
+    """
+    if os.getenv("GITHUB_ACTIONS") and os.getenv("NBA_BIO_UPDATE", "0") != "1":
+        print(f"{BIO.name}: se conserva la biografia anterior en GitHub Actions")
+        return
     try:
         from nba_api.stats.endpoints import leaguedashplayerbiostats
 
         raw = leaguedashplayerbiostats.LeagueDashPlayerBioStats(
             season=SEASON,
             season_type_all_star="Regular Season",
-            timeout=120,
+            timeout=int(os.getenv("NBA_BIO_TIMEOUT", "30")),
         ).get_data_frames()[0]
     except Exception as error:  # noqa: BLE001 - no bloquear las estadisticas
         print(f"::warning::No se pudo actualizar {BIO.name}: {error}")
@@ -83,36 +97,37 @@ def _update_bio() -> None:
 
 
 def main() -> int:
-    frames = {}
-    for per_mode in MODES:
-        try:
-            frames[per_mode] = load_player_stats(
-                SEASON,
-                per_mode=per_mode,
-                refresh=True,
-                timeout=120,
-            )
-        except Exception as error:  # noqa: BLE001 - no romper el workflow por un timeout
-            print(
-                f"::warning::No se pudieron actualizar las estadisticas "
-                f"({per_mode}) de {SEASON}: {error}"
-            )
-            if all(path.exists() for path in _destinations()):
-                print("Se conservan las estadisticas de jugadores anteriores.")
-                return 0
-            return 1
+    try:
+        pergame, totals = fetch_player_stats(SEASON)
+    except Exception as error:  # noqa: BLE001 - no romper el workflow por red
+        print(
+            f"::warning::No se pudieron actualizar las estadisticas de "
+            f"{SEASON} desde ESPN: {error}"
+        )
+        if all(path.exists() for path in _destinations()):
+            print("Se conservan las estadisticas de jugadores anteriores.")
+            return 0
+        return 1
 
-    for per_mode, suffix in MODES.items():
-        frame = frames[per_mode]
-        source = player_stats_path(SEASON, per_mode)
+    if pergame.empty or totals.empty:
+        print("::warning::ESPN no devolvio estadisticas de jugadores.")
+        return 0 if all(path.exists() for path in _destinations()) else 1
+
+    for per_mode, frame in (("PerGame", pergame), ("Totals", totals)):
+        suffix = MODES[per_mode]
         destination = (
             ROOT / "artifacts" / f"player_stats_{SEASON.replace('-', '_')}_{suffix}.csv"
         )
+        source = player_stats_path(SEASON, per_mode)
+        source.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_csv(source, index=False)
+        destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         print(
             f"{destination.relative_to(ROOT)}: {len(frame)} jugadores, "
             f"{int(frame['gp'].max())} partidos maximos"
         )
+
     _update_bio()
     return 0
 

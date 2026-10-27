@@ -1,8 +1,9 @@
 """Actualiza la foto de jugadores que usa el modelo de props en la web.
 
-Se ejecuta en GitHub Actions. Descarga los game logs de la temporada actual y
-reconstruye ``artifacts/player_state.csv`` con las medias moviles mas recientes.
-No reentrena el modelo: usa los promedios de 2025-26 ya publicados para las
+Se ejecuta en GitHub Actions. Agrega a ``player_game_logs_recent.csv`` los
+boxscores de ESPN que aun no esten en el historico y reconstruye
+``artifacts/player_state.csv`` con las medias moviles mas recientes. No
+reentrena el modelo: usa los promedios de 2025-26 ya publicados para las
 features de temporada anterior.
 """
 
@@ -16,7 +17,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from nba_ml.data.player_logs import load_player_logs  # noqa: E402
+from nba_ml.data.espn import append_recent_games  # noqa: E402
 from nba_ml.models.player_props import (  # noqa: E402
     build_player_state,
     build_prior_averages,
@@ -158,10 +159,48 @@ def _update_history(current_logs: pd.DataFrame, player_ids: set[int]) -> pd.Data
     return combined
 
 
+def _load_history() -> pd.DataFrame:
+    if not HISTORY.exists():
+        return pd.DataFrame(columns=HISTORY_COLUMNS)
+    return pd.read_csv(
+        HISTORY,
+        dtype={"player_id": int, "game_id": str},
+        parse_dates=["game_date"],
+    )
+
+
+def _current_logs(history: pd.DataFrame) -> pd.DataFrame:
+    logs = history[
+        history["season"].astype(str).eq(CURRENT_SEASON)
+    ].copy()
+    if logs.empty:
+        raise ValueError(
+            f"No hay game logs de {CURRENT_SEASON} en {HISTORY.name}"
+        )
+    logs["game_date"] = pd.to_datetime(logs["game_date"], errors="coerce")
+    logs = logs.dropna(subset=["game_date", "player_id"])
+    logs["player_id"] = logs["player_id"].astype(int)
+    logs["game_id"] = logs["game_id"].astype(str)
+    return logs
+
+
 def main() -> int:
     destination = ARTIFACTS / "player_state.csv"
     try:
-        logs = load_player_logs([CURRENT_SEASON], refresh=True)
+        history = _load_history()
+        schedule_path = ARTIFACTS / f"schedule_{CURRENT_SEASON.replace('-', '_')}.csv"
+        schedule = (
+            pd.read_csv(schedule_path, dtype={"game_id": str})
+            if schedule_path.exists()
+            else None
+        )
+        history = append_recent_games(
+            history,
+            schedule,
+            CURRENT_SEASON,
+            days_back=14,
+        )
+        logs = _current_logs(history)
         prior_stats = pd.read_csv(
             ARTIFACTS / f"player_stats_{PRIOR_SEASON.replace('-', '_')}_pergame.csv"
         )
@@ -170,7 +209,7 @@ def main() -> int:
         temporary = destination.with_suffix(".tmp")
         state.to_csv(temporary, index=False)
         temporary.replace(destination)
-    except Exception as error:  # noqa: BLE001 - no romper el workflow por un timeout
+    except Exception as error:  # noqa: BLE001 - no romper el workflow por red
         print(f"::warning::No se pudo actualizar el estado de props: {error}")
         if destination.exists():
             print("Se conserva el estado de props anterior.")

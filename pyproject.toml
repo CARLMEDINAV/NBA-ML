@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 pipeline = [
     "nba_api>=1.11,<1.12",
+    "requests>=2.31",
     "matplotlib>=3.9",
 ]
 app = ["streamlit>=1.37,<2"]
