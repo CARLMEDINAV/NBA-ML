@@ -15,17 +15,10 @@
         <p class="eyebrow">stats.nba.com · temporada regular</p>
         <h1>NBA Totals <span>ML</span></h1>
         <p class="lead">
-          Total de puntos previsto, probabilidad empírica de over/under,
-          hándicap estimado y props de jugadores: <strong>PTS</strong>,
-          <strong>REB</strong>, <strong>AST</strong> y <strong>PRA</strong>.
-          Sin promesas de rentabilidad: el valor está en el pipeline y la
-          evaluación honesta.
         </p>
       </div>
       <div class="hero-side">
         <span id="statusBadge" class="badge badge-soft">Cargando modelo…</span>
-        <a class="badge badge-link" href="https://github.com/CARLMEDINAV/NBA-ML" target="_blank" rel="noreferrer">GitHub ↗</a>
-      </div>
     </header>
 
     <section class="panel line-panel" aria-label="Línea de referencia">
@@ -37,11 +30,6 @@
           <button class="step" type="button" id="lineUp" aria-label="Subir línea">+</button>
         </div>
       </div>
-      <p class="hint">
-        La línea de total la eliges tú. El hándicap y las cuotas de mercado se
-        consultan en ESPN cuando están disponibles; son informativos, no una
-        recomendación de apuestas.
-      </p>
     </section>
 
     <nav class="tabs" role="tablist" aria-label="Secciones">
@@ -98,11 +86,6 @@
           <div>
             <p class="eyebrow">Partido a partido</p>
             <h2>Análisis y hándicap</h2>
-            <p class="muted">
-              Puntos proyectados, ganador probable, hándicap sugerido y cuotas
-              de mercado cuando están disponibles. El hándicap es una estimación
-              del modelo, no una línea oficial ni consejo de apuestas.
-            </p>
           </div>
           <button class="btn btn-ghost" type="button" id="analysisRefresh">Actualizar</button>
         </div>
@@ -177,7 +160,7 @@
               <tr>
                 <th>Fecha</th><th>Partido</th><th class="num">Total real</th>
                 <th class="num">Predicción</th><th class="num">Error</th>
-                <th class="num">P(over)</th><th>Resultado</th><th>Modelo</th><th>Acierto</th>
+                <th class="num">Probabilidad de (over)</th><th>Resultado</th><th>Modelo</th><th>Acierto</th>
                 <th>Hándicap</th><th class="num">Margen real</th>
               </tr>
             </thead>
@@ -258,11 +241,6 @@
           <div>
             <p class="eyebrow">Player props</p>
             <h2>Predicciones de jugadores</h2>
-            <p class="muted">
-              Puntos, rebotes, asistencias y PRA proyectados para los próximos
-              partidos. Son estimaciones del modelo: no incluyen lesiones,
-              alineaciones ni cuotas de props.
-            </p>
           </div>
           <button class="btn btn-ghost" type="button" id="propsRefresh">Actualizar</button>
         </div>
@@ -339,13 +317,7 @@
 
     <footer class="footer">
       <p>
-        Proyecto educativo. Sin lesiones ni alineaciones. Cuotas de mercado de
-        ESPN cuando están disponibles; no es consejo de apuestas.
         Datos: NBA / <code>nba_api</code>.
-      </p>
-      <p>
-        <a href="https://github.com/CARLMEDINAV/NBA-ML" target="_blank" rel="noreferrer">Código y metodología</a>
-        · Streamlit para el dashboard completo en local.
       </p>
     </footer>
   </div>
