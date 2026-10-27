@@ -1502,6 +1502,9 @@ function bindEvents() {
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
+  $$("[data-goto-tab]").forEach((button) => {
+    button.addEventListener("click", () => activateTab(button.dataset.gotoTab));
+  });
 
   $("#lineInput").addEventListener("change", (event) => setLine(event.target.value));
   $("#lineDown").addEventListener("click", () => setLine(state.line - 0.5));

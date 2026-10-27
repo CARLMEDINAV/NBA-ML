@@ -6,20 +6,34 @@
   <meta name="theme-color" content="#0b1020">
   <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261027-3">
+  <link rel="stylesheet" href="/styles.css?v=20261027-4">
 </head>
 <body>
   <div class="page">
-    <header class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">NBA · temporada regular</p>
-        <h1>NBA Totals</h1>
-        <p class="lead">
-        </p>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">NT</span>
+        <div class="brand-copy">
+          <h1 class="brand-name">NBA TOTALS</h1>
+          <span class="brand-sub">NBA · LIVE DATA</span>
+        </div>
       </div>
-      <div class="hero-side">
-        <span id="statusBadge" class="badge badge-soft">Cargando modelo…</span>
-      </div>
+      <nav class="topbar-actions" aria-label="Accesos rápidos">
+        <button class="topbar-btn topbar-btn-primary" type="button" data-goto-tab="props">
+          <svg class="topbar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 19V10M12 19V5M19 19v-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          </svg>
+          Scanner
+        </button>
+        <button class="topbar-btn" type="button" data-goto-tab="results">
+          <svg class="topbar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="6" width="16" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M8 4v4M16 4v4M4 10h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          Calendario
+        </button>
+      </nav>
+      <span id="statusBadge" class="badge badge-soft topbar-status">Cargando modelo…</span>
     </header>
 
     <section class="panel line-panel" aria-label="Línea de referencia">
@@ -448,6 +462,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261027-3" defer></script>
+  <script src="/app.js?v=20261027-4" defer></script>
 </body>
 </html>
