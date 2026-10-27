@@ -220,6 +220,7 @@ def test_player_props_projections():
     assert payload["model_name"] == "Ridge props"
     assert payload["trained_through"] == "2026-27"
     assert payload["pra_metrics"]["mae"] > 0
+    assert "Nivel A-D" in payload["grade_note"]
     assert isinstance(payload["teams_without_games"], list)
     game = payload["games"][0]
     assert len(game["players"]) <= 5
@@ -237,6 +238,8 @@ def test_player_props_projections():
             + player["projected_ast"]
         )
     ) < 1e-9
+    assert player["grade"] in {"A", "B", "C", "D"}
+    assert 0 <= player["confidence"] <= 1
     assert player["headshot_url"].startswith(
         "https://cdn.nba.com/headshots/nba/latest/260x190/"
     )

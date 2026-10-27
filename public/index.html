@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261027-5">
+  <link rel="stylesheet" href="/styles.css?v=20261027-6">
 </head>
 <body>
   <div class="page">
@@ -318,6 +318,7 @@
           <span><b>AST</b> asistencias</span>
           <span><b>PRA</b> PTS + REB + AST</span>
           <span><b>PJ</b> partidos jugados en 2026-27</span>
+          <span class="props-grade-legend"><b>Nivel</b> confianza del modelo · A 80-100% · B 65-80% · C 50-65% · D &lt;50%</span>
         </div>
         <div class="table-wrap">
           <table class="props-table">
@@ -326,6 +327,7 @@
                 <th>Fecha</th><th>Partido</th><th>Jugador</th><th>Equipo</th>
                 <th class="num">PTS</th><th class="num">REB</th>
                 <th class="num">AST</th><th class="num">PRA</th>
+                <th class="num">Nivel</th>
                 <th class="num">PJ</th>
               </tr>
             </thead>
@@ -472,6 +474,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261027-5" defer></script>
+  <script src="/app.js?v=20261027-6" defer></script>
 </body>
 </html>

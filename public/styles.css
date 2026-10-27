@@ -693,7 +693,11 @@ tbody tr.is-clickable:focus-visible {
   font-size: 0.7rem;
   letter-spacing: 0.03em;
 }
-.props-table { min-width: 880px; }
+.props-grade-legend {
+  flex-basis: 100%;
+  padding-top: 2px;
+}
+.props-table { min-width: 980px; }
 .props-table .matchup { white-space: nowrap; }
 .props-table .matchup small {
   display: block;
@@ -702,6 +706,42 @@ tbody tr.is-clickable:focus-visible {
   font-size: 0.66rem;
 }
 .props-table .pra-value { color: #ffd8bd; font-weight: 800; }
+
+.prop-grade {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.prop-grade b { font-size: 0.78rem; }
+.prop-grade small { font-size: 0.62rem; font-weight: 600; opacity: 0.82; }
+.prop-grade-a {
+  color: var(--green);
+  background: rgba(69, 214, 160, 0.12);
+  border-color: rgba(69, 214, 160, 0.32);
+}
+.prop-grade-b {
+  color: var(--blue);
+  background: rgba(116, 168, 255, 0.12);
+  border-color: rgba(116, 168, 255, 0.3);
+}
+.prop-grade-c {
+  color: var(--orange);
+  background: rgba(255, 155, 84, 0.12);
+  border-color: rgba(255, 155, 84, 0.3);
+}
+.prop-grade-d {
+  color: var(--red);
+  background: rgba(255, 107, 129, 0.12);
+  border-color: rgba(255, 107, 129, 0.3);
+}
 
 .pill {
   display: inline-flex;

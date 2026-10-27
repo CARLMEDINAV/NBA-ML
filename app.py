@@ -1626,6 +1626,11 @@ def player_props(
             "pra_metrics": metrics.get("pra"),
             "validation": metrics.get("validation"),
             "warning": warning,
+            "grade_note": (
+                "Nivel A-D: confianza del modelo sobre PRA (1 - sigma/PRA). "
+                "A 80-100%, B 65-80%, C 50-65%, D menos de 50%; no es una "
+                "probabilidad de apuesta."
+            ),
             "note": (
                 "Proyecciones por partido con un modelo Ridge entrenado con "
                 "game logs 2023-24 a 2026-27 y validado fuera de muestra en "

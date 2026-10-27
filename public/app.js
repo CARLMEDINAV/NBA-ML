@@ -4,6 +4,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const PLAYER_SORT_LABELS = { pra: "PRA", pts: "PTS", reb: "REB", ast: "AST" };
+const PROP_GRADE_LABELS = { A: "Muy probable", B: "Probable", C: "Media", D: "Baja" };
 
 const nf1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
 const nf0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
@@ -244,6 +245,31 @@ function hitMark(value) {
   if (value === 1 || value === true) return '<span class="hit">✓</span>';
   if (value === 0 || value === false) return '<span class="miss">✗</span>';
   return '<span class="na">—</span>';
+}
+
+function propGradeInfo(player, fallbackSigma) {
+  let confidence = Number(player.confidence);
+  let grade = String(player.grade || "").toUpperCase();
+  if (!Number.isFinite(confidence) || !PROP_GRADE_LABELS[grade]) {
+    const sigma = Number(fallbackSigma || 0);
+    const projected = Number(player.projected_pra || 0);
+    confidence =
+      sigma > 0 && projected > 0
+        ? Math.max(0, Math.min(1, 1 - sigma / projected))
+        : 0;
+    const percentage = Math.round(confidence * 100);
+    grade = percentage >= 80 ? "A" : percentage >= 65 ? "B" : percentage >= 50 ? "C" : "D";
+  }
+  return { confidence, grade };
+}
+
+function propGradeBadge(player, fallbackSigma) {
+  const { confidence, grade } = propGradeInfo(player, fallbackSigma);
+  const percentage = Math.round(confidence * 100);
+  const label = PROP_GRADE_LABELS[grade] || "Baja";
+  return `<span class="prop-grade prop-grade-${grade.toLowerCase()}" title="${esc(
+    `${label}: ${percentage}% de confianza del modelo sobre PRA`
+  )}"><b>${grade}</b><small>${percentage}%</small></span>`;
 }
 
 function showToast(message) {
@@ -748,7 +774,7 @@ async function loadProps(silent = false) {
   const tbody = $("#propsBody");
   const button = $("#propsRefresh");
   if (!silent) {
-    loadingRow(tbody, 9);
+    loadingRow(tbody, 10);
     setBusy(button, true);
     notice($("#propsNotice"), "");
     $("#propsSummary").innerHTML = "";
@@ -774,9 +800,16 @@ async function loadProps(silent = false) {
     );
     const metrics = data.metrics || {};
     const praMetrics = data.pra_metrics || {};
+    const praSigma = Number(praMetrics.sigma || 0);
+    const gradeCount = players.reduce((counts, player) => {
+      const { grade } = propGradeInfo(player, praSigma);
+      counts[grade] += 1;
+      return counts;
+    }, { A: 0, B: 0, C: 0, D: 0 });
     $("#propsSummary").innerHTML = [
       summaryCard("Partidos", String(data.count), `${data.player_count} proyecciones`),
       summaryCard("Mejor PRA", top ? top.player_name : "—", top ? `${num(top.projected_pra)} PRA · ${top.team}` : ""),
+      summaryCard("Nivel A", String(gradeCount.A), `${players.length} props · confianza 80%+`),
       summaryCard("MAE PRA", num(praMetrics.mae), "validación 2025-26"),
       summaryCard("Modelo", data.model_name || "Ridge props", `hasta ${data.trained_through || "—"}`),
     ].join("");
@@ -787,7 +820,7 @@ async function loadProps(silent = false) {
     notice($("#propsNotice"), [data.warning, missingTeamsText].filter(Boolean).join(" "));
 
     if (!players.length) {
-      emptyRow(tbody, 9, "No hay jugadores para esos filtros.");
+      emptyRow(tbody, 10, "No hay jugadores para esos filtros.");
       $("#propsNote").textContent = "Prueba a ampliar los días o quitar el filtro de equipo.";
       return;
     }
@@ -825,6 +858,7 @@ async function loadProps(silent = false) {
           <td class="num">${num(player.projected_reb)}</td>
           <td class="num">${num(player.projected_ast)}</td>
           <td class="num pra-value">${num(player.projected_pra)}</td>
+          <td class="num">${propGradeBadge(player, praSigma)}</td>
           <td class="num">${num(player.gp, 0)}</td>
         </tr>`;
       })
@@ -839,9 +873,9 @@ async function loadProps(silent = false) {
       maxGp <= 2
         ? "La 2026-27 acaba de empezar: con 1-2 partidos por jugador, el modelo se apoya en la temporada anterior."
         : "";
-    $("#propsNote").textContent = `${data.note || ""} ${validationText} ${earlySeasonText}`.trim();
+    $("#propsNote").textContent = `${data.note || ""} ${data.grade_note || ""} ${validationText} ${earlySeasonText}`.trim();
   } catch (error) {
-    emptyRow(tbody, 9, "No se pudieron cargar las proyecciones de jugadores.");
+    emptyRow(tbody, 10, "No se pudieron cargar las proyecciones de jugadores.");
     notice($("#propsNotice"), error.message, true);
     showToast(error.message);
   } finally {

@@ -36,6 +36,7 @@ PROP_TARGET_LABELS = {
 }
 ROLL_STATS = ("min", "pts", "reb", "ast", "pra", "fga", "fta", "tov")
 ROLL_WINDOWS = (3, 5, 10)
+PROP_GRADE_THRESHOLDS = (("A", 80), ("B", 65), ("C", 50))
 VALIDATION_CUTOFF = "2026-02-01"
 DEFAULT_ALPHA = 1.0
 
@@ -413,6 +414,36 @@ def build_player_state(
     return state
 
 
+def prop_confidence(projected_pra: float, sigma: float) -> tuple[float, str]:
+    """Confianza relativa de una proyeccion de PRA.
+
+    Se calcula como ``1 - sigma / PRA proyectado`` y se traduce a los
+    niveles A (80-100%), B (65-80%), C (50-65%) y D (<50%). Es una medida
+    de senal frente al error historico del modelo, no una probabilidad de
+    apuesta ni una cuota.
+    """
+
+    try:
+        projection = float(projected_pra)
+        error = float(sigma)
+    except (TypeError, ValueError):
+        return 0.0, "D"
+    if (
+        not np.isfinite(projection)
+        or projection <= 0
+        or not np.isfinite(error)
+        or error < 0
+    ):
+        return 0.0, "D"
+    confidence = 1.0 if error == 0 else 1.0 - error / projection
+    confidence = round(float(np.clip(confidence, 0.0, 1.0)), 4)
+    percentage = round(confidence * 100)
+    for grade, threshold in PROP_GRADE_THRESHOLDS:
+        if percentage >= threshold:
+            return confidence, grade
+    return confidence, "D"
+
+
 def predict_player_props(
     artifact: dict[str, Any],
     player_state: pd.DataFrame,
@@ -490,9 +521,13 @@ def predict_player_props(
         ["projected_pra", "projected_pts"], ascending=False
     ).head(max(1, int(limit)))
 
+    pra_metrics = (artifact.get("metrics") or {}).get("pra") or {}
+    pra_sigma = float(pra_metrics.get("sigma") or 0.0)
     rows: list[dict[str, Any]] = []
     for player in players.itertuples(index=False):
         projected_min = getattr(player, "min_roll5", None)
+        projected_pra = round(float(player.projected_pra), 1)
+        confidence, grade = prop_confidence(projected_pra, pra_sigma)
         rows.append(
             {
                 "player_id": int(player.player_id),
@@ -509,7 +544,9 @@ def predict_player_props(
                 "projected_pts": round(float(player.projected_pts), 1),
                 "projected_reb": round(float(player.projected_reb), 1),
                 "projected_ast": round(float(player.projected_ast), 1),
-                "projected_pra": round(float(player.projected_pra), 1),
+                "projected_pra": projected_pra,
+                "confidence": confidence,
+                "grade": grade,
                 "headshot_url": _headshot_url(player.player_id),
             }
         )
