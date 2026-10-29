@@ -89,12 +89,30 @@ cada equipo calcula cuántos jugadores hay en el parte y cruza al jugador con su
 medias por partido de 2026-27 (PTS, REB, AST y PRA), su ranking interno y una
 etiqueta de jugador clave cuando está en el top 5 de PRA.
 
-Ese contexto **no se usa para ajustar las proyecciones**. El Ridge y las
-probabilidades de Bet Builder no descuentan al lesionado ni cambian minutos: un
-ajuste así requeriría un modelo calibrado de disponibilidad y roles. Por eso la
-interfaz muestra el parte y advierte expresamente que el modelo no se ha movido.
-El Bet Builder incluye además un resumen de disponibilidad por partido cuando se
-consulta con `injuries=1`, sin alterar las probabilidades del ticket.
+El **total** sigue sin usar lesiones. El **ganador, el margen y el hándicap**
+aplican un ajuste experimental de disponibilidad:
+
+- Se identifica a los cinco jugadores con más PRA de cada equipo en 2026-27.
+- Solo cuentan las bajas confirmadas (`Out`) que tienen estadísticas y están en
+  ese top-5. Día a día, dudas y jugadores sin muestra no se ajustan.
+- La fracción de PRA ausente se multiplica por **5,53 puntos de margen** por
+  fracción completa. La probabilidad de ganar se recalcula con los residuos
+  históricos del margen.
+- El coeficiente sale de una regresión del margen con efectos fijos de equipo,
+  rival y temporada, entrenada con 2024-25 (2.384 equipos-partido) y validada
+  con 2025-26 (2.400 equipos-partido). En la validación, el coeficiente fue
+  -5,53 puntos por fracción completa.
+
+Ejemplo: si Luka Dončić (51,0 PRA) y Ziaire Williams (16,5) están de baja, LAL
+pierde aproximadamente 2,6 puntos de margen frente a su top-5. La interfaz
+muestra la probabilidad base y la ajustada para que la diferencia sea visible.
+No es un modelo de minutos ni una probabilidad oficial: es una corrección
+histórica agregada y la incertidumbre de un partido individual sigue siendo alta.
+
+El ajuste se activa con `injuries=1` en `/api/upcoming`, `/api/predict` y
+`/api/bet-builder/events`; el análisis del ticket lo recibe con
+`"injuries": true`. El Bet Builder incluye además el resumen de disponibilidad
+por partido y advierte que el total no se ajusta.
 
 ### Bet Builder
 
@@ -155,12 +173,13 @@ Ejemplo de análisis:
 }
 ```
 
-Limitaciones: el modelo está entrenado hasta 2025-26 y no incorpora lesiones,
-alineaciones, noticias ni cambios de cuota posteriores a la consulta. Las
-probabilidades son frecuencias empíricas de residuos históricos, no
-probabilidades calibradas como cuotas de una casa de apuestas. En líneas
-enteras el empate (push) no se modela; se recomienda usar líneas terminadas
-en .5.
+Limitaciones: el modelo está entrenado hasta 2025-26. El ganador y el hándicap
+incluyen el ajuste por bajas confirmadas descrito arriba; el total del partido y
+los props no. No se modelan alineaciones, minutos, noticias ni cambios de cuota
+posteriores a la consulta. Las probabilidades son frecuencias empíricas de
+residuos históricos, no probabilidades calibradas como cuotas de una casa de
+apuestas. En líneas enteras el empate (push) no se modela; se recomienda usar
+líneas terminadas en .5.
 
 ---
 
@@ -196,6 +215,7 @@ nba-ml/
 │       └── results.py        # liquidación over/under contra resultados reales
 ├── public/bet-builder.js     # explorador de mercados, ticket y análisis
 ├── public/injuries.js        # parte de ESPN, filtros y contexto por equipo
+├── scripts/calibrate_availability_impact.py # calibración del ajuste por bajas
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
 ├── tests/test_schedule.py    # normalización y filtros del calendario
 ├── tests/test_players.py     # cálculo de PRA y caché de jugadores
@@ -366,12 +386,14 @@ La app pública está pensada para abrirla desde el móvil:
   **Props** con PTS, REB, AST y PRA proyectados por jugador. Cada jugador tiene
   una ficha visual con sus últimos partidos, línea ajustable, acierto histórico,
   minutos, efectividad, uso, H2H y defensores. La pestaña **Lesiones** muestra
-  el parte de ESPN y el peso estadístico de cada baja, sin ajustar el modelo.
+  el parte de ESPN, el peso estadístico de cada baja y el ajuste de margen
+  estimado; ese ajuste se aplica al ganador y al hándicap, no al total.
 - **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
   `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`,
   `/api/injuries`, `/api/bet-builder/events`). `/api/upcoming?odds=1&analysis=1`
   añade hándicap, proyecciones por equipo y cuotas de ESPN cuando están
-  disponibles.
+  disponibles. Añade `injuries=1` para aplicar el ajuste por bajas al ganador,
+  margen y hándicap; `POST /api/bet-builder/analyze` acepta `"injuries": true`.
 - **Datos:** `artifacts/` contiene una foto del modelo de totales, el modelo de
   props, el estado de los equipos y jugadores, el calendario, las estadísticas
   de jugadores y el backtest. Vercel no escribe en disco ni conserva la caché de
@@ -486,6 +508,11 @@ futuros no altera sus features.
 - Artefacto final reentrenado con todas las temporadas disponibles. El script
   `scripts/update_margin_artifact.py` permite añadir el modelo de margen a un
   artefacto ya entrenado sin reentrenar el total.
+- **Ajuste por bajas:** `scripts/calibrate_availability_impact.py` reproduce el
+  coeficiente de disponibilidad. Entrena con 2024-25 y evalúa en 2025-26; el
+  resultado actual es 5,53 puntos de margen por fracción completa de PRA del
+  top-5 ausente, con MAE de margen 12,43 y R² 0,075 en el holdout. Es una
+  corrección agregada, no un modelo de minutos.
 
 ### Props de jugadores
 
@@ -533,19 +560,21 @@ orden temporal de los splits, normalización y filtros del calendario, cálculo 
 PRA y caché de jugadores, props por jugador, liquidación over/under y métricas
 de acierto, margen y hándicap, la ficha visual de jugador, un test de humo del
 dashboard y la API pública de Vercel, el parte de lesiones de ESPN (contrato,
-filtros, fallo de fuente y contexto en Bet Builder), y la matemática del Bet
+filtros, fallo de fuente y contexto en Bet Builder), el ajuste por bajas en
+predicción, próximos partidos y análisis del ticket, y la matemática del Bet
 Builder: combinaciones independientes, rechazo de probabilidades/cuotas/líneas
-inválidas, selecciones del mismo partido y cálculos de EV (83 en total).
+inválidas, selecciones del mismo partido y cálculos de EV (87 en total).
 
 ---
 
 ## Limitaciones
 
-- **Lesiones mostradas, no modeladas**: el parte de ESPN se publica en la
-  pestaña **Lesiones**, pero el modelo no descuenta al jugador ausente ni ajusta
-  minutos. Un modelo con disponibilidad de jugadores mejoraría el MAE de
-  totales y, sobre todo, el de props. Los props tampoco modelan minutos ni
-  rotaciones: usan el promedio reciente de minutos como contexto.
+- **Lesiones parcialmente modeladas**: el parte de ESPN se publica en la
+  pestaña **Lesiones** y las bajas confirmadas del top-5 ajustan ganador, margen
+  y hándicap. El total y los props no se ajustan, y no hay modelo de minutos ni
+  de sustitución. El ajuste es un coeficiente histórico agregado, no un impacto
+  específico por jugador. Los props tampoco modelan minutos ni rotaciones: usan
+  el promedio reciente de minutos como contexto.
 - **Sin histórico de cuotas**: solo se consultan cuotas actuales de ESPN para
   partidos próximos. No se puede evaluar ROI, CLV ni comparar contra el cierre
   histórico. `P(over)` y `P(cubre)` son probabilidades del modelo, no una
@@ -559,8 +588,9 @@ inválidas, selecciones del mismo partido y cálculos de EV (83 en total).
 
 ## Próximos pasos
 
-1. Convertir el parte de lesiones en features de disponibilidad y construir un
-   modelo de minutos para los props; hoy solo se muestra como contexto.
+1. Sustituir el coeficiente agregado de disponibilidad por un modelo de minutos
+   y roles, y extenderlo a totales y props; hoy solo se ajustan ganador, margen
+   y hándicap.
 2. Incorporar líneas históricas de apertura/cierre y evaluar CLV.
 3. Modelar prórrogas y ritmo por separado (pace × eficiencia).
 4. Añadir viaje/distancia y altitud; 3 partidos en 4 días.

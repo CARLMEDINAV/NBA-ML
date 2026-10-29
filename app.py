@@ -140,24 +140,48 @@ INJURY_STATUS_LABELS = {
     "probable": "Probable",
     "available": "Disponible",
 }
+AVAILABILITY_COEFFICIENT = 5.53
+AVAILABILITY_MODEL = {
+    "version": "availability-top5-v1",
+    "fit_season": "2024-25",
+    "holdout_season": "2025-26",
+    "fit_team_games": 2384,
+    "holdout_team_games": 2400,
+    "coefficient_points_per_share": AVAILABILITY_COEFFICIENT,
+    "holdout_coefficient_points_per_share": 5.53,
+    "description": (
+        "Regresión del margen local por la fracción de PRA del top-5 ausente, "
+        "con efectos fijos de equipo, rival y temporada. Entrenada con 2024-25 "
+        "y validada con 2025-26."
+    ),
+}
 INJURY_MODEL_NOTE = (
-    "El modelo Ridge y las probabilidades de Bet Builder no incorporan lesiones, "
-    "alineaciones ni minutos disponibles. Este parte es contexto: no resta puntos "
-    "ni cambia automáticamente una proyección. Un ajuste de impacto requeriría un "
-    "modelo calibrado de disponibilidad y roles, que este proyecto no tiene."
+    "El total sigue sin usar lesiones. Para ganador, margen y hándicap, la app "
+    "aplica un ajuste experimental de disponibilidad: resta 5,53 puntos de "
+    "margen por cada fracción completa del PRA del top-5 que está de baja "
+    "confirmada (Out). Se calibró con 2024-25 y se validó con 2025-26. Solo "
+    "aplica a bajas con estadísticas 2026-27; día a día, dudas y jugadores sin "
+    "muestra no se ajustan. No es un modelo de minutos ni una probabilidad oficial."
 )
 INJURY_IMPACT_NOTE = (
-    "Para orientar el impacto mostramos los puntos, rebotes, asistencias y PRA por "
-    "partido del jugador y su posición dentro del equipo. No se presenta una "
-    "pérdida de puntos inventada ni una probabilidad ajustada."
+    "Para cada equipo se calcula qué fracción del PRA de su top-5 está de baja. "
+    "El margen se mueve 5,53 puntos por fracción completa y la probabilidad de "
+    "ganar se recalcula con los residuos históricos del margen. Es una "
+    "estimación histórica agregada, no una pérdida de puntos inventada ni una "
+    "garantía para un partido concreto."
 )
 INJURY_LIMITATIONS = [
     "ESPN publica el estado y una nota periodística; no garantiza que la baja se "
     "mantenga hasta el partido ni sustituye un reporte oficial de la NBA.",
     "El ranking interno usa las medias por partido de 2026-27 y puede estar "
     "afectado por muestras cortas, traspasos o jugadores sin minutos.",
-    "El modelo de totales, hándicap, ganador y Bet Builder no usa lesiones. Las "
-    "probabilidades mostradas no descuentan al jugador ausente.",
+    "El ajuste solo aplica a bajas confirmadas (Out) de jugadores del top-5 con "
+    "estadísticas 2026-27. Día a día, dudas, jugadores sin muestra y cambios de "
+    "última hora no se ajustan.",
+    "El total del partido y los props no se ajustan: solo cambian el margen, el "
+    "ganador y el hándicap. No se modelan minutos ni la sustitución del jugador.",
+    "El coeficiente es una estimación histórica agregada, no un impacto específico "
+    "por jugador; la incertidumbre de un partido individual sigue siendo alta.",
 ]
 ESPN_TO_NBA = {
     "GS": "GSW",
@@ -181,6 +205,7 @@ class BetBuilderAnalyzeIn(BaseModel):
     selections: list[BetBuilderSelectionIn] = Field(default_factory=list, max_length=20)
     stake: float = Field(10.0, gt=0, le=1_000_000.0)
     decimal_odds: float | None = Field(None, gt=1.0, le=1000.0)
+    injuries: bool = False
 
 
 app = FastAPI(
@@ -1238,9 +1263,13 @@ def _analysis_text(
             rest += " Hay al menos un equipo en back-to-back."
         parts.append(rest)
 
+    availability_text = _availability_summary_text(result.get("availability"))
+    if availability_text:
+        parts.append(availability_text + ".")
     parts.append(
-        "Riesgo: no incluye lesiones, alineaciones ni cambios de última hora; "
-        "el total tiene un componente aleatorio alto."
+        "Riesgo: el total no incluye lesiones, alineaciones ni cambios de última "
+        "hora; el ajuste de ganador/margen es histórico y no modela minutos. El "
+        "total tiene un componente aleatorio alto."
     )
     return " ".join(parts)
 
@@ -1401,6 +1430,9 @@ def _injury_player_lookup() -> tuple[
             if not pd.isna(row.get("player_id"))
         }
         team_players = len(group)
+        team_top5_pra = float(
+            pd.to_numeric(group["pra"], errors="coerce").head(5).sum()
+        )
         for index, row in enumerate(group.to_dict("records"), start=1):
             player_id = row.get("player_id")
             player_name = str(row.get("player_name") or "").strip()
@@ -1410,6 +1442,7 @@ def _injury_player_lookup() -> tuple[
             item = {
                 "player_id": int(player_id),
                 "player_name": player_name,
+                "team": team,
                 "gp": 0 if pd.isna(games_played) else int(games_played),
                 "min": _injury_number(row.get("min")),
                 "pts": _injury_number(row.get("pts")),
@@ -1419,6 +1452,7 @@ def _injury_player_lookup() -> tuple[
                 "pra_rank": index,
                 "pts_rank": points_rank.get(int(player_id)),
                 "team_players": team_players,
+                "team_top5_pra": _injury_number(team_top5_pra),
             }
             lookup[(team, _name_key(player_name))] = item
             by_name.setdefault(_name_key(player_name), []).append(item)
@@ -1472,6 +1506,196 @@ def _injury_impact_summary(injuries: list[dict[str, Any]]) -> str:
         detail += f" ({stats['pra']:.1f} PRA)"
     parts.append(f"Principal: {detail}")
     return " · ".join(parts)
+
+
+def _empty_availability(team: str | None = None) -> dict[str, Any]:
+    return {
+        "team": team,
+        "missing_share": 0.0,
+        "missing_pra": 0.0,
+        "top5_pra": None,
+        "impact_points": 0.0,
+        "players": [],
+    }
+
+
+def _team_availability(team: dict[str, Any] | None) -> dict[str, Any]:
+    """Impacto estimado de las bajas confirmadas del top-5 de PRA."""
+    if not team:
+        return _empty_availability()
+    top5 = team.get("top5_pra")
+    try:
+        top5_value = float(top5) if top5 is not None else 0.0
+    except (TypeError, ValueError):
+        top5_value = 0.0
+
+    players: list[dict[str, Any]] = []
+    missing_pra = 0.0
+    for injury in team.get("injuries", []):
+        if injury.get("status_class") != "out" or not injury.get("is_key_player"):
+            continue
+        pra = (injury.get("stats") or {}).get("pra")
+        if pra is None:
+            continue
+        try:
+            pra_value = float(pra)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(pra_value) or pra_value <= 0:
+            continue
+        missing_pra += pra_value
+        players.append(
+            {
+                "player_name": injury.get("player_name"),
+                "player_id": injury.get("player_id"),
+                "status": injury.get("status"),
+                "status_label": injury.get("status_label"),
+                "pra": round(pra_value, 1),
+                "impact_points": (
+                    round(-AVAILABILITY_COEFFICIENT * pra_value / top5_value, 2)
+                    if top5_value > 0
+                    else 0.0
+                ),
+            }
+        )
+
+    share = min(1.0, missing_pra / top5_value) if top5_value > 0 else 0.0
+    return {
+        "team": team.get("team"),
+        "missing_share": round(share, 4),
+        "missing_pra": round(missing_pra, 1),
+        "top5_pra": round(top5_value, 1) if top5_value > 0 else None,
+        "impact_points": round(-AVAILABILITY_COEFFICIENT * share, 2),
+        "players": players,
+    }
+
+
+def _availability_summary_text(availability: dict[str, Any] | None) -> str:
+    if not availability or not availability.get("model_adjusted"):
+        return ""
+    parts: list[str] = []
+    for key in ("home", "away"):
+        side = availability.get(key) or {}
+        share = float(side.get("missing_share") or 0)
+        if share > 0:
+            team = side.get("team") or key
+            impact = abs(float(side.get("impact_points") or 0))
+            names = ", ".join(
+                str(player.get("player_name") or "")
+                for player in side.get("players", [])[:2]
+                if player.get("player_name")
+            )
+            detail = f"{team} -{impact:.1f} pts de margen"
+            if names:
+                detail += f" ({names})"
+            parts.append(detail)
+    return "Ajuste por bajas: " + " · ".join(parts) if parts else ""
+
+
+def _apply_availability_adjustment(
+    result: dict[str, Any],
+    home_team: dict[str, Any] | None,
+    away_team: dict[str, Any] | None,
+    artifact: dict[str, Any],
+) -> dict[str, Any]:
+    """Ajusta margen, ganador y hándicap; nunca el total ni las props."""
+    home = _team_availability(home_team)
+    away = _team_availability(away_team)
+    base_margin = result.get("predicted_margin")
+    base_probability = result.get("home_win_probability")
+    base_spread = result.get("model_home_spread")
+    base_home_score = result.get("projected_home_score")
+    base_away_score = result.get("projected_away_score")
+    base_cover = result.get("home_cover_probability")
+
+    availability: dict[str, Any] = {
+        "model_adjusted": False,
+        "home": home,
+        "away": away,
+        "margin_shift": 0.0,
+        "coefficient_points_per_share": AVAILABILITY_COEFFICIENT,
+        "model": AVAILABILITY_MODEL,
+        "base": {
+            "predicted_margin": base_margin,
+            "home_win_probability": base_probability,
+            "model_home_spread": base_spread,
+            "projected_home_score": base_home_score,
+            "projected_away_score": base_away_score,
+            "home_cover_probability": base_cover,
+        },
+        "total_adjusted": False,
+        "note": INJURY_MODEL_NOTE,
+    }
+
+    result["base_predicted_margin"] = base_margin
+    result["base_home_win_probability"] = base_probability
+    result["base_model_home_spread"] = base_spread
+    result["base_projected_home_score"] = base_home_score
+    result["base_projected_away_score"] = base_away_score
+    result["base_home_cover_probability"] = base_cover
+
+    if base_margin is None or pd.isna(base_margin):
+        result["availability"] = availability
+        return result
+
+    shift = AVAILABILITY_COEFFICIENT * (
+        float(away.get("missing_share") or 0)
+        - float(home.get("missing_share") or 0)
+    )
+    if abs(shift) < 1e-9:
+        result["availability"] = availability
+        return result
+
+    adjusted_margin = float(base_margin) + shift
+    residuals = np.asarray(artifact.get("margin_residuals", []), dtype=float)
+    adjusted_probability = None
+    if residuals.size:
+        adjusted_probability = float(np.mean(residuals > -adjusted_margin))
+    elif base_probability is not None:
+        adjusted_probability = float(base_probability)
+
+    adjusted_home_score = None
+    adjusted_away_score = None
+    predicted_total = result.get("predicted_total")
+    if predicted_total is not None and not pd.isna(predicted_total):
+        adjusted_home_score = (float(predicted_total) + adjusted_margin) / 2.0
+        adjusted_away_score = (float(predicted_total) - adjusted_margin) / 2.0
+
+    adjusted_cover = None
+    handicap = result.get("handicap")
+    if handicap is not None and residuals.size:
+        adjusted_cover = float(
+            np.mean(residuals > ((-float(handicap)) - adjusted_margin))
+        )
+
+    result["predicted_margin"] = adjusted_margin
+    result["home_win_probability"] = adjusted_probability
+    result["model_home_spread"] = -adjusted_margin if base_spread is not None else None
+    result["projected_home_score"] = adjusted_home_score
+    result["projected_away_score"] = adjusted_away_score
+    if adjusted_cover is not None:
+        result["home_cover_probability"] = adjusted_cover
+        result["away_cover_probability"] = 1.0 - adjusted_cover
+
+    availability.update(
+        {
+            "model_adjusted": True,
+            "margin_shift": round(shift, 4),
+            "adjusted": {
+                "predicted_margin": adjusted_margin,
+                "home_win_probability": adjusted_probability,
+                "model_home_spread": result["model_home_spread"],
+                "projected_home_score": adjusted_home_score,
+                "projected_away_score": adjusted_away_score,
+                "home_cover_probability": adjusted_cover,
+            },
+            "summary": _availability_summary_text(
+                {"model_adjusted": True, "home": home, "away": away}
+            ),
+        }
+    )
+    result["availability"] = availability
+    return result
 
 
 def _injury_report(
@@ -1538,7 +1762,11 @@ def _injury_report(
 
             match = lookup.get((abbreviation, _name_key(name)))
             if match is None:
-                candidates = by_name.get(_name_key(name), [])
+                candidates = [
+                    candidate
+                    for candidate in by_name.get(_name_key(name), [])
+                    if candidate.get("team") == abbreviation
+                ]
                 if len(candidates) == 1:
                     match = candidates[0]
             stats = (
@@ -1554,6 +1782,7 @@ def _injury_report(
                         "pra_rank",
                         "pts_rank",
                         "team_players",
+                        "team_top5_pra",
                     ]
                 }
                 if match
@@ -1567,8 +1796,11 @@ def _injury_report(
                     "pra_rank": None,
                     "pts_rank": None,
                     "team_players": None,
+                    "team_top5_pra": None,
                 }
             )
+            if match and teams[abbreviation].get("top5_pra") is None:
+                teams[abbreviation]["top5_pra"] = match.get("team_top5_pra")
             gp = stats.get("gp")
             pra_rank = stats.get("pra_rank")
             is_key_player = bool(gp and gp >= 2 and pra_rank is not None and pra_rank <= 5)
@@ -1636,7 +1868,10 @@ def _injury_report(
             if injury.get("status_class") == "out"
         ][:3]
         team["impact_summary"] = _injury_impact_summary(injuries)
-        team["model_adjusted"] = False
+        team["availability"] = _team_availability(team)
+        team["model_adjusted"] = bool(
+            team["availability"]["missing_share"] > 0
+        )
         report_teams.append(team)
     report_teams.sort(key=lambda item: (-item["injury_count"], item["team_name"]))
 
@@ -1670,9 +1905,12 @@ def _injury_report(
         "source_updated_at": source_updated_at,
         "stale": stale,
         "warning": warning,
-        "model_adjusted": False,
+        "model_adjusted": any(
+            team.get("model_adjusted") for team in report_teams
+        ),
         "model_note": INJURY_MODEL_NOTE,
         "impact_note": INJURY_IMPACT_NOTE,
+        "adjustment": AVAILABILITY_MODEL,
         "limitations": INJURY_LIMITATIONS,
     }
     return report_teams, meta
@@ -1747,6 +1985,10 @@ def _injuries_response(
             if injury.get("status_class") == "out"
         ][:3]
         summary["impact_summary"] = _injury_impact_summary(injuries)
+        summary["availability"] = _team_availability(summary)
+        summary["model_adjusted"] = bool(
+            summary["availability"]["missing_share"] > 0
+        )
         filtered_teams.append(summary)
 
     flat = [injury for item in filtered_teams for injury in item["injuries"]]
@@ -1756,6 +1998,9 @@ def _injuries_response(
         status_counts[raw_status] = status_counts.get(raw_status, 0) + 1
     return {
         **meta,
+        "model_adjusted": any(
+            item.get("model_adjusted") for item in filtered_teams
+        ),
         "count": len(flat),
         "team_count": sum(1 for item in filtered_teams if item["injury_count"]),
         "status_counts": status_counts,
@@ -1792,6 +2037,8 @@ def _injury_team_summary(team: dict[str, Any] | None) -> dict[str, Any]:
             for injury in team.get("injuries", [])
         ],
         "impact_summary": team.get("impact_summary"),
+        "availability": team.get("availability"),
+        "model_adjusted": team.get("model_adjusted", False),
     }
 
 
@@ -1800,10 +2047,12 @@ def _bb_injury_context(
     index: dict[str, dict[str, Any]],
     meta: dict[str, Any],
 ) -> dict[str, Any]:
+    adjustment = event.get("availability") or {}
     return {
         "home": _injury_team_summary(index.get(str(event.get("home") or ""))),
         "away": _injury_team_summary(index.get(str(event.get("away") or ""))),
-        "model_adjusted": False,
+        "model_adjusted": bool(adjustment.get("model_adjusted")),
+        "adjustment": adjustment,
         "source": "ESPN",
         "source_updated_at": meta.get("source_updated_at"),
         "source_url": meta.get("source_url"),
@@ -1841,8 +2090,8 @@ BET_BUILDER_LIMITATIONS = [
     (
         "La probabilidad conjunta solo se calcula cuando todas las selecciones "
         "pertenecen a partidos distintos. En ese caso se aplica el supuesto "
-        "explícito de independencia; no se modela correlación por lesiones, "
-        "noticias, alineaciones o contexto de partido."
+        "explícito de independencia; no se modela la correlación entre lesiones "
+        "de un mismo partido, noticias, alineaciones o contexto."
     ),
     (
         "Las selecciones del mismo partido se muestran con su probabilidad "
@@ -1861,8 +2110,10 @@ BET_BUILDER_LIMITATIONS = [
         "distribución calibrada por línea."
     ),
     (
-        "El resumen de lesiones de ESPN es informativo: se muestra junto al "
-        "partido, pero no ajusta las probabilidades ni el ticket."
+        "El resumen de lesiones de ESPN se usa para ajustar el ganador y el "
+        "hándicap con un coeficiente histórico de disponibilidad. El total del "
+        "partido y los props no se ajustan; el ajuste no modela minutos ni la "
+        "sustitución del jugador."
     ),
 ]
 
@@ -2164,6 +2415,17 @@ def _bb_event_payload(
         "projected_away_score": _rounded(result.get("projected_away_score"), 1),
         "predicted_margin": _rounded(result.get("predicted_margin"), 1),
         "home_win_probability": _rounded(result.get("home_win_probability"), 6),
+        "base_predicted_margin": _rounded(result.get("base_predicted_margin"), 1),
+        "base_home_win_probability": _rounded(
+            result.get("base_home_win_probability"), 6
+        ),
+        "base_projected_home_score": _rounded(
+            result.get("base_projected_home_score"), 1
+        ),
+        "base_projected_away_score": _rounded(
+            result.get("base_projected_away_score"), 1
+        ),
+        "availability": result.get("availability"),
         "home_rest": result.get("home_rest"),
         "away_rest": result.get("away_rest"),
         "data_state_date": None if state_date is None else state_date.strftime("%Y-%m-%d"),
@@ -2200,6 +2462,7 @@ def _bb_events(
     schedule: pd.DataFrame,
     artifact: dict,
     state: pd.DataFrame,
+    injury_index: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], int, pd.Timestamp | None, str | None]:
     end = start + pd.Timedelta(days=days - 1)
     dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
@@ -2236,6 +2499,13 @@ def _bb_events(
         except ValueError:
             skipped += 1
             continue
+        if injury_index is not None:
+            _apply_availability_adjustment(
+                result,
+                injury_index.get(str(game.home)),
+                injury_index.get(str(game.away)),
+                artifact,
+            )
         events.append(
             _bb_event_payload(
                 game, result, market, names, state_date, odds_as_of, artifact
@@ -2301,6 +2571,7 @@ def _bb_selection_payload(
         "warning": None,
         "is_custom_line": False,
         "selection_id": None,
+        "availability": event.get("availability"),
     }
 
     if schedule_row is None:
@@ -2596,13 +2867,15 @@ def meta(today: str | None = None) -> JSONResponse:
             "teams": _team_payload(state),
             "handicap_test_metrics": artifact.get("margin_test_metrics"),
             "caveat": (
-                "Las proyecciones no incorporan lesiones ni alineaciones. El "
-                "parte de ESPN se muestra como contexto y no cambia el total, "
-                "el hándicap ni las probabilidades. La línea de total es una "
-                "referencia introducida por el usuario. Las cuotas de mercado, "
-                "cuando aparecen, son informativas y no una recomendación de "
-                "apuestas."
+                "El total no incorpora lesiones ni alineaciones. El ganador y "
+                "el hándicap aplican un ajuste experimental por bajas "
+                "confirmadas de ESPN, calibrado con 2024-25 y validado en "
+                "2025-26; no modela minutos ni sustitución. La línea de total "
+                "es una referencia introducida por el usuario. Las cuotas de "
+                "mercado, cuando aparecen, son informativas y no una "
+                "recomendación de apuestas."
             ),
+            "availability_model": AVAILABILITY_MODEL,
         }
     )
 
@@ -2618,7 +2891,7 @@ def injuries(
     status: str | None = None,
     q: str | None = None,
 ) -> JSONResponse:
-    """Parte de lesiones de ESPN, sin ajustar las proyecciones del modelo."""
+    """Parte de lesiones de ESPN y su impacto estimado en margen/ganador."""
     return _ok(_injuries_response(team=team, status=status, q=q))
 
 
@@ -2631,12 +2904,18 @@ def upcoming(
     live: bool = False,
     odds: bool = False,
     analysis: bool = False,
+    injuries: bool = False,
 ) -> JSONResponse:
     artifact = _artifact()
     state = _state()
     schedule = _schedule()
     start = _today(today)
     end = start + pd.Timedelta(days=days - 1)
+    injury_meta: dict[str, Any] = {}
+    injury_index: dict[str, dict[str, Any]] | None = None
+    if injuries:
+        injury_teams, injury_meta = _injury_report(state)
+        injury_index = {item["team"]: item for item in injury_teams}
     live_updated = None
     if live:
         schedule, live_updated = _merge_live(schedule, _live_dates(today))
@@ -2682,6 +2961,13 @@ def upcoming(
         except ValueError:
             skipped += 1
             continue
+        if injury_index is not None:
+            _apply_availability_adjustment(
+                result,
+                injury_index.get(str(game.home)),
+                injury_index.get(str(game.away)),
+                artifact,
+            )
 
         low, high = result["interval_80"]
         probability = float(result["probability_over"])
@@ -2724,6 +3010,17 @@ def upcoming(
             "projected_home_score": result.get("projected_home_score"),
             "projected_away_score": result.get("projected_away_score"),
             "home_win_probability": result.get("home_win_probability"),
+            "base_predicted_margin": result.get("base_predicted_margin"),
+            "base_home_win_probability": result.get(
+                "base_home_win_probability"
+            ),
+            "base_projected_home_score": result.get(
+                "base_projected_home_score"
+            ),
+            "base_projected_away_score": result.get(
+                "base_projected_away_score"
+            ),
+            "availability": result.get("availability"),
             "market_total": market_total,
             "market_probability_over": market_probability,
             "market_total_side": market_side,
@@ -2764,7 +3061,7 @@ def upcoming(
         warning = (
             f"El estado de los equipos es del {last_state.date()} "
             f"({stale_days} días). Las predicciones no incorporan partidos "
-            "posteriores ni lesiones."
+            "posteriores; el ajuste por bajas depende del parte de ESPN."
         )
     return _ok(
         {
@@ -2776,6 +3073,19 @@ def upcoming(
             "skipped": skipped,
             "warning": warning,
             "live_updated": live_updated,
+            "injuries_source": "ESPN" if injuries else None,
+            "injuries_warning": injury_meta.get("warning") if injuries else None,
+            "availability_model": AVAILABILITY_MODEL if injuries else None,
+            "injury_adjusted_games": (
+                sum(
+                    1
+                    for row in rows
+                    if (row.get("availability") or {}).get("model_adjusted")
+                )
+                if injuries
+                else 0
+            ),
+            "injury_adjustment_note": INJURY_MODEL_NOTE if injuries else None,
             "market_source": (
                 "ESPN / DraftKings"
                 if odds and not market_frame.empty
@@ -2783,8 +3093,9 @@ def upcoming(
             ),
             "handicap_note": (
                 "El hándicap sugerido y el ganador probable son estimaciones del "
-                "modelo. El hándicap y las cuotas de mercado, cuando aparecen, son "
-                "informativos y pueden cambiar."
+                "modelo; incluyen el ajuste por bajas confirmadas cuando "
+                "`injuries=1`. El total no se ajusta. El hándicap y las cuotas de "
+                "mercado, cuando aparecen, son informativos y pueden cambiar."
             ),
             "games": rows,
         }
@@ -2796,6 +3107,7 @@ def _bb_event_lookup(
     schedule: pd.DataFrame,
     artifact: dict,
     state: pd.DataFrame,
+    injury_index: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], pd.DataFrame]:
     index = schedule.drop_duplicates(subset=["game_id"], keep="last").set_index("game_id")
     events: dict[str, dict[str, Any]] = {}
@@ -2812,7 +3124,9 @@ def _bb_event_lookup(
             continue
         day = pd.Timestamp(row.get("game_date")).normalize()
         if day not in day_cache:
-            day_events, _, _, _ = _bb_events(day, 1, schedule, artifact, state)
+            day_events, _, _, _ = _bb_events(
+                day, 1, schedule, artifact, state, injury_index=injury_index
+            )
             day_cache[day] = {item["event_id"]: item for item in day_events}
         if event_id in day_cache[day]:
             events[event_id] = day_cache[day][event_id]
@@ -2832,14 +3146,22 @@ def bet_builder_events(
     schedule = _schedule()
     start = _today(date)
     end = start + pd.Timedelta(days=days - 1)
-    events, skipped, state_date, odds_as_of = _bb_events(
-        start, days, schedule, artifact, state
-    )
-    injury_warning = None
+    injury_teams: list[dict[str, Any]] = []
+    injury_meta: dict[str, Any] = {}
+    injury_index: dict[str, dict[str, Any]] | None = None
     if injuries:
         injury_teams, injury_meta = _injury_report(state)
         injury_index = {item["team"]: item for item in injury_teams}
-        injury_warning = injury_meta.get("warning")
+    events, skipped, state_date, odds_as_of = _bb_events(
+        start,
+        days,
+        schedule,
+        artifact,
+        state,
+        injury_index=injury_index,
+    )
+    injury_warning = injury_meta.get("warning") if injuries else None
+    if injuries:
         for event in events:
             event["injuries"] = _bb_injury_context(event, injury_index, injury_meta)
     query = (q or "").strip().casefold()
@@ -2926,6 +3248,16 @@ def bet_builder_events(
             "odds_as_of": odds_as_of if has_odds else None,
             "injuries_source": "ESPN" if injuries else None,
             "injuries_warning": injury_warning,
+            "availability_model": AVAILABILITY_MODEL if injuries else None,
+            "injury_adjusted_events": (
+                sum(
+                    1
+                    for event in events
+                    if (event.get("availability") or {}).get("model_adjusted")
+                )
+                if injuries
+                else 0
+            ),
             "market_total_events": market_total_events,
             "limitations": BET_BUILDER_LIMITATIONS,
             "player_markets": BET_BUILDER_PLAYER_MARKETS,
@@ -2940,11 +3272,17 @@ def bet_builder_analyze(payload: BetBuilderAnalyzeIn) -> JSONResponse:
     state = _state()
     schedule = _schedule()
     state_date = _bb_state_date(state)
+    injury_index = None
+    injury_meta: dict[str, Any] = {}
+    if payload.injuries:
+        injury_teams, injury_meta = _injury_report(state)
+        injury_index = {item["team"]: item for item in injury_teams}
     event_map, schedule_index = _bb_event_lookup(
         [selection.event_id for selection in payload.selections],
         schedule,
         artifact,
         state,
+        injury_index=injury_index,
     )
     selections: list[dict[str, Any]] = []
     for selection in payload.selections:
@@ -3095,6 +3433,18 @@ def bet_builder_analyze(payload: BetBuilderAnalyzeIn) -> JSONResponse:
             1 for selection in selections if selection.get("is_custom_line")
         ),
         "same_game_groups": len(same_game_groups),
+        "injuries_source": "ESPN" if payload.injuries else None,
+        "injuries_warning": injury_meta.get("warning") if payload.injuries else None,
+        "availability_model": AVAILABILITY_MODEL if payload.injuries else None,
+        "injury_adjusted_selections": (
+            sum(
+                1
+                for selection in selections
+                if (selection.get("availability") or {}).get("model_adjusted")
+            )
+            if payload.injuries
+            else 0
+        ),
     }
     assumptions = [
         "Las probabilidades individuales son frecuencias empíricas de los "
@@ -3108,8 +3458,15 @@ def bet_builder_analyze(payload: BetBuilderAnalyzeIn) -> JSONResponse:
                 else "No se calcula una probabilidad conjunta; no se aplica el supuesto de independencia."
             )
         ),
-        "No se incluyen lesiones, alineaciones, noticias de última hora ni "
-        "cambios de cuota posteriores a la consulta.",
+        (
+            "El ganador y el hándicap incluyen el ajuste histórico por bajas "
+            "confirmadas de ESPN; el total y las líneas no se ajustan. No se "
+            "modelan minutos, alineaciones, noticias de última hora ni cambios "
+            "de cuota posteriores a la consulta."
+            if payload.injuries
+            else "No se incluyen lesiones, alineaciones, noticias de última hora "
+            "ni cambios de cuota posteriores a la consulta."
+        ),
     ]
     return _ok(
         {
@@ -3145,6 +3502,7 @@ def predict(
     date: str | None = None,
     line: float = Query(225.5, ge=100, le=350),
     handicap: float | None = Query(None, ge=-60, le=60),
+    injuries: bool = False,
 ) -> JSONResponse:
     artifact = _artifact()
     state = _state()
@@ -3163,6 +3521,17 @@ def predict(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+    injury_meta: dict[str, Any] = {}
+    if injuries:
+        injury_teams, injury_meta = _injury_report(state)
+        injury_index = {item["team"]: item for item in injury_teams}
+        _apply_availability_adjustment(
+            result,
+            injury_index.get(str(result["home"])),
+            injury_index.get(str(result["away"])),
+            artifact,
+        )
+
     names = _team_names(state)
     home_name = names.get(str(result["home"]), str(result["home"]))
     away_name = names.get(str(result["away"]), str(result["away"]))
@@ -3173,6 +3542,11 @@ def predict(
     result.update(_handicap_fields(result, home_name, away_name, None))
     result["analysis"] = _analysis_text(result, home_name, away_name, line)
     result["warning"] = _prediction_warning(result, as_of)
+    result["injuries_source"] = "ESPN" if injuries else None
+    result["injuries_warning"] = (
+        injury_meta.get("warning") if injuries else None
+    )
+    result["availability_model"] = AVAILABILITY_MODEL if injuries else None
     return _ok(result)
 
 

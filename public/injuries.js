@@ -3,6 +3,7 @@
 
   const $ = (selector) => document.querySelector(selector);
   const nf1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
+  const nf2 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
 
   const state = {
     loaded: false,
@@ -29,6 +30,12 @@
   function num(value, digits = 1) {
     if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
     return nf1.format(Number(value));
+  }
+
+  function signed(value, digits = 1) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+    const number = Number(value);
+    return `${number >= 0 ? "+" : ""}${num(number, digits)}`;
   }
 
   function initials(name) {
@@ -209,6 +216,11 @@
     const logoClass = team.team_logo_url ? "" : " is-fallback";
     const countLabel =
       team.injury_count === 1 ? "1 en el parte" : `${team.injury_count} en el parte`;
+    const availability = team.availability;
+    const adjustment =
+      availability && Number(availability.missing_share) > 0
+        ? `<span class="injury-adjust" title="Impacto estimado en el margen, no en el total">Ajuste de margen ${signed(availability.impact_points)} pts</span>`
+        : "";
     return `<article class="injury-team">
       <header class="injury-team-head">
         <div class="injury-team-brand">
@@ -220,7 +232,7 @@
         </div>
         <span class="injury-team-count${team.out_count ? " is-out" : ""}">${esc(countLabel)}</span>
       </header>
-      <p class="injury-impact">${esc(team.impact_summary || impactSummary(team.injuries || []))}</p>
+      <p class="injury-impact">${esc(team.impact_summary || impactSummary(team.injuries || []))} ${adjustment}</p>
       <div class="injury-rows">
         ${(team.injuries || []).map(renderInjury).join("") || '<div class="injury-empty-row">ESPN no reporta jugadores lesionados para este equipo.</div>'}
       </div>
@@ -308,10 +320,15 @@
   function renderModelNote() {
     const data = state.data;
     if (!data) return;
+    const model = data.adjustment;
+    const detail = model
+      ? `<p class="injury-impact-note">Coeficiente: ${nf2.format(Number(model.coefficient_points_per_share))} pts de margen por fracción completa del top-5 · ajuste ${esc(model.fit_season || "—")} (${num(model.fit_team_games, 0)} equipos-partido) → validación ${esc(model.holdout_season || "—")} (${num(model.holdout_team_games, 0)}).</p>`
+      : "";
     $("#injuriesModelNote").innerHTML = `<div>
       <strong>Cómo afecta al equipo</strong>
       <p>${esc(data.model_note || "")}</p>
       <p class="injury-impact-note">${esc(data.impact_note || "")}</p>
+      ${detail}
     </div>`;
   }
 
@@ -334,8 +351,8 @@
             <span>Prueba a quitar el filtro de estado, cambiar de equipo o desmarcar “Solo equipos con bajas”.</span>
           </div>`;
       $("#injuriesNote").textContent = warning
-        ? "Sin parte de ESPN no se puede describir el impacto de las bajas. El modelo no se ve afectado."
-        : "El parte se actualiza al consultar ESPN. El modelo no ajusta sus probabilidades por lesiones.";
+        ? "Sin parte de ESPN no se puede describir el impacto de las bajas. El modelo base sigue funcionando sin ajuste."
+        : "El parte se actualiza al consultar ESPN. El ganador y el hándicap usan las bajas confirmadas; el total no.";
       return;
     }
     list.innerHTML = teams.map(renderTeam).join("");
@@ -344,8 +361,8 @@
       `${filteredCount} lesiones en ${teams.length} equipos mostrados.`,
       state.data.stale
         ? "La fuente no se pudo actualizar; se muestra la última copia disponible."
-        : "Fuente: ESPN. El modelo no ajusta sus probabilidades por lesiones.",
-      "Un jugador puede aparecer como baja y volver antes del partido: revisa la hora del parte.",
+        : "Fuente: ESPN. El ajuste de margen/ganador solo usa bajas confirmadas (Out) del top-5.",
+      "El total y los props no se ajustan. Un jugador puede aparecer como baja y volver antes del partido: revisa la hora del parte.",
     ].join(" ");
   }
 

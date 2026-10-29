@@ -166,6 +166,110 @@ def test_predict_rejects_invalid_team():
     assert response.status_code == 400
 
 
+def test_predict_injury_adjustment(monkeypatch):
+    base = client.get(
+        "/api/predict",
+        params={
+            "home": "BOS",
+            "away": "LAL",
+            "date": "2027-01-15",
+            "line": 225.5,
+        },
+    ).json()
+    app_module.INJURY_CACHE.clear()
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (_injury_fixture(team="BOS", player="Jayson Tatum"), False, None),
+    )
+    response = client.get(
+        "/api/predict",
+        params={
+            "home": "BOS",
+            "away": "LAL",
+            "date": "2027-01-15",
+            "line": 225.5,
+            "injuries": 1,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["availability"]["model_adjusted"] is True
+    assert payload["availability"]["home"]["missing_share"] > 0
+    assert payload["base_home_win_probability"] == pytest.approx(
+        base["home_win_probability"]
+    )
+    assert payload["base_predicted_margin"] == pytest.approx(
+        base["predicted_margin"]
+    )
+    assert payload["predicted_margin"] < base["predicted_margin"]
+    assert payload["home_win_probability"] < base["home_win_probability"]
+    assert payload["predicted_total"] == pytest.approx(base["predicted_total"])
+    assert "Ajuste por bajas" in payload["analysis"]
+
+
+def test_upcoming_injury_adjustment(monkeypatch):
+    base = client.get(
+        "/api/upcoming",
+        params={"today": "2027-01-15", "days": 3, "line": 225.5},
+    ).json()
+    base_game = base["games"][0]
+    home = base_game["home"]
+    players = client.get(
+        "/api/players",
+        params={
+            "season": "2026-27",
+            "team": home,
+            "limit": 5,
+            "sort": "pra",
+            "min_gp": 2,
+        },
+    ).json()["players"]
+    assert players
+    app_module.INJURY_CACHE.clear()
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (
+            _injury_fixture(team=home, player=players[0]["player_name"]),
+            False,
+            None,
+        ),
+    )
+    response = client.get(
+        "/api/upcoming",
+        params={
+            "today": "2027-01-15",
+            "days": 3,
+            "line": 225.5,
+            "team": home,
+            "injuries": 1,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["injury_adjusted_games"] >= 1
+    adjusted_game = next(
+        item for item in payload["games"] if item["game_id"] == base_game["game_id"]
+    )
+    assert adjusted_game["availability"]["model_adjusted"] is True
+    assert adjusted_game["base_home_win_probability"] == pytest.approx(
+        base_game["home_win_probability"]
+    )
+    assert adjusted_game["base_predicted_margin"] == pytest.approx(
+        base_game["predicted_margin"]
+    )
+    assert adjusted_game["predicted_margin"] != pytest.approx(
+        base_game["predicted_margin"]
+    )
+    assert adjusted_game["home_win_probability"] != pytest.approx(
+        base_game["home_win_probability"]
+    )
+    assert adjusted_game["predicted_total"] == pytest.approx(
+        base_game["predicted_total"]
+    )
+
+
 def test_players_pra():
     response = client.get(
         "/api/players",
@@ -389,7 +493,7 @@ def test_static_frontend_is_served():
     assert 'id="pdDefenders"' in response.text
     assert 'id="upcomingSummary" aria-busy="true"' in response.text
     assert 'class="loading skeleton-row"' in response.text
-    assert "no incorpora partidos posteriores ni lesiones" in response.text
+    assert "ajuste histórico por bajas confirmadas" in response.text
     assert "VER ANÁLISIS DEL PARTIDO" in response.text
 
 
@@ -408,6 +512,8 @@ def test_static_javascript_includes_player_headshots():
     assert "loadingRows" in response.text
     assert "skeleton-row" in response.text
     assert 'label: "MIN"' in response.text
+    assert "Ajuste por bajas" in response.text
+    assert "injuries: 1" in response.text
 
 
 def test_static_styles_reserve_layout_space():
@@ -426,6 +532,8 @@ def test_static_injuries_javascript_contract():
     assert "model_note" in response.text
     assert "data-player-id" in response.text
     assert "injuries:activate" in response.text
+    assert "injury-adjust" in response.text
+    assert "Ajuste de margen" in response.text
 
 
 def test_bet_builder_events_contract(monkeypatch):
@@ -868,15 +976,20 @@ def test_injuries_contract_and_filter(monkeypatch):
     assert payload["season"] == "2026-27"
     assert payload["count"] == 2
     assert payload["team_count"] == 1
-    assert payload["model_adjusted"] is False
+    assert payload["model_adjusted"] is True
     assert payload["model_note"]
     assert payload["impact_note"]
+    assert payload["adjustment"]["coefficient_points_per_share"] > 0
     assert payload["source_updated_at"]
 
     boston = next(item for item in payload["teams"] if item["team"] == "BOS")
     assert boston["injury_count"] == 2
     assert boston["out_count"] == 1
     assert boston["day_to_day_count"] == 1
+    assert boston["model_adjusted"] is True
+    assert boston["availability"]["missing_share"] > 0
+    assert boston["availability"]["impact_points"] < 0
+    assert boston["availability"]["players"][0]["player_name"] == "Jayson Tatum"
     assert "Tatum" in boston["impact_summary"]
 
     tatum = next(item for item in boston["injuries"] if item["player_name"] == "Jayson Tatum")
@@ -917,7 +1030,48 @@ def test_injuries_source_failure_is_visible(monkeypatch):
     assert payload["count"] == 0
     assert payload["team_count"] == 0
     assert payload["warning"]
+    assert payload["model_adjusted"] is False
     assert len(payload["teams"]) == 30
+
+
+def test_day_to_day_injury_does_not_adjust(monkeypatch):
+    base = client.get(
+        "/api/predict",
+        params={
+            "home": "BOS",
+            "away": "LAL",
+            "date": "2027-01-15",
+            "line": 225.5,
+        },
+    ).json()
+    fixture = _injury_fixture(team="BOS", player="Jayson Tatum")
+    fixture["injuries"][0]["injuries"][0]["status"] = "Day-To-Day"
+    app_module.INJURY_CACHE.clear()
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (fixture, False, None),
+    )
+    response = client.get(
+        "/api/predict",
+        params={
+            "home": "BOS",
+            "away": "LAL",
+            "date": "2027-01-15",
+            "line": 225.5,
+            "injuries": 1,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["availability"]["model_adjusted"] is False
+    assert payload["predicted_margin"] == pytest.approx(base["predicted_margin"])
+    assert payload["home_win_probability"] == pytest.approx(
+        base["home_win_probability"]
+    )
+    assert payload["base_predicted_margin"] == pytest.approx(
+        base["predicted_margin"]
+    )
 
 
 def test_bet_builder_events_can_include_injury_context(monkeypatch):
@@ -928,8 +1082,14 @@ def test_bet_builder_events_can_include_injury_context(monkeypatch):
     assert base.status_code == 200
     event = base.json()["events"][0]
     team = event["home"]
+    players = client.get(
+        "/api/players",
+        params={"season": "2026-27", "team": team, "limit": 1, "sort": "pra"},
+    ).json()["players"]
+    assert players
+    player = players[0]["player_name"]
     app_module.INJURY_CACHE.clear()
-    fixture = _injury_fixture(team=team, player="Jayson Tatum")
+    fixture = _injury_fixture(team=team, player=player)
     monkeypatch.setattr(
         app_module,
         "_fetch_espn_injuries_raw",
@@ -942,8 +1102,79 @@ def test_bet_builder_events_can_include_injury_context(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert payload["injuries_source"] == "ESPN"
+    assert payload["injury_adjusted_events"] >= 1
     matched = next(item for item in payload["events"] if item["event_id"] == event["event_id"])
-    assert matched["injuries"]["model_adjusted"] is False
+    assert matched["injuries"]["model_adjusted"] is True
     assert matched["injuries"]["home"]["team"] == team
     assert matched["injuries"]["home"]["count"] >= 1
     assert matched["injuries"]["note"]
+    assert matched["availability"]["model_adjusted"] is True
+    assert matched["availability"]["home"]["missing_share"] > 0
+    assert matched["base_home_win_probability"] is not None
+    assert matched["home_win_probability"] != matched["base_home_win_probability"]
+
+
+def test_bet_builder_analyze_injury_adjustment(monkeypatch):
+    base = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    ).json()
+    event = base["events"][0]
+    home = event["home"]
+    players = client.get(
+        "/api/players",
+        params={
+            "season": "2026-27",
+            "team": home,
+            "limit": 5,
+            "sort": "pra",
+            "min_gp": 2,
+        },
+    ).json()["players"]
+    assert players
+    app_module.INJURY_CACHE.clear()
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (
+            _injury_fixture(team=home, player=players[0]["player_name"]),
+            False,
+            None,
+        ),
+    )
+    adjusted = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1, "injuries": 1},
+    ).json()
+    adjusted_event = next(
+        item for item in adjusted["events"] if item["event_id"] == event["event_id"]
+    )
+    winner = next(
+        item for item in adjusted_event["markets"] if item["id"] == "winner"
+    )
+    home_option = next(
+        option for option in winner["options"] if option["side"] == "HOME"
+    )
+    response = client.post(
+        "/api/bet-builder/analyze",
+        json={
+            "selections": [
+                {
+                    "event_id": event["event_id"],
+                    "event_date": event["date"],
+                    "market": "winner",
+                    "side": "HOME",
+                    "line": None,
+                }
+            ],
+            "stake": 10,
+            "injuries": True,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    selection = payload["selections"][0]
+    assert selection["status"] == "ok"
+    assert selection["availability"]["model_adjusted"] is True
+    assert selection["probability"] == pytest.approx(home_option["probability"])
+    assert payload["data_quality"]["injury_adjusted_selections"] == 1

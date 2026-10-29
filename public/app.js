@@ -82,6 +82,42 @@ function signed(value, digits = 2) {
   return `${number >= 0 ? "+" : ""}${num(number, digits)}`;
 }
 
+function availabilityText(availability) {
+  if (!availability || !availability.model_adjusted) return "";
+  const parts = [];
+  for (const side of [availability.home, availability.away]) {
+    if (!side || !(Number(side.missing_share) > 0)) continue;
+    const names = (side.players || [])
+      .map((player) => player.player_name)
+      .filter(Boolean)
+      .slice(0, 2);
+    const team = side.team || "Equipo";
+    const impact = signed(side.impact_points, 1);
+    parts.push(`${team} ${impact} pts${names.length ? ` (${names.join(", ")})` : ""}`);
+  }
+  return parts.join(" · ");
+}
+
+function availabilityHtml(availability) {
+  const text = availabilityText(availability);
+  if (!text) return "";
+  return `<span class="injury-adjust-badge" title="${esc(availability.note || "")}">Ajuste por bajas</span><span class="injury-adjust-text">${esc(text)}</span>`;
+}
+
+function winProbabilityCell(game) {
+  const adjusted = Boolean(game.availability?.model_adjusted);
+  const base =
+    game.base_home_win_probability === null ||
+    game.base_home_win_probability === undefined
+      ? null
+      : Number(game.base_home_win_probability);
+  const baseLine =
+    adjusted && base !== null
+      ? `<small class="market-line">base ${pct(base)}</small>`
+      : "";
+  return `<strong>${pct(game.home_win_probability)}</strong>${baseLine}`;
+}
+
 function shortDate(value) {
   if (!value) return "—";
   const date = new Date(`${value}T12:00:00`);
@@ -399,7 +435,7 @@ async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
-    loadingRows(tbody, 8, 6);
+    loadingRows(tbody, 9, 6);
     setBusy(button, true);
     notice($("#upcomingNotice"), "");
     $("#upcomingNote").textContent = "";
@@ -411,6 +447,7 @@ async function loadUpcoming(silent = false) {
       team: state.upcoming.team,
       line: state.line,
       live: 1,
+      injuries: 1,
     });
     state.loaded.upcoming = true;
     $("#upcomingRange").textContent = `${data.start} → ${data.end}`;
@@ -427,7 +464,7 @@ async function loadUpcoming(silent = false) {
     $("#upcomingSummary").setAttribute("aria-busy", "false");
 
     if (!data.games.length) {
-      emptyRow(tbody, 8, "No hay partidos programados en ese rango para el filtro elegido.");
+      emptyRow(tbody, 9, "No hay partidos programados en ese rango para el filtro elegido.");
       $("#upcomingNote").textContent = [
         "Prueba a ampliar los días o quitar el filtro de equipo.",
         data.warning || "",
@@ -448,19 +485,27 @@ async function loadUpcoming(silent = false) {
           <td class="num">${num(game.predicted_total)}</td>
           <td>${num(game.interval_low, 0)} – ${num(game.interval_high, 0)}</td>
           <td class="num">${pct(game.probability_over)}</td>
+          <td class="num">${winProbabilityCell(game)}</td>
           <td>${leanPill(game.lean)}</td>
           <td>${esc(game.model_handicap || "—")}</td>
         </tr>`
       )
       .join("");
-    const upcomingNote = `${data.count} partidos · línea ${num(data.line, 1)} · P(over) calculada con los residuos fuera de muestra.${data.live_updated ? ` · actualizado ${data.live_updated}` : ""}`;
-    $("#upcomingNote").textContent = data.warning
-      ? `${upcomingNote} ${data.warning}`
-      : upcomingNote;
-    $("#upcomingNote").classList.toggle("is-warning", Boolean(data.warning));
+    const adjustedCount = Number(data.injury_adjusted_games || 0);
+    const injuryNote = adjustedCount
+      ? ` · ${adjustedCount} partido${adjustedCount === 1 ? "" : "s"} con ajuste por bajas`
+      : "";
+    const upcomingNote = `${data.count} partidos · línea ${num(data.line, 1)} · P(over) calculada con los residuos fuera de muestra${injuryNote}.${data.live_updated ? ` · actualizado ${data.live_updated}` : ""}`;
+    $("#upcomingNote").textContent = [upcomingNote, data.warning, data.injuries_warning]
+      .filter(Boolean)
+      .join(" ");
+    $("#upcomingNote").classList.toggle(
+      "is-warning",
+      Boolean(data.warning || data.injuries_warning),
+    );
   } catch (error) {
     if (!silent) {
-      emptyRow(tbody, 8, "No se pudieron cargar los próximos partidos.");
+      emptyRow(tbody, 9, "No se pudieron cargar los próximos partidos.");
       notice($("#upcomingNotice"), error.message, true);
       showToast(error.message);
     }
@@ -489,6 +534,7 @@ async function loadAnalysis(silent = false) {
       live: 1,
       odds: 1,
       analysis: 1,
+      injuries: 1,
     });
     state.loaded.analysis = true;
     $("#analysisRange").textContent = `${data.start} → ${data.end}`;
@@ -563,6 +609,8 @@ async function loadAnalysis(silent = false) {
             <div><span>Total previsto</span><strong>${num(game.predicted_total)}</strong></div>
             <div><span>Posible ganador</span><strong>${esc(game.possible_winner || "—")}</strong></div>
             <div><span>Hándicap modelo</span><strong>${esc(game.model_handicap || "—")}</strong></div>
+            <div><span>P(gana local)</span><strong>${pct(game.home_win_probability)}${game.availability?.model_adjusted ? ` <small>base ${pct(game.base_home_win_probability)}</small>` : ""}</strong></div>
+            <div><span>Ajuste por bajas</span><strong>${availabilityHtml(game.availability) || "Sin bajas clave"}</strong></div>
             <div><span>Mercado</span><strong>${esc(game.market_handicap || "Sin cuota")}${hasMarketTotal ? ` · ${num(game.market_total)}` : ""}</strong></div>
             <div><span>Cuotas over/under</span><strong>${esc(game.over_odds || "—")} / ${esc(game.under_odds || "—")}</strong></div>
           </div>
@@ -574,8 +622,12 @@ async function loadAnalysis(silent = false) {
     const source = data.market_source
       ? ` Cuotas: ${data.market_source}. En la línea de mercado, Alta/Baja = probabilidad ≥55% / ≤45%; Leve = 50-55%.`
       : " Sin cuotas de mercado para esas fechas.";
-    $("#analysisNote").textContent = `${games.length} partidos · línea de referencia ${num(data.line, 1)}.${source} ${data.handicap_note || ""}`;
-    notice($("#analysisNotice"), data.warning || "");
+    const adjustedCount = Number(data.injury_adjusted_games || 0);
+    const injuryNote = adjustedCount
+      ? ` ${adjustedCount} partido${adjustedCount === 1 ? "" : "s"} con ajuste por bajas confirmadas; el total no se ajusta.`
+      : "";
+    $("#analysisNote").textContent = `${games.length} partidos · línea de referencia ${num(data.line, 1)}.${source}${injuryNote} ${data.handicap_note || ""}`;
+    notice($("#analysisNotice"), [data.warning, data.injuries_warning].filter(Boolean).join(" "));
   } catch (error) {
     if (!silent) {
       emptyRow(tbody, 11, "No se pudo cargar el análisis.");
@@ -1478,7 +1530,13 @@ async function submitPrediction(event) {
   notice($("#predictNotice"), "");
   box.innerHTML = '<div class="empty"><span class="spinner"></span>Calculando predicción…</div>';
   try {
-    const result = await api("/api/predict", { home, away, date, line: state.line });
+    const result = await api("/api/predict", {
+      home,
+      away,
+      date,
+      line: state.line,
+      injuries: 1,
+    });
     const probability = Number(result.probability_over);
     const low = Number(result.interval_80[0]);
     const high = Number(result.interval_80[1]);
@@ -1499,14 +1557,18 @@ async function submitPrediction(event) {
           <div class="result-line"><span>Puntos previstos</span><strong>${esc(result.home)} ${num(result.projected_home_score)} · ${esc(result.away)} ${num(result.projected_away_score)}</strong></div>
           <div class="result-line"><span>Ganador probable</span><strong>${esc(result.possible_winner || "—")}</strong></div>
           <div class="result-line"><span>Hándicap modelo</span><strong>${esc(result.model_handicap || "—")}</strong></div>
-          <div class="result-line"><span>P(gana ${esc(result.home)})</span><strong>${pct(result.home_win_probability)}</strong></div>
+          <div class="result-line"><span>P(gana ${esc(result.home)})</span><strong>${pct(result.home_win_probability)}${result.availability?.model_adjusted ? ` <small>base ${pct(result.base_home_win_probability)}</small>` : ""}</strong></div>
+          ${result.availability?.model_adjusted ? `<div class="result-line"><span>Ajuste por bajas</span><strong>${availabilityHtml(result.availability)}</strong></div>` : ""}
           <div class="result-line"><span>Descanso</span><strong>${esc(result.home)} ${num(result.home_rest, 0)}d · ${esc(result.away)} ${num(result.away_rest, 0)}d</strong></div>
           <div class="result-line"><span>Elo</span><strong>${num(result.home_elo, 0)} · ${num(result.away_elo, 0)}</strong></div>
           <div class="result-line"><span>Último partido</span><strong>${esc(result.home_last_game)} · ${esc(result.away_last_game)}</strong></div>
         </div>
       </div>
       ${result.analysis ? `<p class="analysis-text predict-analysis">${esc(result.analysis)}</p>` : ""}`;
-    notice($("#predictNotice"), result.warning || "");
+    notice(
+      $("#predictNotice"),
+      [result.warning, result.injuries_warning].filter(Boolean).join(" "),
+    );
   } catch (error) {
     box.innerHTML = "";
     notice($("#predictNotice"), error.message, true);
@@ -1816,7 +1878,7 @@ async function init() {
     if (statusText) statusText.textContent = "API no disponible";
     showToast(error.message);
     const tbody = $("#upcomingBody");
-    if (tbody) emptyRow(tbody, 8, "No se pudo conectar con la API.");
+    if (tbody) emptyRow(tbody, 9, "No se pudo conectar con la API.");
   }
 }
 

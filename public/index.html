@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261028-1">
+  <link rel="stylesheet" href="/styles.css?v=20261029-2">
 </head>
 <body>
   <div class="page">
@@ -74,7 +74,7 @@
           <div>
             <p class="eyebrow">Calendario</p>
             <h2>Próximos partidos</h2>
-            <p class="muted">Total previsto, intervalo 80% y señal del modelo. Usa el último estado disponible; no incorpora partidos posteriores ni lesiones.</p>
+            <p class="muted">Total previsto, intervalo 80% y señal del modelo. El ganador y el hándicap incluyen un ajuste histórico por bajas confirmadas de ESPN; el total no se ajusta.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="upcomingRefresh">Actualizar</button>
         </div>
@@ -112,16 +112,16 @@
             <thead>
               <tr>
                 <th>Fecha</th><th>Hora ET</th><th>Partido</th>
-                <th class="num">Total</th><th>IC 80%</th><th class="num">P(over)</th><th>Señal</th><th>Hándicap</th>
+                <th class="num">Total</th><th>IC 80%</th><th class="num">P(over)</th><th class="num">P(local)</th><th>Señal</th><th>Hándicap</th>
               </tr>
             </thead>
             <tbody id="upcomingBody">
-              <tr class="loading skeleton-row"><td colspan="8"><span class="spinner"></span>Cargando…</td></tr>
-              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
-              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
-              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
-              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
-              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="8"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row"><td colspan="9"><span class="spinner"></span>Cargando…</td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="9"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="9"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="9"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="9"><span class="skeleton-bar"></span></td></tr>
+              <tr class="loading skeleton-row" aria-hidden="true"><td colspan="9"><span class="skeleton-bar"></span></td></tr>
             </tbody>
           </table>
         </div>
@@ -288,7 +288,7 @@
           <div>
             <p class="eyebrow">Disponibilidad</p>
             <h2>Lesiones y bajas</h2>
-            <p class="muted">Parte de ESPN con el estado de cada jugador y su peso estadístico en el equipo. Es contexto: el modelo no ajusta automáticamente sus proyecciones por lesiones.</p>
+            <p class="muted">Parte de ESPN con el estado de cada jugador y su peso estadístico en el equipo. Las bajas confirmadas del top-5 ajustan el ganador y el hándicap; el total y los props no se ajustan.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="injuriesRefresh">Actualizar</button>
         </div>
@@ -627,8 +627,8 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261028-1" defer></script>
-  <script src="/bet-builder.js?v=20261028-1" defer></script>
-  <script src="/injuries.js?v=20261028-1" defer></script>
+  <script src="/app.js?v=20261029-2" defer></script>
+  <script src="/bet-builder.js?v=20261029-2" defer></script>
+  <script src="/injuries.js?v=20261029-2" defer></script>
 </body>
 </html>

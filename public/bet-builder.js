@@ -542,11 +542,16 @@
     const sides = [info.away, info.home].filter((side) => side && side.team);
     if (!sides.length) return "";
     const total = sides.reduce((sum, side) => sum + Number(side.count || 0), 0);
+    const adjusted = Boolean(info.model_adjusted);
+    const adjustment = (info.adjustment?.summary || "").replace(
+      /^Ajuste por bajas:\s*/i,
+      "",
+    );
     if (!total && info.warning) {
       return `<div class="bb-injury-line is-muted">
         <span class="bb-injury-label">Parte ESPN</span>
         <span>Lesiones no disponibles</span>
-        <span class="bb-injury-model">no ajusta el modelo</span>
+        <span class="bb-injury-model">sin ajuste</span>
       </div>`;
     }
     const text = sides
@@ -562,8 +567,8 @@
       .join(" · ");
     return `<div class="bb-injury-line" title="${esc(info.note || "")}">
       <span class="bb-injury-label">Parte ESPN</span>
-      <span>${esc(text)}</span>
-      <span class="bb-injury-model">no ajusta el modelo</span>
+      <span>${esc(text)}${adjustment ? ` · ${esc(adjustment)}` : ""}</span>
+      <span class="bb-injury-model">${adjusted ? "ajuste por bajas" : "sin ajuste"}</span>
     </div>`;
   }
 
@@ -1206,6 +1211,7 @@
         })),
         stake,
         decimal_odds: odds,
+        injuries: true,
       };
       const analysis = await request("/api/bet-builder/analyze", {
         method: "POST",
