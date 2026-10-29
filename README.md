@@ -81,6 +81,21 @@ próximo rival, un posible defensor para ese partido y los defensores que más l
 marcaron según los datos de matchup de la NBA. Las barras comparan cada partido
 con la línea; la fila **PRÓX.** es una proyección, no un resultado.
 
+### Lesiones y disponibilidad
+
+La pestaña **Lesiones** muestra el parte global de ESPN (`/api/injuries`) con el
+estado de cada jugador, la fecha de actualización y una nota periodística. Para
+cada equipo calcula cuántos jugadores hay en el parte y cruza al jugador con sus
+medias por partido de 2026-27 (PTS, REB, AST y PRA), su ranking interno y una
+etiqueta de jugador clave cuando está en el top 5 de PRA.
+
+Ese contexto **no se usa para ajustar las proyecciones**. El Ridge y las
+probabilidades de Bet Builder no descuentan al lesionado ni cambian minutos: un
+ajuste así requeriría un modelo calibrado de disponibilidad y roles. Por eso la
+interfaz muestra el parte y advierte expresamente que el modelo no se ha movido.
+El Bet Builder incluye además un resumen de disponibilidad por partido cuando se
+consulta con `injuries=1`, sin alterar las probabilidades del ticket.
+
 ### Bet Builder
 
 La pestaña **Bet Builder** permite construir una combinada con partidos y
@@ -117,7 +132,8 @@ Reglas de cálculo:
 API:
 
 ```text
-GET  /api/bet-builder/events?date=2026-10-27&days=1
+GET  /api/injuries
+GET  /api/bet-builder/events?date=2026-10-27&days=1&injuries=1
 POST /api/bet-builder/analyze
 ```
 
@@ -179,6 +195,7 @@ nba-ml/
 │       ├── player_props.py   # PTS/REB/AST/PRA por jugador
 │       └── results.py        # liquidación over/under contra resultados reales
 ├── public/bet-builder.js     # explorador de mercados, ticket y análisis
+├── public/injuries.js        # parte de ESPN, filtros y contexto por equipo
 ├── tests/test_pipeline.py    # 11 tests, incluidos los anti-leakage
 ├── tests/test_schedule.py    # normalización y filtros del calendario
 ├── tests/test_players.py     # cálculo de PRA y caché de jugadores
@@ -348,11 +365,13 @@ La app pública está pensada para abrirla desde el móvil:
   total, posible ganador, hándicap sugerido y cuotas over/under; y una pestaña
   **Props** con PTS, REB, AST y PRA proyectados por jugador. Cada jugador tiene
   una ficha visual con sus últimos partidos, línea ajustable, acierto histórico,
-  minutos, efectividad, uso, H2H y defensores.
+  minutos, efectividad, uso, H2H y defensores. La pestaña **Lesiones** muestra
+  el parte de ESPN y el peso estadístico de cada baja, sin ajustar el modelo.
 - **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
-  `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`).
-  `/api/upcoming?odds=1&analysis=1` añade hándicap, proyecciones por equipo y
-  cuotas de ESPN cuando están disponibles.
+  `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`,
+  `/api/injuries`, `/api/bet-builder/events`). `/api/upcoming?odds=1&analysis=1`
+  añade hándicap, proyecciones por equipo y cuotas de ESPN cuando están
+  disponibles.
 - **Datos:** `artifacts/` contiene una foto del modelo de totales, el modelo de
   props, el estado de los equipos y jugadores, el calendario, las estadísticas
   de jugadores y el backtest. Vercel no escribe en disco ni conserva la caché de
@@ -513,16 +532,18 @@ back-to-back, consistencia del estado usado en predicción, contrato de features
 orden temporal de los splits, normalización y filtros del calendario, cálculo de
 PRA y caché de jugadores, props por jugador, liquidación over/under y métricas
 de acierto, margen y hándicap, la ficha visual de jugador, un test de humo del
-dashboard y la API pública de Vercel, y la matemática del Bet Builder:
-combinaciones independientes, rechazo de probabilidades/cuotas/líneas inválidas,
-selecciones del mismo partido y cálculos de EV (79 en total).
+dashboard y la API pública de Vercel, el parte de lesiones de ESPN (contrato,
+filtros, fallo de fuente y contexto en Bet Builder), y la matemática del Bet
+Builder: combinaciones independientes, rechazo de probabilidades/cuotas/líneas
+inválidas, selecciones del mismo partido y cálculos de EV (83 en total).
 
 ---
 
 ## Limitaciones
 
-- **Sin lesiones, sanciones ni alineaciones**: es la mayor fuente de información
-  no capturada. Un modelo con disponibilidad de jugadores mejoraría el MAE de
+- **Lesiones mostradas, no modeladas**: el parte de ESPN se publica en la
+  pestaña **Lesiones**, pero el modelo no descuenta al jugador ausente ni ajusta
+  minutos. Un modelo con disponibilidad de jugadores mejoraría el MAE de
   totales y, sobre todo, el de props. Los props tampoco modelan minutos ni
   rotaciones: usan el promedio reciente de minutos como contexto.
 - **Sin histórico de cuotas**: solo se consultan cuotas actuales de ESPN para
@@ -538,8 +559,8 @@ selecciones del mismo partido y cálculos de EV (79 en total).
 
 ## Próximos pasos
 
-1. Añadir disponibilidad de jugadores (lesiones/rotaciones) y un modelo de
-   minutos para los props.
+1. Convertir el parte de lesiones en features de disponibilidad y construir un
+   modelo de minutos para los props; hoy solo se muestra como contexto.
 2. Incorporar líneas históricas de apertura/cierre y evaluar CLV.
 3. Modelar prórrogas y ritmo por separado (pace × eficiencia).
 4. Añadir viaje/distancia y altitud; 3 partidos en 4 días.

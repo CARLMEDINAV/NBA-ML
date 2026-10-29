@@ -377,6 +377,9 @@ def test_static_frontend_is_served():
     assert "Análisis" in response.text
     assert "Handicap sugerido" in response.text
     assert "Jugadores" in response.text
+    assert "Lesiones y bajas" in response.text
+    assert 'id="injuriesList"' in response.text
+    assert "/injuries.js" in response.text
     assert "Props" in response.text
     assert "Predicciones de jugadores" in response.text
     assert 'id="playerDetail"' in response.text
@@ -414,6 +417,15 @@ def test_static_styles_reserve_layout_space():
     assert ".skeleton-bar" in response.text
     assert ".control-note" in response.text
     assert "min-height: 1.55em" in response.text
+
+
+def test_static_injuries_javascript_contract():
+    response = client.get("/injuries.js")
+    assert response.status_code == 200
+    assert "/api/injuries" in response.text
+    assert "model_note" in response.text
+    assert "data-player-id" in response.text
+    assert "injuries:activate" in response.text
 
 
 def test_bet_builder_events_contract(monkeypatch):
@@ -791,3 +803,147 @@ def test_bet_builder_stale_market_line(monkeypatch):
     assert "cambi" in payload["selections"][0]["stale_reason"]
     assert payload["joint_status"] == "invalid"
     assert payload["joint_probability"] is None
+
+
+def _injury_fixture(team: str = "BOS", player: str = "Jayson Tatum") -> dict:
+    return {
+        "timestamp": "2026-10-28T18:00:00Z",
+        "season": {"displayName": "2026-27"},
+        "injuries": [
+            {
+                "id": "2",
+                "displayName": "Boston Celtics",
+                "injuries": [
+                    {
+                        "id": "-test-1",
+                        "status": "Out",
+                        "date": "2026-10-27T12:00:00Z",
+                        "shortComment": "Test injury report from ESPN.",
+                        "athlete": {
+                            "displayName": player,
+                            "position": {"abbreviation": "F"},
+                            "team": {
+                                "id": "2",
+                                "abbreviation": team,
+                                "displayName": "Boston Celtics",
+                                "logos": [{"href": "https://example.com/logo.png"}],
+                            },
+                            "headshot": {"href": "https://example.com/player.png"},
+                        },
+                    },
+                    {
+                        "id": "-test-2",
+                        "status": "Day-To-Day",
+                        "date": "2026-10-28T09:00:00Z",
+                        "shortComment": "Day-to-day test note.",
+                        "athlete": {
+                            "displayName": "Derrick White",
+                            "position": {"abbreviation": "G"},
+                            "team": {
+                                "id": "2",
+                                "abbreviation": team,
+                                "displayName": "Boston Celtics",
+                                "logos": [{"href": "https://example.com/logo.png"}],
+                            },
+                            "headshot": {"href": "https://example.com/player2.png"},
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def test_injuries_contract_and_filter(monkeypatch):
+    app_module.INJURY_CACHE.clear()
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (_injury_fixture(), False, None),
+    )
+    response = client.get("/api/injuries")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "ESPN"
+    assert payload["season"] == "2026-27"
+    assert payload["count"] == 2
+    assert payload["team_count"] == 1
+    assert payload["model_adjusted"] is False
+    assert payload["model_note"]
+    assert payload["impact_note"]
+    assert payload["source_updated_at"]
+
+    boston = next(item for item in payload["teams"] if item["team"] == "BOS")
+    assert boston["injury_count"] == 2
+    assert boston["out_count"] == 1
+    assert boston["day_to_day_count"] == 1
+    assert "Tatum" in boston["impact_summary"]
+
+    tatum = next(item for item in boston["injuries"] if item["player_name"] == "Jayson Tatum")
+    assert tatum["status_label"] == "Baja"
+    assert tatum["status_class"] == "out"
+    assert tatum["player_id"]
+    assert tatum["stats"]["pts"] is not None
+    assert tatum["stats"]["pra"] is not None
+    assert tatum["is_key_player"] is True
+
+    filtered = client.get(
+        "/api/injuries",
+        params={"team": "BOS", "status": "Out", "q": "Tatum"},
+    )
+    assert filtered.status_code == 200
+    filtered_payload = filtered.json()
+    assert filtered_payload["count"] == 1
+    assert len(filtered_payload["teams"]) == 1
+    assert filtered_payload["teams"][0]["team"] == "BOS"
+    assert filtered_payload["teams"][0]["injuries"][0]["player_name"] == "Jayson Tatum"
+
+    day_to_day = client.get("/api/injuries", params={"q": "day to day"})
+    assert day_to_day.status_code == 200
+    assert day_to_day.json()["count"] == 1
+    assert day_to_day.json()["teams"][0]["injuries"][0]["player_name"] == "Derrick White"
+
+
+def test_injuries_source_failure_is_visible(monkeypatch):
+    app_module.INJURY_CACHE.clear()
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (None, False, "network error"),
+    )
+    response = client.get("/api/injuries")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 0
+    assert payload["team_count"] == 0
+    assert payload["warning"]
+    assert len(payload["teams"]) == 30
+
+
+def test_bet_builder_events_can_include_injury_context(monkeypatch):
+    base = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1},
+    )
+    assert base.status_code == 200
+    event = base.json()["events"][0]
+    team = event["home"]
+    app_module.INJURY_CACHE.clear()
+    fixture = _injury_fixture(team=team, player="Jayson Tatum")
+    monkeypatch.setattr(
+        app_module,
+        "_fetch_espn_injuries_raw",
+        lambda: (fixture, False, None),
+    )
+    response = client.get(
+        "/api/bet-builder/events",
+        params={"date": "2027-01-15", "days": 1, "injuries": 1},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["injuries_source"] == "ESPN"
+    matched = next(item for item in payload["events"] if item["event_id"] == event["event_id"])
+    assert matched["injuries"]["model_adjusted"] is False
+    assert matched["injuries"]["home"]["team"] == team
+    assert matched["injuries"]["home"]["count"] >= 1
+    assert matched["injuries"]["note"]

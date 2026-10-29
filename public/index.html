@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261027-8">
+  <link rel="stylesheet" href="/styles.css?v=20261028-1">
 </head>
 <body>
   <div class="page">
@@ -63,6 +63,7 @@
       <button class="tab" role="tab" aria-selected="false" data-tab="analysis">Análisis</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="results">Resultados</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="players">Jugadores</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" aria-selected="false" data-tab="props">Props</button>
       <button class="tab" role="tab" aria-selected="false" data-tab="predict">Predicción</button>
     </nav>
@@ -282,6 +283,58 @@
         <p class="table-note" id="playersNote"></p>
       </section>
 
+      <section id="tab-injuries" class="tab-panel" role="tabpanel" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Disponibilidad</p>
+            <h2>Lesiones y bajas</h2>
+            <p class="muted">Parte de ESPN con el estado de cada jugador y su peso estadístico en el equipo. Es contexto: el modelo no ajusta automáticamente sus proyecciones por lesiones.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="injuriesRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row">
+          <label>Equipo
+            <select id="injuriesTeam"><option value="">Todos</option></select>
+          </label>
+          <label>Estado
+            <select id="injuriesStatus">
+              <option value="">Todos</option>
+              <option value="Out">Bajas</option>
+              <option value="Day-To-Day">Día a día</option>
+              <option value="Doubtful">Duda alta</option>
+              <option value="Questionable">Duda</option>
+              <option value="Probable">Probable</option>
+            </select>
+          </label>
+          <label class="grow">Buscar
+            <input id="injuriesSearch" type="search" placeholder="Jugador, equipo o nota">
+          </label>
+          <label class="injury-check">
+            <input id="injuriesOnlyAffected" type="checkbox" checked>
+            Solo equipos con bajas
+          </label>
+          <span class="control-note" id="injuriesRange"></span>
+        </div>
+        <div id="injuriesNotice" class="notice" hidden></div>
+        <div class="summary-grid" id="injuriesSummary" aria-busy="true">
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Lesiones</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Equipos</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Bajas</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+          <div class="summary-card summary-skeleton" aria-hidden="true">
+            <span class="k">Fuente</span><span class="v">—</span><span class="s">Cargando</span>
+          </div>
+        </div>
+        <div id="injuriesModelNote" class="injury-model-note"></div>
+        <div id="injuriesList" class="injury-list" aria-live="polite"></div>
+        <p class="table-note" id="injuriesNote"></p>
+      </section>
+
       <section id="tab-props" class="tab-panel" role="tabpanel" hidden>
         <div class="section-head">
           <div>
@@ -481,7 +534,7 @@
           <aside class="pd-card pd-games-panel">
             <div class="pd-segmented" role="group" aria-label="Vista">
               <button class="is-active" type="button" id="pdGamesTab">Partidos</button>
-              <button type="button" disabled title="Datos de lesiones no disponibles">Lesiones <span aria-hidden="true">🔒</span></button>
+              <button type="button" id="pdInjuriesLink" title="Ver el parte de lesiones del equipo">Lesiones <span aria-hidden="true">↗</span></button>
             </div>
             <div class="pd-segmented pd-segmented-small" id="pdVenueFilter" role="group" aria-label="Condición">
               <button class="is-active" data-venue="all" type="button">Todos</button>
@@ -574,7 +627,8 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261027-8" defer></script>
-  <script src="/bet-builder.js?v=20261027-8" defer></script>
+  <script src="/app.js?v=20261028-1" defer></script>
+  <script src="/bet-builder.js?v=20261028-1" defer></script>
+  <script src="/injuries.js?v=20261028-1" defer></script>
 </body>
 </html>

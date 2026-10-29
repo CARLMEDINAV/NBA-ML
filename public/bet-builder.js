@@ -412,6 +412,7 @@
     const params = new URLSearchParams();
     if (state.filters.date) params.set("date", state.filters.date);
     params.set("days", String(state.filters.days || 7));
+    params.set("injuries", "1");
     try {
       const data = await request(`/api/bet-builder/events?${params.toString()}`);
       state.events = Array.isArray(data.events) ? data.events : [];
@@ -424,8 +425,12 @@
         const dateInput = $("#bbDate");
         if (dateInput) dateInput.value = data.start;
       }
-      if (data.warning) {
-        setNotice($("#bbNotice"), data.warning, false);
+      if (data.warning || data.injuries_warning) {
+        setNotice(
+          $("#bbNotice"),
+          [data.warning, data.injuries_warning].filter(Boolean).join(" "),
+          false,
+        );
       }
       renderEvents();
       renderMarketSummary();
@@ -531,10 +536,42 @@
     updatePickStates();
   }
 
+  function renderEventInjuries(event) {
+    const info = event.injuries;
+    if (!info) return "";
+    const sides = [info.away, info.home].filter((side) => side && side.team);
+    if (!sides.length) return "";
+    const total = sides.reduce((sum, side) => sum + Number(side.count || 0), 0);
+    if (!total && info.warning) {
+      return `<div class="bb-injury-line is-muted">
+        <span class="bb-injury-label">Parte ESPN</span>
+        <span>Lesiones no disponibles</span>
+        <span class="bb-injury-model">no ajusta el modelo</span>
+      </div>`;
+    }
+    const text = sides
+      .map((side) => {
+        const count = Number(side.count || 0);
+        if (!count) return `${side.team} sin bajas`;
+        const names = (side.players || [])
+          .slice(0, 2)
+          .map((player) => `${player.player_name} (${player.status_label})`)
+          .join(", ");
+        return `${side.team}: ${count} en el parte${names ? ` · ${names}` : ""}`;
+      })
+      .join(" · ");
+    return `<div class="bb-injury-line" title="${esc(info.note || "")}">
+      <span class="bb-injury-label">Parte ESPN</span>
+      <span>${esc(text)}</span>
+      <span class="bb-injury-model">no ajusta el modelo</span>
+    </div>`;
+  }
+
   function renderEvent(event) {
     const warning = event.data_warning
       ? `<div class="bb-event-warning">${esc(event.data_warning)}</div>`
       : "";
+    const injuries = renderEventInjuries(event);
     const status = event.status && event.status !== "Programado" ? event.status : "";
     const meta = [shortDate(event.date), event.time_et ? `${event.time_et} ET` : "", status]
       .filter(Boolean)
@@ -552,6 +589,7 @@
         </div>
       </header>
       ${warning}
+      ${injuries}
       ${(event.markets || []).map((market) => renderMarket(event, market)).join("")}
     </article>`;
   }

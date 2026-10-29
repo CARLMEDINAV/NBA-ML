@@ -12,8 +12,10 @@ Ejecutar en local:
 from __future__ import annotations
 
 import math
+import re
 import sys
 import time
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
@@ -123,6 +125,40 @@ LIVE_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
 ODDS_CACHE_SECONDS = 300
 ODDS_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
 MAX_ODDS_DATES = 8
+ESPN_INJURIES_URL = (
+    "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
+)
+ESPN_INJURIES_PAGE = "https://www.espn.com/nba/injuries"
+INJURY_CACHE_SECONDS = 300
+INJURY_CACHE: dict[str, Any] = {}
+INJURY_STATUS_LABELS = {
+    "out": "Baja",
+    "day-to-day": "Día a día",
+    "day to day": "Día a día",
+    "doubtful": "Duda alta",
+    "questionable": "Duda",
+    "probable": "Probable",
+    "available": "Disponible",
+}
+INJURY_MODEL_NOTE = (
+    "El modelo Ridge y las probabilidades de Bet Builder no incorporan lesiones, "
+    "alineaciones ni minutos disponibles. Este parte es contexto: no resta puntos "
+    "ni cambia automáticamente una proyección. Un ajuste de impacto requeriría un "
+    "modelo calibrado de disponibilidad y roles, que este proyecto no tiene."
+)
+INJURY_IMPACT_NOTE = (
+    "Para orientar el impacto mostramos los puntos, rebotes, asistencias y PRA por "
+    "partido del jugador y su posición dentro del equipo. No se presenta una "
+    "pérdida de puntos inventada ni una probabilidad ajustada."
+)
+INJURY_LIMITATIONS = [
+    "ESPN publica el estado y una nota periodística; no garantiza que la baja se "
+    "mantenga hasta el partido ni sustituye un reporte oficial de la NBA.",
+    "El ranking interno usa las medias por partido de 2026-27 y puede estar "
+    "afectado por muestras cortas, traspasos o jugadores sin minutos.",
+    "El modelo de totales, hándicap, ganador y Bet Builder no usa lesiones. Las "
+    "probabilidades mostradas no descuentan al jugador ausente.",
+]
 ESPN_TO_NBA = {
     "GS": "GSW",
     "NO": "NOP",
@@ -1238,6 +1274,545 @@ def _team_payload(state: pd.DataFrame) -> list[dict[str, str]]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# Lesiones y disponibilidad (ESPN)
+# ---------------------------------------------------------------------------
+
+
+def _name_key(value: Any) -> str:
+    """Normaliza nombres para cruzar ESPN con las estadísticas NBA."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+
+def _search_key(value: Any) -> str:
+    return re.sub(r"\s+", " ", _name_key(value))
+
+
+def _injury_number(value: Any, digits: int = 1) -> float | None:
+    try:
+        if value is None or pd.isna(value):
+            return None
+        number = float(value)
+        return round(number, digits) if math.isfinite(number) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _injury_status_key(status: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(status or "").strip().casefold()).strip("-")
+
+
+def _injury_status_label(status: Any) -> str:
+    key = _injury_status_key(status)
+    label = INJURY_STATUS_LABELS.get(key.replace("-", " "))
+    return label or INJURY_STATUS_LABELS.get(key) or str(status or "Sin estado")
+
+
+def _injury_status_class(status: Any) -> str:
+    key = _injury_status_key(status)
+    if key == "out":
+        return "out"
+    if key == "day-to-day":
+        return "day"
+    if key in {"doubtful", "questionable"}:
+        return "doubtful"
+    if key == "probable":
+        return "probable"
+    return "other"
+
+
+def _injury_status_priority(status: Any) -> int:
+    return {
+        "out": 0,
+        "doubtful": 1,
+        "questionable": 2,
+        "day": 3,
+        "probable": 4,
+    }.get(_injury_status_class(status), 5)
+
+
+def _fetch_espn_injuries_raw() -> tuple[dict[str, Any] | None, bool, str | None]:
+    """Descarga el parte global de ESPN con caché y tolerancia a fallos."""
+    now = time.time()
+    cached = INJURY_CACHE.get("raw")
+    cached_at = float(INJURY_CACHE.get("at") or 0)
+    if cached is not None and now - cached_at < INJURY_CACHE_SECONDS:
+        return cached, False, None
+
+    try:
+        response = httpx.get(
+            ESPN_INJURIES_URL,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; nba-ml/0.6)",
+                "Accept": "application/json",
+            },
+            timeout=LIVE_TIMEOUT,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict) or not isinstance(data.get("injuries"), list):
+            raise ValueError("ESPN no devolvió un parte de lesiones válido")
+    except Exception as error:
+        if cached is not None:
+            return cached, True, str(error)
+        return None, False, str(error)
+
+    INJURY_CACHE["raw"] = data
+    INJURY_CACHE["at"] = now
+    return data, False, None
+
+
+def _injury_player_lookup() -> tuple[
+    dict[tuple[str, str], dict[str, Any]], dict[str, list[dict[str, Any]]]
+]:
+    """Cruza los nombres de ESPN con las medias por partido de 2026-27."""
+    try:
+        players = _players("2026-27", "pergame")
+    except HTTPException:
+        return {}, {}
+    if players is None or players.empty:
+        return {}, {}
+
+    frame = players.copy()
+    for column in ["gp", "min", "pts", "reb", "ast", "pra"]:
+        if column not in frame.columns:
+            frame[column] = np.nan
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+
+    lookup: dict[tuple[str, str], dict[str, Any]] = {}
+    by_name: dict[str, list[dict[str, Any]]] = {}
+    for raw_team, group in frame.groupby("team", dropna=False):
+        team = _nba_abbreviation(raw_team)
+        group = group[pd.to_numeric(group["gp"], errors="coerce").fillna(0) > 0].copy()
+        if group.empty:
+            continue
+        group = group.sort_values(
+            ["pra", "pts", "player_name"], ascending=[False, False, True], na_position="last"
+        )
+        points_order = group.sort_values(
+            ["pts", "pra", "player_name"], ascending=[False, False, True], na_position="last"
+        ).reset_index(drop=True)
+        points_rank = {
+            int(row["player_id"]): index + 1
+            for index, row in points_order.iterrows()
+            if not pd.isna(row.get("player_id"))
+        }
+        team_players = len(group)
+        for index, row in enumerate(group.to_dict("records"), start=1):
+            player_id = row.get("player_id")
+            player_name = str(row.get("player_name") or "").strip()
+            if not player_name or pd.isna(player_id):
+                continue
+            games_played = pd.to_numeric(row.get("gp"), errors="coerce")
+            item = {
+                "player_id": int(player_id),
+                "player_name": player_name,
+                "gp": 0 if pd.isna(games_played) else int(games_played),
+                "min": _injury_number(row.get("min")),
+                "pts": _injury_number(row.get("pts")),
+                "reb": _injury_number(row.get("reb")),
+                "ast": _injury_number(row.get("ast")),
+                "pra": _injury_number(row.get("pra")),
+                "pra_rank": index,
+                "pts_rank": points_rank.get(int(player_id)),
+                "team_players": team_players,
+            }
+            lookup[(team, _name_key(player_name))] = item
+            by_name.setdefault(_name_key(player_name), []).append(item)
+    return lookup, by_name
+
+
+def _injury_counts(injuries: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {
+        "injury_count": len(injuries),
+        "out_count": 0,
+        "day_to_day_count": 0,
+        "questionable_count": 0,
+        "doubtful_count": 0,
+        "probable_count": 0,
+    }
+    for injury in injuries:
+        status_class = injury.get("status_class")
+        if status_class == "out":
+            counts["out_count"] += 1
+        elif status_class == "day":
+            counts["day_to_day_count"] += 1
+        elif status_class == "doubtful":
+            if _injury_status_key(injury.get("status")) == "questionable":
+                counts["questionable_count"] += 1
+            else:
+                counts["doubtful_count"] += 1
+        elif status_class == "probable":
+            counts["probable_count"] += 1
+    return counts
+
+
+def _injury_impact_summary(injuries: list[dict[str, Any]]) -> str:
+    if not injuries:
+        return "Sin bajas reportadas por ESPN."
+    counts = _injury_counts(injuries)
+    parts: list[str] = []
+    if counts["out_count"]:
+        parts.append(f"{counts['out_count']} baja{'s' if counts['out_count'] != 1 else ''}")
+    if counts["day_to_day_count"]:
+        parts.append(f"{counts['day_to_day_count']} día a día")
+    if counts["questionable_count"]:
+        parts.append(f"{counts['questionable_count']} en duda")
+    if counts["doubtful_count"]:
+        parts.append(
+            f"{counts['doubtful_count']} duda{'s' if counts['doubtful_count'] != 1 else ''} alta"
+        )
+    principal = injuries[0]
+    stats = principal.get("stats") or {}
+    detail = principal.get("player_name") or "jugador sin nombre"
+    if stats.get("pra") is not None:
+        detail += f" ({stats['pra']:.1f} PRA)"
+    parts.append(f"Principal: {detail}")
+    return " · ".join(parts)
+
+
+def _injury_report(
+    state: pd.DataFrame,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Construye el parte por equipo y metadatos; nunca inventa lesiones."""
+    raw, stale, _error = _fetch_espn_injuries_raw()
+    lookup, by_name = _injury_player_lookup()
+
+    teams: dict[str, dict[str, Any]] = {}
+    team_names = {_name_key(row.team_name): str(row.team_abbreviation) for row in state.itertuples(index=False)}
+    for row in state.itertuples(index=False):
+        abbreviation = str(row.team_abbreviation)
+        teams[abbreviation] = {
+            "team": abbreviation,
+            "team_name": str(row.team_name),
+            "team_logo_url": _team_logo_url(getattr(row, "team_id", None)),
+            "injuries": [],
+        }
+
+    espn_teams = raw.get("injuries", []) if raw else []
+    for espn_team in espn_teams:
+        if not isinstance(espn_team, dict):
+            continue
+        team_items = espn_team.get("injuries") or []
+        if not isinstance(team_items, list):
+            continue
+        for item in team_items:
+            if not isinstance(item, dict):
+                continue
+            athlete = item.get("athlete") or {}
+            athlete_team = athlete.get("team") or {}
+            abbreviation = _nba_abbreviation(athlete_team.get("abbreviation"))
+            if not abbreviation:
+                abbreviation = team_names.get(
+                    _name_key(espn_team.get("displayName") or athlete_team.get("displayName")),
+                    "",
+                )
+            if not abbreviation:
+                continue
+            name = str(athlete.get("displayName") or "").strip()
+            if not name:
+                continue
+            if abbreviation not in teams:
+                logos = athlete_team.get("logos") or []
+                logo = next(
+                    (
+                        logo.get("href")
+                        for logo in logos
+                        if isinstance(logo, dict) and logo.get("href")
+                    ),
+                    None,
+                )
+                teams[abbreviation] = {
+                    "team": abbreviation,
+                    "team_name": str(
+                        athlete_team.get("displayName")
+                        or espn_team.get("displayName")
+                        or abbreviation
+                    ),
+                    "team_logo_url": logo,
+                    "injuries": [],
+                }
+
+            match = lookup.get((abbreviation, _name_key(name)))
+            if match is None:
+                candidates = by_name.get(_name_key(name), [])
+                if len(candidates) == 1:
+                    match = candidates[0]
+            stats = (
+                {
+                    key: match.get(key)
+                    for key in [
+                        "gp",
+                        "min",
+                        "pts",
+                        "reb",
+                        "ast",
+                        "pra",
+                        "pra_rank",
+                        "pts_rank",
+                        "team_players",
+                    ]
+                }
+                if match
+                else {
+                    "gp": None,
+                    "min": None,
+                    "pts": None,
+                    "reb": None,
+                    "ast": None,
+                    "pra": None,
+                    "pra_rank": None,
+                    "pts_rank": None,
+                    "team_players": None,
+                }
+            )
+            gp = stats.get("gp")
+            pra_rank = stats.get("pra_rank")
+            is_key_player = bool(gp and gp >= 2 and pra_rank is not None and pra_rank <= 5)
+            if not match:
+                role_note = "Sin estadísticas 2026-27"
+            elif not gp:
+                role_note = "Sin minutos registrados"
+            elif gp < 2:
+                role_note = f"Muestra corta ({gp} PJ)"
+            elif is_key_player:
+                role_note = f"Top {pra_rank} del equipo en PRA"
+            else:
+                role_note = "Rotación"
+
+            status = str(item.get("status") or "Sin estado").strip()
+            updated = item.get("date")
+            date_value = None
+            try:
+                parsed = pd.to_datetime(updated, utc=True, errors="coerce")
+                if pd.notna(parsed):
+                    date_value = parsed.tz_convert(NBA_ET).strftime("%Y-%m-%d")
+            except Exception:
+                date_value = None
+            position = athlete.get("position") or {}
+            headshot = athlete.get("headshot") or {}
+            injury = {
+                "player_name": name,
+                "player_id": match.get("player_id") if match else None,
+                "position": str(position.get("abbreviation") or position.get("displayName") or ""),
+                "status": status,
+                "status_label": _injury_status_label(status),
+                "status_class": _injury_status_class(status),
+                "date": date_value,
+                "updated_at": updated if isinstance(updated, str) else None,
+                "short_comment": str(
+                    item.get("shortComment") or item.get("longComment") or ""
+                ).strip(),
+                "headshot_url": headshot.get("href") if isinstance(headshot, dict) else None,
+                "stats": stats,
+                "is_key_player": is_key_player,
+                "role_note": role_note,
+            }
+            teams[abbreviation]["injuries"].append(injury)
+
+    report_teams: list[dict[str, Any]] = []
+    for team in teams.values():
+        injuries = team["injuries"]
+        injuries.sort(
+            key=lambda injury: (
+                _injury_status_priority(injury.get("status")),
+                -(injury.get("stats", {}).get("pra") or -1),
+                injury.get("player_name") or "",
+            )
+        )
+        team.update(_injury_counts(injuries))
+        team["key_absentees"] = [
+            {
+                "player_name": injury["player_name"],
+                "status": injury["status"],
+                "status_label": injury["status_label"],
+                "pra": injury.get("stats", {}).get("pra"),
+                "is_key_player": injury.get("is_key_player"),
+            }
+            for injury in injuries
+            if injury.get("status_class") == "out"
+        ][:3]
+        team["impact_summary"] = _injury_impact_summary(injuries)
+        team["model_adjusted"] = False
+        report_teams.append(team)
+    report_teams.sort(key=lambda item: (-item["injury_count"], item["team_name"]))
+
+    source_updated_at = None
+    season = None
+    if raw:
+        season = (raw.get("season") or {}).get("displayName")
+        try:
+            timestamp = pd.to_datetime(raw.get("timestamp"), utc=True, errors="coerce")
+            if pd.notna(timestamp):
+                source_updated_at = timestamp.tz_convert(NBA_ET).strftime("%Y-%m-%d %H:%M ET")
+        except Exception:
+            source_updated_at = None
+
+    warning = None
+    if raw is None:
+        warning = (
+            "No se pudo consultar el parte de lesiones de ESPN. "
+            "La app sigue funcionando, pero no hay datos de disponibilidad."
+        )
+    elif stale:
+        warning = (
+            "No se pudo actualizar el parte de lesiones de ESPN; se muestra la "
+            f"última copia disponible ({source_updated_at or 'sin fecha'})."
+        )
+    meta = {
+        "generated_at": pd.Timestamp.now(tz=NBA_ET).strftime("%Y-%m-%d %H:%M ET"),
+        "source": "ESPN",
+        "source_url": ESPN_INJURIES_PAGE,
+        "season": season,
+        "source_updated_at": source_updated_at,
+        "stale": stale,
+        "warning": warning,
+        "model_adjusted": False,
+        "model_note": INJURY_MODEL_NOTE,
+        "impact_note": INJURY_IMPACT_NOTE,
+        "limitations": INJURY_LIMITATIONS,
+    }
+    return report_teams, meta
+
+
+def _injuries_response(
+    team: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+) -> dict[str, Any]:
+    state = _state()
+    teams, meta = _injury_report(state)
+    selected = {
+        item.strip().upper()
+        for item in (team or "").split(",")
+        if item.strip()
+    }
+    status_key = _injury_status_key(status)
+    query = _search_key(q)
+
+    filtered_teams: list[dict[str, Any]] = []
+    for team_row in teams:
+        if selected and team_row["team"].upper() not in selected:
+            continue
+        injuries = list(team_row["injuries"])
+        if status_key:
+            injuries = [
+                injury
+                for injury in injuries
+                if status_key
+                in {
+                    _injury_status_key(injury.get("status")),
+                    _injury_status_key(injury.get("status_label")),
+                }
+            ]
+        if query:
+            injuries = [
+                injury
+                for injury in injuries
+                if query
+                in _search_key(
+                    " ".join(
+                        [
+                            str(team_row.get("team") or ""),
+                            str(team_row.get("team_name") or ""),
+                            str(injury.get("player_name") or ""),
+                            str(injury.get("status") or ""),
+                            str(injury.get("status_label") or ""),
+                            str(injury.get("short_comment") or ""),
+                        ]
+                    )
+                )
+            ]
+
+        team_matches_query = bool(
+            query and query in _search_key(f"{team_row.get('team', '')} {team_row.get('team_name', '')}")
+        )
+        if (status_key or query) and not injuries and not team_matches_query:
+            continue
+        summary = dict(team_row)
+        summary.update(_injury_counts(injuries))
+        summary["injuries"] = injuries
+        summary["key_absentees"] = [
+            {
+                "player_name": injury["player_name"],
+                "status": injury["status"],
+                "status_label": injury["status_label"],
+                "pra": injury.get("stats", {}).get("pra"),
+                "is_key_player": injury.get("is_key_player"),
+            }
+            for injury in injuries
+            if injury.get("status_class") == "out"
+        ][:3]
+        summary["impact_summary"] = _injury_impact_summary(injuries)
+        filtered_teams.append(summary)
+
+    flat = [injury for item in filtered_teams for injury in item["injuries"]]
+    status_counts: dict[str, int] = {}
+    for injury in flat:
+        raw_status = injury.get("status") or "Sin estado"
+        status_counts[raw_status] = status_counts.get(raw_status, 0) + 1
+    return {
+        **meta,
+        "count": len(flat),
+        "team_count": sum(1 for item in filtered_teams if item["injury_count"]),
+        "status_counts": status_counts,
+        "teams": filtered_teams,
+    }
+
+
+def _injury_team_summary(team: dict[str, Any] | None) -> dict[str, Any]:
+    if not team:
+        return {
+            "team": None,
+            "team_name": None,
+            "count": 0,
+            "out_count": 0,
+            "day_to_day_count": 0,
+            "players": [],
+            "impact_summary": "Sin datos de ESPN para este equipo.",
+        }
+    return {
+        "team": team.get("team"),
+        "team_name": team.get("team_name"),
+        "count": team.get("injury_count", 0),
+        "out_count": team.get("out_count", 0),
+        "day_to_day_count": team.get("day_to_day_count", 0),
+        "players": [
+            {
+                "player_name": injury.get("player_name"),
+                "status": injury.get("status"),
+                "status_label": injury.get("status_label"),
+                "status_class": injury.get("status_class"),
+                "is_key_player": injury.get("is_key_player"),
+                "pra": injury.get("stats", {}).get("pra"),
+            }
+            for injury in team.get("injuries", [])
+        ],
+        "impact_summary": team.get("impact_summary"),
+    }
+
+
+def _bb_injury_context(
+    event: dict[str, Any],
+    index: dict[str, dict[str, Any]],
+    meta: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "home": _injury_team_summary(index.get(str(event.get("home") or ""))),
+        "away": _injury_team_summary(index.get(str(event.get("away") or ""))),
+        "model_adjusted": False,
+        "source": "ESPN",
+        "source_updated_at": meta.get("source_updated_at"),
+        "source_url": meta.get("source_url"),
+        "warning": meta.get("warning"),
+        "note": INJURY_MODEL_NOTE,
+    }
+
+
+
 def _prediction_warning(result: dict[str, Any], as_of: pd.Timestamp) -> str | None:
     oldest = min(
         pd.Timestamp(result["home_last_game"]),
@@ -1284,6 +1859,10 @@ BET_BUILDER_LIMITATIONS = [
         "Los mercados de jugador están deshabilitados: el modelo de props tiene "
         "proyecciones y confianza, pero no líneas de mercado ni una "
         "distribución calibrada por línea."
+    ),
+    (
+        "El resumen de lesiones de ESPN es informativo: se muestra junto al "
+        "partido, pero no ajusta las probabilidades ni el ticket."
     ),
 ]
 
@@ -2017,10 +2596,12 @@ def meta(today: str | None = None) -> JSONResponse:
             "teams": _team_payload(state),
             "handicap_test_metrics": artifact.get("margin_test_metrics"),
             "caveat": (
-                "Sin lesiones ni alineaciones. El total y el hándicap son "
-                "estimaciones del modelo; la línea de total es una referencia "
-                "introducida por el usuario. Las cuotas de mercado, cuando "
-                "aparecen, son informativas y no una recomendación de apuestas."
+                "Las proyecciones no incorporan lesiones ni alineaciones. El "
+                "parte de ESPN se muestra como contexto y no cambia el total, "
+                "el hándicap ni las probabilidades. La línea de total es una "
+                "referencia introducida por el usuario. Las cuotas de mercado, "
+                "cuando aparecen, son informativas y no una recomendación de "
+                "apuestas."
             ),
         }
     )
@@ -2029,6 +2610,16 @@ def meta(today: str | None = None) -> JSONResponse:
 @app.get("/api/teams")
 def teams() -> JSONResponse:
     return _ok({"teams": _team_payload(_state())})
+
+
+@app.get("/api/injuries")
+def injuries(
+    team: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+) -> JSONResponse:
+    """Parte de lesiones de ESPN, sin ajustar las proyecciones del modelo."""
+    return _ok(_injuries_response(team=team, status=status, q=q))
 
 
 @app.get("/api/upcoming")
@@ -2234,6 +2825,7 @@ def bet_builder_events(
     days: int = Query(7, ge=1, le=14),
     q: str | None = None,
     market: str | None = None,
+    injuries: bool = False,
 ) -> JSONResponse:
     artifact = _artifact()
     state = _state()
@@ -2243,6 +2835,13 @@ def bet_builder_events(
     events, skipped, state_date, odds_as_of = _bb_events(
         start, days, schedule, artifact, state
     )
+    injury_warning = None
+    if injuries:
+        injury_teams, injury_meta = _injury_report(state)
+        injury_index = {item["team"]: item for item in injury_teams}
+        injury_warning = injury_meta.get("warning")
+        for event in events:
+            event["injuries"] = _bb_injury_context(event, injury_index, injury_meta)
     query = (q or "").strip().casefold()
     if query:
         events = [
@@ -2325,6 +2924,8 @@ def bet_builder_events(
             "warning": state_warning,
             "odds_source": "ESPN / DraftKings" if has_odds else None,
             "odds_as_of": odds_as_of if has_odds else None,
+            "injuries_source": "ESPN" if injuries else None,
+            "injuries_warning": injury_warning,
             "market_total_events": market_total_events,
             "limitations": BET_BUILDER_LIMITATIONS,
             "player_markets": BET_BUILDER_PLAYER_MARKETS,

@@ -370,6 +370,7 @@ function populateTeams(meta) {
   fillTeams($("#analysisTeam"), teams, true);
   fillTeams($("#resultsTeam"), teams, true);
   fillTeams($("#playersTeam"), teams, true);
+  fillTeams($("#injuriesTeam"), teams, true);
   fillTeams($("#propsTeam"), teams, true);
   fillTeams($("#predictHome"), teams);
   fillTeams($("#predictAway"), teams);
@@ -1533,6 +1534,9 @@ function activateTab(name) {
   if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
+  if (name === "injuries") {
+    window.dispatchEvent(new CustomEvent("injuries:activate"));
+  }
   if (name === "betbuilder") {
     window.dispatchEvent(new CustomEvent("betbuilder:activate"));
   }
@@ -1718,6 +1722,16 @@ function bindEvents() {
   $("#pdAnalysis").addEventListener("click", () => {
     if (state.detail.data?.player?.team) {
       openAnalysisForTeam(state.detail.data.player.team);
+    }
+  });
+  $("#pdInjuriesLink")?.addEventListener("click", () => {
+    const team = state.detail.data?.player?.team;
+    closePlayerDetail();
+    activateTab("injuries");
+    if (team) {
+      window.dispatchEvent(
+        new CustomEvent("injuries:focus", { detail: { team } })
+      );
     }
   });
 
