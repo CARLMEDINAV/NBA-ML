@@ -80,7 +80,7 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600022,2026-10-30,20:00,3,Final,MIN,LAC,Target Center,False,127,101,228.0
 0022600023,2026-10-30,22:00,3,Final,GSW,LAL,Chase Center,False,112,95,207.0
 0022600024,2026-10-30,22:00,3,Final,PHX,DEN,Mortgage Matchup Center,False,120,127,247.0
-0022600147,2026-10-31,15:00,1,10/31 - 3:00 PM EDT,UTA,POR,Delta Center,False,0,0,
+0022600147,2026-10-31,15:00,3,Final,UTA,POR,Delta Center,False,90,112,202.0
 0022600148,2026-10-31,18:00,1,10/31 - 6:00 PM EDT,CHA,PHI,Spectrum Center,False,0,0,
 0022600149,2026-10-31,19:00,1,10/31 - 7:00 PM EDT,NOP,ATL,Smoothie King Center,False,0,0,
 0022600150,2026-10-31,20:00,1,10/31 - 8:00 PM EDT,MEM,SAC,FedExForum,False,0,0,
