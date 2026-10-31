@@ -75,11 +75,11 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600017,2026-10-30,19:30,3,Final,BKN,DET,Barclays Center,False,94,110,204.0
 0022600018,2026-10-30,19:30,3,Final,PHI,NYK,Xfinity Mobile Arena,False,98,93,191.0
 0022600019,2026-10-30,19:30,3,Final,TOR,ORL,Scotiabank Arena,False,114,121,235.0
-0022600020,2026-10-30,20:00,2,22.5 - 4th,MIA,IND,Kaseya Center,False,141,123,
-0022600021,2026-10-30,20:00,2,11.3 - 4th,DAL,HOU,American Airlines Center,False,109,108,
+0022600020,2026-10-30,20:00,3,Final,MIA,IND,Kaseya Center,False,145,125,270.0
+0022600021,2026-10-30,20:00,3,Final,DAL,HOU,American Airlines Center,False,116,111,227.0
 0022600022,2026-10-30,20:00,3,Final,MIN,LAC,Target Center,False,127,101,228.0
-0022600023,2026-10-30,22:00,2,3:01 - 1st,GSW,LAL,Chase Center,False,14,28,
-0022600024,2026-10-30,22:00,2,End of 1st,PHX,DEN,Mortgage Matchup Center,False,37,32,
+0022600023,2026-10-30,22:00,2,Halftime,GSW,LAL,Chase Center,False,53,53,
+0022600024,2026-10-30,22:00,2,8:05 - 3rd,PHX,DEN,Mortgage Matchup Center,False,76,84,
 0022600147,2026-10-31,15:00,1,10/31 - 3:00 PM EDT,UTA,POR,Delta Center,False,0,0,
 0022600148,2026-10-31,18:00,1,10/31 - 6:00 PM EDT,CHA,PHI,Spectrum Center,False,0,0,
 0022600149,2026-10-31,19:00,1,10/31 - 7:00 PM EDT,NOP,ATL,Smoothie King Center,False,0,0,
