@@ -81,12 +81,12 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600023,2026-10-30,22:00,3,Final,GSW,LAL,Chase Center,False,112,95,207.0
 0022600024,2026-10-30,22:00,3,Final,PHX,DEN,Mortgage Matchup Center,False,120,127,247.0
 0022600147,2026-10-31,15:00,3,Final,UTA,POR,Delta Center,False,90,112,202.0
-0022600148,2026-10-31,18:00,1,10/31 - 6:00 PM EDT,CHA,PHI,Spectrum Center,False,0,0,
-0022600149,2026-10-31,19:00,1,10/31 - 7:00 PM EDT,NOP,ATL,Smoothie King Center,False,0,0,
-0022600150,2026-10-31,20:00,1,10/31 - 8:00 PM EDT,MEM,SAC,FedExForum,False,0,0,
-0022600151,2026-10-31,20:00,1,10/31 - 8:00 PM EDT,MIL,CLE,Fiserv Forum,False,0,0,
-0022600152,2026-10-31,20:00,1,10/31 - 8:00 PM EDT,SAS,MIN,Frost Bank Center,False,0,0,
-0022600153,2026-10-31,20:30,1,10/31 - 8:30 PM EDT,HOU,OKC,Toyota Center (Houston),False,0,0,
+0022600148,2026-10-31,18:00,3,Final,CHA,PHI,Spectrum Center,False,104,109,213.0
+0022600149,2026-10-31,19:00,2,9:45 - 4th,NOP,ATL,Smoothie King Center,False,96,78,
+0022600150,2026-10-31,20:00,2,3:46 - 2nd,MEM,SAC,FedExForum,False,53,42,
+0022600151,2026-10-31,20:00,2,1:04 - 2nd,MIL,CLE,Fiserv Forum,False,46,69,
+0022600152,2026-10-31,20:00,2,1:16 - 2nd,SAS,MIN,Frost Bank Center,False,54,61,
+0022600153,2026-10-31,20:30,2,1:30 - 1st,HOU,OKC,Toyota Center (Houston),False,33,20,
 0022600154,2026-11-01,15:30,1,11/1 - 3:30 PM EST,ORL,BOS,Kia Center,False,0,0,
 0022600155,2026-11-01,17:00,1,11/1 - 5:00 PM EST,IND,BKN,Gainbridge Fieldhouse,False,0,0,
 0022600156,2026-11-01,20:30,1,11/1 - 8:30 PM EST,GSW,LAC,Chase Center,False,0,0,
