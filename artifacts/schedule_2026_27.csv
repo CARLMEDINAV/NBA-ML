@@ -138,8 +138,8 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600193,2026-11-07,20:30,3,Final/OT,GSW,ORL,Chase Center,False,126,119,245.0
 0022600194,2026-11-07,21:00,3,Final,PHX,HOU,Mortgage Matchup Center,False,102,99,201.0
 0022600195,2026-11-07,22:00,3,Final,POR,SAS,Moda Center,False,103,125,228.0
-0022600196,2026-11-08,15:30,1,11/8 - 3:30 PM EST,CHI,PHI,United Center,False,0,0,
-0022600197,2026-11-08,18:00,1,11/8 - 6:00 PM EST,DET,LAL,Little Caesars Arena,False,0,0,
+0022600196,2026-11-08,15:30,3,Final,CHI,PHI,United Center,False,121,127,248.0
+0022600197,2026-11-08,18:00,2,8:44 - 1st,DET,LAL,Little Caesars Arena,False,4,8,
 0022600198,2026-11-08,19:00,1,11/8 - 7:00 PM EST,MIN,UTA,Target Center,False,0,0,
 0022600199,2026-11-08,19:30,1,11/8 - 7:30 PM EST,DAL,BKN,American Airlines Center,False,0,0,
 0022600200,2026-11-08,20:00,1,11/8 - 8:00 PM EST,MIL,BOS,Fiserv Forum,False,0,0,
