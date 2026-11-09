@@ -139,12 +139,12 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600194,2026-11-07,21:00,3,Final,PHX,HOU,Mortgage Matchup Center,False,102,99,201.0
 0022600195,2026-11-07,22:00,3,Final,POR,SAS,Moda Center,False,103,125,228.0
 0022600196,2026-11-08,15:30,3,Final,CHI,PHI,United Center,False,121,127,248.0
-0022600197,2026-11-08,18:00,2,8:44 - 1st,DET,LAL,Little Caesars Arena,False,4,8,
-0022600198,2026-11-08,19:00,1,11/8 - 7:00 PM EST,MIN,UTA,Target Center,False,0,0,
-0022600199,2026-11-08,19:30,1,11/8 - 7:30 PM EST,DAL,BKN,American Airlines Center,False,0,0,
-0022600200,2026-11-08,20:00,1,11/8 - 8:00 PM EST,MIL,BOS,Fiserv Forum,False,0,0,
-0022600201,2026-11-08,21:00,1,11/8 - 9:00 PM EST,LAC,NOP,Intuit Dome,False,0,0,
-0022600202,2026-11-08,21:00,1,11/8 - 9:00 PM EST,SAC,MIA,Golden 1 Center,False,0,0,
+0022600197,2026-11-08,18:00,3,Final,DET,LAL,Little Caesars Arena,False,116,121,237.0
+0022600198,2026-11-08,19:00,3,Final,MIN,UTA,Target Center,False,115,100,215.0
+0022600199,2026-11-08,19:30,2,7:27 - 4th,DAL,BKN,American Airlines Center,False,109,78,
+0022600200,2026-11-08,20:00,2,10:57 - 4th,MIL,BOS,Fiserv Forum,False,76,94,
+0022600201,2026-11-08,21:00,2,8:29 - 2nd,LAC,NOP,Intuit Dome,False,38,34,
+0022600202,2026-11-08,21:00,2,7:57 - 2nd,SAC,MIA,Golden 1 Center,False,43,43,
 0022600203,2026-11-09,19:00,1,11/9 - 7:00 PM EST,ATL,LAL,State Farm Arena,False,0,0,
 0022600204,2026-11-09,19:00,1,11/9 - 7:00 PM EST,CHA,CLE,Spectrum Center,False,0,0,
 0022600205,2026-11-09,19:00,1,11/9 - 7:00 PM EST,DET,WAS,Little Caesars Arena,False,0,0,
