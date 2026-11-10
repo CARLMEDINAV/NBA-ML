@@ -145,14 +145,14 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600200,2026-11-08,20:00,3,Final,MIL,BOS,Fiserv Forum,False,97,117,214.0
 0022600201,2026-11-08,21:00,3,Final,LAC,NOP,Intuit Dome,False,139,123,262.0
 0022600202,2026-11-08,21:00,3,Final,SAC,MIA,Golden 1 Center,False,108,114,222.0
-0022600203,2026-11-09,19:00,1,11/9 - 7:00 PM EST,ATL,LAL,State Farm Arena,False,0,0,
-0022600204,2026-11-09,19:00,1,11/9 - 7:00 PM EST,CHA,CLE,Spectrum Center,False,0,0,
-0022600205,2026-11-09,19:00,1,11/9 - 7:00 PM EST,DET,WAS,Little Caesars Arena,False,0,0,
-0022600206,2026-11-09,19:30,1,11/9 - 7:30 PM EST,TOR,MEM,Scotiabank Arena,False,0,0,
-0022600207,2026-11-09,20:00,1,11/9 - 8:00 PM EST,DAL,IND,American Airlines Center,False,0,0,
-0022600208,2026-11-09,20:30,1,11/9 - 8:30 PM EST,HOU,DEN,Toyota Center (Houston),False,0,0,
-0022600209,2026-11-09,21:00,1,11/9 - 9:00 PM EST,PHX,SAS,Mortgage Matchup Center,False,0,0,
-0022600210,2026-11-09,22:00,1,11/9 - 10:00 PM EST,GSW,NOP,Chase Center,False,0,0,
+0022600203,2026-11-09,19:00,3,Final,ATL,LAL,State Farm Arena,False,114,124,238.0
+0022600204,2026-11-09,19:00,3,Final,CHA,CLE,Spectrum Center,False,124,112,236.0
+0022600205,2026-11-09,19:00,3,Final,DET,WAS,Little Caesars Arena,False,122,111,233.0
+0022600206,2026-11-09,19:30,3,Final,TOR,MEM,Scotiabank Arena,False,102,118,220.0
+0022600207,2026-11-09,20:00,2,1:14 - 4th,DAL,IND,American Airlines Center,False,118,113,
+0022600208,2026-11-09,20:30,2,6:27 - 4th,HOU,DEN,Toyota Center (Houston),False,93,87,
+0022600209,2026-11-09,21:00,2,9:24 - 3rd,PHX,SAS,Mortgage Matchup Center,False,54,67,
+0022600210,2026-11-09,22:00,2,2:17 - 1st,GSW,NOP,Chase Center,False,29,16,
 0022600211,2026-11-10,19:30,1,11/10 - 7:30 PM EST,NYK,MIL,Madison Square Garden,False,0,0,
 0022600212,2026-11-10,20:00,1,11/10 - 8:00 PM EST,PHI,BOS,Xfinity Mobile Arena,False,0,0,
 0022600213,2026-11-10,21:00,1,11/10 - 9:00 PM EST,PHX,LAC,Mortgage Matchup Center,False,0,0,
