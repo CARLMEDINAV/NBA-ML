@@ -534,6 +534,8 @@ def test_static_injuries_javascript_contract():
     assert "injuries:activate" in response.text
     assert "injury-adjust" in response.text
     assert "Ajuste de margen" in response.text
+    assert "Coeficiente aplicado" in response.text
+    assert "holdout_coefficient_points_per_share" in response.text
 
 
 def test_bet_builder_events_contract(monkeypatch):
@@ -979,7 +981,15 @@ def test_injuries_contract_and_filter(monkeypatch):
     assert payload["model_adjusted"] is True
     assert payload["model_note"]
     assert payload["impact_note"]
-    assert payload["adjustment"]["coefficient_points_per_share"] > 0
+    adjustment = payload["adjustment"]
+    assert adjustment["coefficient_points_per_share"] > 0
+    assert adjustment["holdout_coefficient_points_per_share"] == pytest.approx(8.17)
+    assert adjustment["pooled_coefficient_points_per_share"] == pytest.approx(7.53)
+    assert adjustment["holdout_app_winner_accuracy_adjusted"] < (
+        adjustment["holdout_app_winner_accuracy_base"]
+    )
+    assert "8,17" in payload["model_note"]
+    assert "evaluada en 2025-26" in adjustment["description"]
     assert payload["source_updated_at"]
 
     boston = next(item for item in payload["teams"] if item["team"] == "BOS")

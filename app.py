@@ -148,27 +148,40 @@ AVAILABILITY_MODEL = {
     "fit_team_games": 2384,
     "holdout_team_games": 2400,
     "coefficient_points_per_share": AVAILABILITY_COEFFICIENT,
-    "holdout_coefficient_points_per_share": 5.53,
+    "fit_coefficient_standard_error": 1.39,
+    "holdout_coefficient_points_per_share": 8.17,
+    "holdout_coefficient_standard_error": 1.40,
+    "pooled_coefficient_points_per_share": 7.53,
+    "holdout_app_games": 1200,
+    "holdout_app_mae_base": 11.34,
+    "holdout_app_mae_adjusted": 11.22,
+    "holdout_app_winner_accuracy_base": 0.69,
+    "holdout_app_winner_accuracy_adjusted": 0.6858,
     "description": (
         "Regresión del margen local por la fracción de PRA del top-5 ausente, "
         "con efectos fijos de equipo, rival y temporada. Entrenada con 2024-25 "
-        "y validada con 2025-26."
+        "y evaluada en 2025-26. El coeficiente aislado del holdout fue 8,17; "
+        "se aplica 5,53, la estimación de 2024-25, como corrección conservadora."
     ),
 }
 INJURY_MODEL_NOTE = (
-    "El total sigue sin usar lesiones. Para ganador, margen y hándicap, la app "
-    "aplica un ajuste experimental de disponibilidad: resta 5,53 puntos de "
-    "margen por cada fracción completa del PRA del top-5 que está de baja "
-    "confirmada (Out). Se calibró con 2024-25 y se validó con 2025-26. Solo "
-    "aplica a bajas con estadísticas 2026-27; día a día, dudas y jugadores sin "
+    "El total del partido sigue sin usar lesiones. Para ganador, margen y "
+    "hándicap, la app aplica un ajuste experimental: el margen del equipo baja "
+    "5,53 puntos por cada fracción completa del PRA de su top-5 de baja "
+    "confirmada (Out) y sube lo mismo por la fracción del rival. El coeficiente "
+    "se estimó en 2024-25 y se evaluó en 2025-26; el holdout aislado fue 8,17, "
+    "así que 5,53 es conservador. Solo aplica a bajas Out de jugadores del top-5 "
+    "con al menos 2 partidos y PRA 2026-27; día a día, dudas y jugadores sin "
     "muestra no se ajustan. No es un modelo de minutos ni una probabilidad oficial."
 )
 INJURY_IMPACT_NOTE = (
     "Para cada equipo se calcula qué fracción del PRA de su top-5 está de baja. "
-    "El margen se mueve 5,53 puntos por fracción completa y la probabilidad de "
-    "ganar se recalcula con los residuos históricos del margen. Es una "
-    "estimación histórica agregada, no una pérdida de puntos inventada ni una "
-    "garantía para un partido concreto."
+    "El margen se mueve 5,53 puntos por fracción completa (a favor si falta el "
+    "rival) y la probabilidad de ganar se recalcula con los residuos históricos "
+    "del margen. En la prueba 2025-26 el MAE de margen mejoró de 11,34 a 11,22, "
+    "pero el acierto de ganador no mejoró (69,0% → 68,6%). Es una estimación "
+    "histórica agregada, no una pérdida de puntos inventada ni una garantía para "
+    "un partido concreto."
 )
 INJURY_LIMITATIONS = [
     "ESPN publica el estado y una nota periodística; no garantiza que la baja se "
@@ -176,12 +189,16 @@ INJURY_LIMITATIONS = [
     "El ranking interno usa las medias por partido de 2026-27 y puede estar "
     "afectado por muestras cortas, traspasos o jugadores sin minutos.",
     "El ajuste solo aplica a bajas confirmadas (Out) de jugadores del top-5 con "
-    "estadísticas 2026-27. Día a día, dudas, jugadores sin muestra y cambios de "
-    "última hora no se ajustan.",
+    "al menos 2 partidos y PRA 2026-27. Día a día, dudas, jugadores sin muestra "
+    "y cambios de última hora no se ajustan.",
     "El total del partido y los props no se ajustan: solo cambian el margen, el "
     "ganador y el hándicap. No se modelan minutos ni la sustitución del jugador.",
+    "La calibración histórica define 'ausente' como cualquier jugador del top-5 "
+    "de PRA de la temporada anterior que no jugó, no solo las bajas Out de ESPN; "
+    "la app aplica solo Out, así que el coeficiente es aproximado.",
     "El coeficiente es una estimación histórica agregada, no un impacto específico "
-    "por jugador; la incertidumbre de un partido individual sigue siendo alta.",
+    "por jugador. El holdout 2025-26 dio 8,17 frente a 5,53 y el acierto de "
+    "ganador no mejoró; la incertidumbre de un partido individual sigue siendo alta.",
 ]
 ESPN_TO_NBA = {
     "GS": "GSW",
@@ -3094,7 +3111,7 @@ def upcoming(
             "handicap_note": (
                 "El hándicap sugerido y el ganador probable son estimaciones del "
                 "modelo; incluyen el ajuste por bajas confirmadas cuando "
-                "`injuries=1`. El total no se ajusta. El hándicap y las cuotas de "
+                "`injuries=1`. El total del partido no se ajusta. El hándicap y las cuotas de "
                 "mercado, cuando aparecen, son informativos y pueden cambiar."
             ),
             "games": rows,

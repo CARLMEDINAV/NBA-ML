@@ -321,8 +321,12 @@
     const data = state.data;
     if (!data) return;
     const model = data.adjustment;
+    const holdoutCoefficient = Number(model?.holdout_coefficient_points_per_share);
+    const holdoutDetail = Number.isFinite(holdoutCoefficient)
+      ? ` · holdout ${esc(model.holdout_season || "—")}: ${nf2.format(holdoutCoefficient)}`
+      : "";
     const detail = model
-      ? `<p class="injury-impact-note">Coeficiente: ${nf2.format(Number(model.coefficient_points_per_share))} pts de margen por fracción completa del top-5 · ajuste ${esc(model.fit_season || "—")} (${num(model.fit_team_games, 0)} equipos-partido) → validación ${esc(model.holdout_season || "—")} (${num(model.holdout_team_games, 0)}).</p>`
+      ? `<p class="injury-impact-note">Coeficiente aplicado: ${nf2.format(Number(model.coefficient_points_per_share))} pts de margen por fracción completa del top-5 · estimado ${esc(model.fit_season || "—")} (${num(model.fit_team_games, 0)} equipos-partido)${holdoutDetail} · ${num(model.holdout_team_games, 0)} equipos-partido en el holdout.</p>`
       : "";
     $("#injuriesModelNote").innerHTML = `<div>
       <strong>Cómo afecta al equipo</strong>

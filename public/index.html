@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020">
   <title>NBA Totals · over/under, hándicap y props</title>
   <meta name="description" content="Predicción del total de puntos NBA, hándicap y props de jugadores (PTS, REB, AST, PRA) con datos NBA actualizados.">
-  <link rel="stylesheet" href="/styles.css?v=20261029-2">
+  <link rel="stylesheet" href="/styles.css?v=20261029-3">
 </head>
 <body>
   <div class="page">
@@ -74,7 +74,7 @@
           <div>
             <p class="eyebrow">Calendario</p>
             <h2>Próximos partidos</h2>
-            <p class="muted">Total previsto, intervalo 80% y señal del modelo. El ganador y el hándicap incluyen un ajuste histórico por bajas confirmadas de ESPN; el total no se ajusta.</p>
+            <p class="muted">Total previsto, intervalo 80% y señal del modelo. El ganador y el hándicap incluyen un ajuste histórico por bajas confirmadas de ESPN; el total del partido no se ajusta.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="upcomingRefresh">Actualizar</button>
         </div>
@@ -346,6 +346,7 @@
         <div class="controls-row">
           <label>Días
             <select id="propsDays">
+              <option value="1">1 día</option>
               <option value="3">3 días</option>
               <option value="7" selected>7 días</option>
               <option value="14">14 días</option>
@@ -356,10 +357,14 @@
           </label>
           <label>Jugadores por partido
             <select id="propsLimit">
-              <option value="5">5</option>
-              <option value="8" selected>8</option>
-              <option value="12">12</option>
-              <option value="20">20</option>
+              <optgroup label="Más comunes">
+                <option value="5">5</option>
+                <option value="8" selected>8</option>
+                <option value="12">12</option>
+              </optgroup>
+              <optgroup label="Todos">
+                <option value="20">20</option>
+              </optgroup>
             </select>
           </label>
           <span class="control-note" id="propsRange"></span>
@@ -627,8 +632,8 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/app.js?v=20261029-2" defer></script>
-  <script src="/bet-builder.js?v=20261029-2" defer></script>
-  <script src="/injuries.js?v=20261029-2" defer></script>
+  <script src="/app.js?v=20261029-3" defer></script>
+  <script src="/bet-builder.js?v=20261029-3" defer></script>
+  <script src="/injuries.js?v=20261029-3" defer></script>
 </body>
 </html>

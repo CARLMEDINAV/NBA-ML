@@ -624,7 +624,7 @@ async function loadAnalysis(silent = false) {
       : " Sin cuotas de mercado para esas fechas.";
     const adjustedCount = Number(data.injury_adjusted_games || 0);
     const injuryNote = adjustedCount
-      ? ` ${adjustedCount} partido${adjustedCount === 1 ? "" : "s"} con ajuste por bajas confirmadas; el total no se ajusta.`
+      ? ` ${adjustedCount} partido${adjustedCount === 1 ? "" : "s"} con ajuste por bajas confirmadas; el total del partido no se ajusta.`
       : "";
     $("#analysisNote").textContent = `${games.length} partidos · línea de referencia ${num(data.line, 1)}.${source}${injuryNote} ${data.handicap_note || ""}`;
     notice($("#analysisNotice"), [data.warning, data.injuries_warning].filter(Boolean).join(" "));

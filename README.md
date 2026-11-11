@@ -89,8 +89,8 @@ cada equipo calcula cuántos jugadores hay en el parte y cruza al jugador con su
 medias por partido de 2026-27 (PTS, REB, AST y PRA), su ranking interno y una
 etiqueta de jugador clave cuando está en el top 5 de PRA.
 
-El **total** sigue sin usar lesiones. El **ganador, el margen y el hándicap**
-aplican un ajuste experimental de disponibilidad:
+El **total del partido** sigue sin usar lesiones. El **ganador, el margen y el
+hándicap** aplican un ajuste experimental de disponibilidad:
 
 - Se identifica a los cinco jugadores con más PRA de cada equipo en 2026-27.
 - Solo cuentan las bajas confirmadas (`Out`) que tienen estadísticas y están en
@@ -99,9 +99,21 @@ aplican un ajuste experimental de disponibilidad:
   fracción completa. La probabilidad de ganar se recalcula con los residuos
   históricos del margen.
 - El coeficiente sale de una regresión del margen con efectos fijos de equipo,
-  rival y temporada, entrenada con 2024-25 (2.384 equipos-partido) y validada
-  con 2025-26 (2.400 equipos-partido). En la validación, el coeficiente fue
-  -5,53 puntos por fracción completa.
+  rival y temporada, estimada con 2024-25 (2.384 equipos-partido). El error
+  estándar agrupado por partido es 1,39.
+- En el holdout de 2025-26 (2.400 equipos-partido) el coeficiente aislado fue
+  **8,17** (error estándar 1,40); el coeficiente agrupado de ambas temporadas
+  es 7,53. Se aplica 5,53, la estimación de 2024-25, como corrección
+  conservadora. La magnitud cambia entre temporadas y el coeficiente no es
+  específico por jugador.
+- La calibración histórica define "ausente" como cualquier jugador del top-5
+  de PRA de la temporada anterior que no jugó, no solo las bajas `Out` de ESPN.
+  La app aplica solo `Out`, así que el ajuste es una aproximación.
+- Al aplicar 5,53 sobre las predicciones del modelo de margen entrenado hasta
+  2024-25 y evaluar 2025-26 (1.200 partidos con datos de disponibilidad), el
+  MAE de margen pasó de 11,34 a 11,22 y el R² de 0,206 a 0,222. El acierto de
+  ganador pasó de 69,0% a 68,6%: la mejora de margen no se traduce en mejor
+  acierto de ganador.
 
 Ejemplo: si Luka Dončić (51,0 PRA) y Ziaire Williams (16,5) están de baja, LAL
 pierde aproximadamente 2,6 puntos de margen frente a su top-5. La interfaz
@@ -112,7 +124,7 @@ histórica agregada y la incertidumbre de un partido individual sigue siendo alt
 El ajuste se activa con `injuries=1` en `/api/upcoming`, `/api/predict` y
 `/api/bet-builder/events`; el análisis del ticket lo recibe con
 `"injuries": true`. El Bet Builder incluye además el resumen de disponibilidad
-por partido y advierte que el total no se ajusta.
+por partido y advierte que el total del partido no se ajusta.
 
 ### Bet Builder
 
@@ -509,9 +521,12 @@ futuros no altera sus features.
   `scripts/update_margin_artifact.py` permite añadir el modelo de margen a un
   artefacto ya entrenado sin reentrenar el total.
 - **Ajuste por bajas:** `scripts/calibrate_availability_impact.py` reproduce el
-  coeficiente de disponibilidad. Entrena con 2024-25 y evalúa en 2025-26; el
-  resultado actual es 5,53 puntos de margen por fracción completa de PRA del
-  top-5 ausente, con MAE de margen 12,43 y R² 0,075 en el holdout. Es una
+  coeficiente de disponibilidad. La estimación de 2024-25 es 5,53 puntos de
+  margen por fracción completa de PRA del top-5 ausente (EE agrupado 1,39); el
+  holdout aislado de 2025-26 da 8,17 (EE 1,40) y el agrupado 7,53. Se aplica
+  5,53 como corrección conservadora. La regresión del holdout tiene MAE 12,43 y
+  R² 0,075; al aplicar el ajuste a las predicciones del modelo base, el MAE de
+  margen pasa de 11,34 a 11,22 y el acierto de ganador de 69,0% a 68,6%. Es una
   corrección agregada, no un modelo de minutos.
 
 ### Props de jugadores
