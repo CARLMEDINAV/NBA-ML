@@ -153,12 +153,12 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600208,2026-11-09,20:30,3,Final,HOU,DEN,Toyota Center (Houston),False,110,100,210.0
 0022600209,2026-11-09,21:00,3,Final,PHX,SAS,Mortgage Matchup Center,False,96,122,218.0
 0022600210,2026-11-09,22:00,3,Final,GSW,NOP,Chase Center,False,138,87,225.0
-0022600211,2026-11-10,19:30,1,11/10 - 7:30 PM EST,NYK,MIL,Madison Square Garden,False,0,0,
-0022600212,2026-11-10,20:00,1,11/10 - 8:00 PM EST,PHI,BOS,Xfinity Mobile Arena,False,0,0,
-0022600213,2026-11-10,21:00,1,11/10 - 9:00 PM EST,PHX,LAC,Mortgage Matchup Center,False,0,0,
-0022600214,2026-11-10,21:00,1,11/10 - 9:00 PM EST,UTA,MIA,Delta Center,False,0,0,
-0022600215,2026-11-10,22:00,1,11/10 - 10:00 PM EST,SAC,ORL,Golden 1 Center,False,0,0,
-0022600216,2026-11-10,23:00,1,11/10 - 11:00 PM EST,POR,OKC,Moda Center,False,0,0,
+0022600211,2026-11-10,19:30,3,Final,NYK,MIL,Madison Square Garden,False,117,85,202.0
+0022600212,2026-11-10,20:00,3,Final,PHI,BOS,Xfinity Mobile Arena,False,101,123,224.0
+0022600213,2026-11-10,21:00,3,Final,PHX,LAC,Mortgage Matchup Center,False,133,110,243.0
+0022600214,2026-11-10,21:00,3,Final,UTA,MIA,Delta Center,False,109,115,224.0
+0022600215,2026-11-10,22:00,2,0.1 - 4th,SAC,ORL,Golden 1 Center,False,100,107,
+0022600216,2026-11-10,23:00,2,Halftime,POR,OKC,Moda Center,False,59,59,
 0022600217,2026-11-11,19:00,1,11/11 - 7:00 PM EST,IND,WAS,Gainbridge Fieldhouse,False,0,0,
 0022600218,2026-11-11,19:00,1,11/11 - 7:00 PM EST,NYK,CLE,Madison Square Garden,False,0,0,
 0022600219,2026-11-11,19:00,1,11/11 - 7:00 PM EST,TOR,BOS,Scotiabank Arena,False,0,0,
@@ -182,11 +182,11 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600040,2026-11-13,21:30,1,11/13 - 9:30 PM EST,SAS,GSW,Frost Bank Center,False,0,0,
 0022600041,2026-11-13,22:00,1,11/13 - 10:00 PM EST,SAC,POR,Golden 1 Center,False,0,0,
 0022600042,2026-11-13,22:30,1,11/13 - 10:30 PM EST,LAC,OKC,Intuit Dome,False,0,0,
-0022600231,2026-11-14,19:00,1,7:00 pm ET,NOP,DEN,Smoothie King Center,False,0,0,
-0022600232,2026-11-14,19:30,1,7:30 pm ET,CLE,DAL,Rocket Arena,False,0,0,
-0022600233,2026-11-14,20:00,1,8:00 pm ET,MIA,DET,Kaseya Center,False,0,0,
-0022600234,2026-11-14,20:00,1,8:00 pm ET,MEM,BKN,FedExForum,False,0,0,
-0022600235,2026-11-14,20:00,1,8:00 pm ET,MIN,CHI,Target Center,False,0,0,
+0022600231,2026-11-14,19:00,1,11/14 - 7:00 PM EST,NOP,DEN,Smoothie King Center,False,0,0,
+0022600232,2026-11-14,19:30,1,11/14 - 7:30 PM EST,CLE,DAL,Rocket Arena,False,0,0,
+0022600233,2026-11-14,20:00,1,11/14 - 8:00 PM EST,MIA,DET,Kaseya Center,False,0,0,
+0022600234,2026-11-14,20:00,1,11/14 - 8:00 PM EST,MEM,BKN,FedExForum,False,0,0,
+0022600235,2026-11-14,20:00,1,11/14 - 8:00 PM EST,MIN,CHI,Target Center,False,0,0,
 0022600236,2026-11-15,13:00,1,1:00 pm ET,PHI,IND,Xfinity Mobile Arena,False,0,0,
 0022600237,2026-11-15,16:00,1,4:00 pm ET,PHX,LAL,Mortgage Matchup Center,False,0,0,
 0022600238,2026-11-15,16:30,1,4:30 pm ET,LAC,CHA,Intuit Dome,False,0,0,
