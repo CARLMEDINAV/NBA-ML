@@ -157,8 +157,8 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600212,2026-11-10,20:00,3,Final,PHI,BOS,Xfinity Mobile Arena,False,101,123,224.0
 0022600213,2026-11-10,21:00,3,Final,PHX,LAC,Mortgage Matchup Center,False,133,110,243.0
 0022600214,2026-11-10,21:00,3,Final,UTA,MIA,Delta Center,False,109,115,224.0
-0022600215,2026-11-10,22:00,2,0.1 - 4th,SAC,ORL,Golden 1 Center,False,100,107,
-0022600216,2026-11-10,23:00,2,Halftime,POR,OKC,Moda Center,False,59,59,
+0022600215,2026-11-10,22:00,3,Final,SAC,ORL,Golden 1 Center,False,100,107,207.0
+0022600216,2026-11-10,23:00,3,Final,POR,OKC,Moda Center,False,123,103,226.0
 0022600217,2026-11-11,19:00,1,11/11 - 7:00 PM EST,IND,WAS,Gainbridge Fieldhouse,False,0,0,
 0022600218,2026-11-11,19:00,1,11/11 - 7:00 PM EST,NYK,CLE,Madison Square Garden,False,0,0,
 0022600219,2026-11-11,19:00,1,11/11 - 7:00 PM EST,TOR,BOS,Scotiabank Arena,False,0,0,
