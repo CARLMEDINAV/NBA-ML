@@ -1,3 +1,52 @@
+
+
+@import "tailwindcss";
+
+@layer base {
+  * {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Custom scrollbars for data tables and horizontal tabs */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+
+/* Numeric tabular styling */
+.font-mono-num {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Pulse animation for live markers */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.96); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ==========================================================================
+   CSS ORIGINAL
+   ========================================================================== */
+
 :root {
   color-scheme: dark;
   --bg: #080c18;
@@ -46,6 +95,7 @@ body::before {
     linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
   background-size: 56px 56px;
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 75%);
   mask-image: linear-gradient(to bottom, black, transparent 75%);
 }
 
@@ -77,6 +127,7 @@ code { font-family: var(--mono); color: #cdd8ec; }
     0 26px 70px rgba(0, 0, 0, .48),
     inset 0 1px 0 rgba(255,255,255,.06),
     inset 0 0 42px rgba(23, 74, 145, .1);
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   isolation: isolate;
   z-index: 12;
@@ -369,6 +420,7 @@ h1 span {
   background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
 
@@ -1128,6 +1180,7 @@ body.modal-open { overflow: hidden; }
   place-items: center;
   padding: 18px;
   background: rgba(3, 6, 14, 0.84);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
 .pd-overlay[hidden] { display: none; }
@@ -1850,6 +1903,7 @@ body.modal-open { overflow: hidden; }
     top: calc(12px + env(safe-area-inset-top));
     right: calc(12px + env(safe-area-inset-right));
     background: rgba(11, 18, 33, 0.88);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
   }
   .pd-hero { gap: 11px; padding-right: 40px; }
@@ -2579,6 +2633,7 @@ body.modal-open { overflow: hidden; }
     background: rgba(13,20,39,.96);
     color: var(--text);
     box-shadow: 0 14px 40px rgba(0,0,0,.55);
+    -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
     font: 800 .82rem var(--font);
     cursor: pointer;
