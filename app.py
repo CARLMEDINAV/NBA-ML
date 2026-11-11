@@ -935,10 +935,10 @@ def _likely_defender_payload(
 
 
 def _espn_price(block: dict[str, Any] | None) -> Any:
-    """Precio americano de un bloque de cuota de ESPN (cierre, apertura o actual)."""
+    """Precio americano de un bloque de cuota de ESPN (cierre, actual o apertura)."""
     if not isinstance(block, dict) or not block:
         return None
-    for key in ("close", "open"):
+    for key in ("close", "current", "open"):
         nested = block.get(key) or {}
         if isinstance(nested, dict) and nested.get("odds") is not None:
             return nested.get("odds")
@@ -1097,15 +1097,13 @@ def _directional_label(probability: float | None, line: float) -> str:
     """
     if probability is None:
         return f"Sin cuota · línea {line:.1f}"
-    if probability >= LEAN_OVER:
-        return f"▲ Más de {line:.1f} (Alta)"
+    if probability == 0.5:
+        return f"Pick'em · {line:.1f}"
     if probability > 0.5:
-        return f"▲ Más de {line:.1f} (Leve)"
-    if probability <= LEAN_UNDER:
-        return f"▼ Menos de {line:.1f} (Baja)"
-    if probability < 0.5:
-        return f"▼ Menos de {line:.1f} (Leve)"
-    return f"Pick'em · {line:.1f}"
+        strength = "Alta" if probability >= LEAN_OVER else "Leve"
+        return f"▲ Más de {line:.1f} ({strength})"
+    strength = "Baja" if probability <= LEAN_UNDER else "Leve"
+    return f"▼ Menos de {line:.1f} ({strength})"
 
 
 def _handicap_fields(
@@ -1411,10 +1409,16 @@ def _fetch_espn_injuries_raw() -> tuple[dict[str, Any] | None, bool, str | None]
     return data, False, None
 
 
+@lru_cache(maxsize=1)
 def _injury_player_lookup() -> tuple[
     dict[tuple[str, str], dict[str, Any]], dict[str, list[dict[str, Any]]]
 ]:
-    """Cruza los nombres de ESPN con las medias por partido de 2026-27."""
+    """Cruza los nombres de ESPN con las medias por partido de 2026-27.
+
+    Se cachea porque la foto de estadísticas no cambia durante la vida del
+    proceso (``_players_cached`` también lo está) y el cruce recorre todas las
+    filas; recalcularlo en cada request es caro.
+    """
     try:
         players = _players("2026-27", "pergame")
     except HTTPException:
@@ -1712,6 +1716,43 @@ def _apply_availability_adjustment(
         }
     )
     result["availability"] = availability
+    return result
+
+
+def _predict_for_game(
+    artifact: dict,
+    state: pd.DataFrame,
+    game: Any,
+    line: float,
+    handicap: float | None,
+    injury_index: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """Predice un partido y aplica el ajuste de lesiones si corresponde.
+
+    Devuelve ``None`` cuando el modelo no puede predecir el partido (equipos
+    desconocidos o fecha fuera de rango); así los endpoints solo incrementan
+    el contador de omitidos en un único sitio.
+    """
+    try:
+        result = predict_game(
+            artifact,
+            state,
+            home=str(game.home),
+            away=str(game.away),
+            as_of=pd.Timestamp(game.game_date),
+            line=line,
+            handicap=handicap,
+            warn_stale=False,
+        )
+    except ValueError:
+        return None
+    if injury_index is not None:
+        _apply_availability_adjustment(
+            result,
+            injury_index.get(str(game.home)),
+            injury_index.get(str(game.away)),
+            artifact,
+        )
     return result
 
 
@@ -2414,6 +2455,11 @@ def _bb_event_payload(
     ]
     low, high = result["interval_80"]
     event_date = pd.Timestamp(game.game_date)
+    has_market_odds = any(
+        option.get("decimal_odds") is not None
+        for item in markets
+        for option in item.get("options", [])
+    )
     return {
         "event_id": str(game.game_id),
         "event_label": f"{away_name} @ {home_name}",
@@ -2446,10 +2492,7 @@ def _bb_event_payload(
         "home_rest": result.get("home_rest"),
         "away_rest": result.get("away_rest"),
         "data_state_date": None if state_date is None else state_date.strftime("%Y-%m-%d"),
-        "odds_as_of": odds_as_of if any(
-            item.get("decimal_odds") is not None
-            for item in markets[0].get("options", [])
-        ) else None,
+        "odds_as_of": odds_as_of if has_market_odds else None,
         "data_warning": _prediction_warning(result, event_date),
         "market_source": _bb_source(provider),
         "selectable_markets": sum(
@@ -2502,27 +2545,17 @@ def _bb_events(
         market_total = _bb_market_number(market, "market_total")
         spread = _bb_market_number(market, "market_spread")
         reference_line = market_total if market_total is not None else 225.5
-        try:
-            result = predict_game(
-                artifact,
-                state,
-                home=game.home,
-                away=game.away,
-                as_of=pd.Timestamp(game.game_date),
-                line=reference_line,
-                handicap=spread,
-                warn_stale=False,
-            )
-        except ValueError:
+        result = _predict_for_game(
+            artifact,
+            state,
+            game,
+            reference_line,
+            spread,
+            injury_index=injury_index,
+        )
+        if result is None:
             skipped += 1
             continue
-        if injury_index is not None:
-            _apply_availability_adjustment(
-                result,
-                injury_index.get(str(game.home)),
-                injury_index.get(str(game.away)),
-                artifact,
-            )
         events.append(
             _bb_event_payload(
                 game, result, market, names, state_date, odds_as_of, artifact
@@ -2964,27 +2997,12 @@ def upcoming(
             if spread is not None and not pd.isna(spread):
                 handicap = float(spread)
 
-        try:
-            result = predict_game(
-                artifact,
-                state,
-                home=game.home,
-                away=game.away,
-                as_of=pd.Timestamp(game.game_date),
-                line=line,
-                handicap=handicap,
-                warn_stale=False,
-            )
-        except ValueError:
+        result = _predict_for_game(
+            artifact, state, game, line, handicap, injury_index=injury_index
+        )
+        if result is None:
             skipped += 1
             continue
-        if injury_index is not None:
-            _apply_availability_adjustment(
-                result,
-                injury_index.get(str(game.home)),
-                injury_index.get(str(game.away)),
-                artifact,
-            )
 
         low, high = result["interval_80"]
         probability = float(result["probability_over"])
@@ -3725,7 +3743,7 @@ def player_props(
             "note": (
                 "Proyecciones por partido con un modelo Ridge entrenado con "
                 "game logs 2023-24 a 2026-27 y validado fuera de muestra en "
-                "2025-26. Usan medías móviles, descanso, localía y contexto "
+                "2025-26. Usan medias móviles, descanso, localía y contexto "
                 "del rival; el contexto de equipo es la última foto disponible. "
                 "No incluyen lesiones, alineaciones ni cuotas de props; no es "
                 "consejo de apuestas."
