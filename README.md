@@ -397,7 +397,7 @@ La app pública está pensada para abrirla desde el móvil:
 - **API:** `/api/upcoming`, `/api/results`, `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`, `/api/injuries` y `/api/bet-builder/*`.
 - **Datos:** los modelos y CSV se conservan en el disco persistente de Render bajo `/var/data/artifacts`. El script de inicio copia artefactos iniciales que falten, sin sobrescribir los ya actualizados.
 - **Actualizaciones:** FastAPI ejecuta los procesos de resultados cada 15 minutos y de jugadores/Props cada 6 horas UTC. Se ejecutan en el mismo servicio que monta el disco para evitar que los cron jobs escriban en un filesystem aislado.
-- **Operación:** el servicio Render usa una instancia Starter con disco persistente de 1 GB; revisar el precio mostrado en Render antes de crear el Blueprint. El disco impide el despliegue zero-downtime y el escalado horizontal.
+- **Operación:** el servicio Render usa una instancia de 1 CPU / 2 GB de RAM con disco persistente de 1 GB; revisar el precio mostrado en Render antes de crear el Blueprint. El disco impide el despliegue zero-downtime y el escalado horizontal.
 - **Configuración:** `render.yaml` define el backend y `vercel.json` publica `public/` y configura el proxy de API.
 
 Guía paso a paso: [docs/RENDER_MIGRATION.md](docs/RENDER_MIGRATION.md).
