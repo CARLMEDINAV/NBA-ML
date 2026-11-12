@@ -27,7 +27,7 @@ const state = {
     limit: 25,
     q: "",
   },
-  props: { days: 5, team: "", limit: 8, players: [], selectedPlayerId: "", selectedStat: "pts", line: null, card: null, cardCache: {}, requestId: 0 },
+  props: { days: 5, team: "", limit: 40, players: [], selectedPlayerId: "", selectedStat: "pts", market: "pts", search: "", line: null, card: null, cardCache: {}, requestId: 0 },
   detail: {
     playerId: null,
     data: null,
@@ -836,7 +836,7 @@ async function loadProps(silent = false) {
     const data = await api("/api/player-props", {
       days: state.props.days,
       team: state.props.team,
-      limit: state.props.limit,
+      limit: 40,
     });
     state.loaded.props = true;
     $("#propsRange").textContent = `${data.start} → ${data.end}`;
@@ -877,6 +877,7 @@ async function loadProps(silent = false) {
     }
     if (!state.props.selectedPlayerId && players.length) state.props.selectedPlayerId = String(players[0].player_id);
     renderPropsPlayerOptions();
+    renderPropsPlayerList();
     if (state.props.selectedPlayerId) await loadPropsPlayerCard(state.props.selectedPlayerId, silent);
     else {
       renderPropsAnalyzer();
@@ -900,6 +901,47 @@ async function loadProps(silent = false) {
   } finally {
     setBusy(button, false);
   }
+}
+
+function propsMarketValue(player, market = state.props.market) {
+  if (market === "pra") return Number(player.projected_pra);
+  if (market === "reb") return Number(player.projected_reb);
+  if (market === "ast") return Number(player.projected_ast);
+  return Number(player.projected_pts);
+}
+
+function renderPropsPlayerList() {
+  const list = $("#propsPlayerList");
+  if (!list) return;
+  const market = state.props.market || "pts";
+  const labels = { pts: "PTS", reb: "REB", ast: "AST", pra: "PRA" };
+  const query = (state.props.search || "").trim().toLocaleLowerCase("es");
+  const filtered = state.props.players.filter((player) =>
+    !query || [player.player_name, player.team, player.opponent].some((value) =>
+      String(value || "").toLocaleLowerCase("es").includes(query)
+    )
+  ).sort((a, b) => propsMarketValue(b, market) - propsMarketValue(a, market));
+  const count = $("#propsBoardCount");
+  if (count) count.textContent = filtered.length + (filtered.length === 1 ? " jugador" : " jugadores");
+  if (!filtered.length) {
+    list.innerHTML = '<div class="props-list-empty">No hay jugadores para esta búsqueda o filtro.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map((player) => {
+    const selected = String(player.player_id) === String(state.props.selectedPlayerId);
+    const value = propsMarketValue(player, market);
+    const grade = String(player.grade || "—");
+    const confidence = player.confidence == null ? "" : pct(Number(player.confidence));
+    const matchup = (player.is_home ? "vs " : "@ ") + (player.opponent || "—");
+    const photo = player.headshot_url
+      ? '<img src="' + esc(player.headshot_url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<span class="props-avatar-fallback">' + esc(String(player.player_name || "?").split(/\s+/).map((part) => part[0] || "").slice(0,2).join("").toUpperCase()) + '</span>';
+    return '<button type="button" class="props-player-row' + (selected ? ' is-selected' : '') + '" data-props-player="' + esc(player.player_id) + '" aria-pressed="' + selected + '">' +
+      '<span class="props-row-player">' + photo + '<span><strong>' + esc(player.player_name) + '</strong><small>' + esc(player.team || "—") + ' · ' + esc(String(player.projected_min ?? "—")) + ' min proyectados</small></span></span>' +
+      '<span class="props-row-matchup"><strong>' + esc(matchup) + '</strong><small>' + esc(player.team || "") + '</small></span>' +
+      '<span class="props-row-projection"><strong>' + (Number.isFinite(value) ? num(value) : "—") + '</strong><small>' + labels[market] + '</small></span>' +
+      '<span class="props-row-grade grade-' + esc(grade.toLowerCase()) + '"><strong>' + esc(grade) + '</strong><small>' + esc(confidence || "Nivel") + '</small></span></button>';
+  }).join("");
 }
 
 function renderPropsPlayerOptions() {
@@ -1817,6 +1859,27 @@ function bindEvents() {
     }, 350);
   });
 
+  $("#propsMarket").addEventListener("change", (event) => {
+    state.props.market = event.target.value;
+    renderPropsPlayerList();
+  });
+  $("#propsSearch").addEventListener("input", (event) => {
+    state.props.search = event.target.value || "";
+    renderPropsPlayerList();
+  });
+  $("#propsPlayerList").addEventListener("click", (event) => {
+    const row = event.target.closest("[data-props-player]");
+    if (!row) return;
+    const playerId = row.dataset.propsPlayer;
+    if (!playerId || String(playerId) === String(state.props.selectedPlayerId)) return;
+    state.props.selectedPlayerId = String(playerId);
+    state.props.card = null;
+    state.props.line = null;
+    $("#propsPlayer").value = playerId;
+    renderPropsPlayerList();
+    loadPropsPlayerCard(playerId);
+    $("#propsAnalyzerTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   $("#propsRefresh").addEventListener("click", () => loadProps());
   $("#propsPlayer").addEventListener("change", (event) => {
     state.props.selectedPlayerId = event.target.value;
