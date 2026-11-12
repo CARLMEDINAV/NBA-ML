@@ -16,6 +16,8 @@ dependencies = [
     "pandas>=2.1,<3",
     "python-dateutil>=2.9",
     "scikit-learn>=1.5,<1.8",
+    "uvicorn[standard]>=0.30,<1",
+    "APScheduler>=3.10,<4",
 ]
 
 [project.optional-dependencies]
@@ -41,5 +43,3 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 
-[tool.vercel]
-entrypoint = "app:app"
