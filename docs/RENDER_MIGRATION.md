@@ -23,7 +23,7 @@ Los workflows de actualización de GitHub Actions quedan disponibles solo para e
 
 ## Almacenamiento persistente
 
-`scripts/start_render.py` copia al disco los artefactos versionados que todavía no existan y convierte `artifacts/` en un enlace al disco persistente. Los archivos ya actualizados en producción no se sobrescriben en cada deploy.
+`scripts/start_render.py` copia al disco los artefactos versionados que todavía no existan y convierte `artifacts/` en un enlace al disco persistente. Los modelos versionados (`model.joblib`, `player_props.joblib`), el backtest de entrenamiento y las estadísticas históricas 2025-26 se sincronizan en cada deploy. Los CSV de temporada en curso, estados e historiales actualizados por el scheduler se preservan; solo se copian si todavía faltan.
 
 El servicio usa una sola instancia porque el disco persistente está adjunto a esa instancia. No escalar horizontalmente ni cambiar el punto de montaje sin diseñar antes una estrategia de almacenamiento compartido.
 
