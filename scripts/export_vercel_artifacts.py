@@ -1,4 +1,4 @@
-r"""Copia a ``artifacts/`` la foto minima que necesita la app de Vercel.
+r"""Copia a ``artifacts/`` la foto versionada que inicializa la API de Render.
 
 Vercel no puede escribir en disco ni conservar la cache de ``data/``. Por eso
 versionamos solo el modelo, el estado de los equipos, el calendario, las
