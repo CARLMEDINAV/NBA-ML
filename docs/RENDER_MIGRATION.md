@@ -32,7 +32,7 @@ El servicio usa una sola instancia porque el disco persistente está adjunto a e
 - `NBA_ENABLE_SCHEDULER=1`: habilita las actualizaciones programadas.
 - `NBA_ARTIFACTS_DIR=/var/data/artifacts`: ubicación persistente de modelos y CSV.
 - `NBA_BIO_UPDATE=0`: evita una consulta de biografía que no es necesaria para cada actualización.
-- `CORS_ORIGINS`: dominio de Vercel permitido.
+- `CORS_ORIGINS=*`: permite llamadas del dominio de producción y de las vistas previas de Vercel; la API es pública y no usa cookies de autenticación.
 - `PYTHON_VERSION=3.12.10`: runtime Python.
 
 No se necesitan claves secretas para el despliegue base.
