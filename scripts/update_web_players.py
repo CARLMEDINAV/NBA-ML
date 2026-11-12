@@ -1,8 +1,8 @@
 """Actualiza las estadisticas de jugadores que consume NBA Totals en Render.
 
-Se ejecuta desde el planificador interno de Render cada seis horas. El servicio
-consulta ESPN como fuente alternativa cuando ``stats.nba.com`` no responde de
-forma fiable, asi que la actualizacion usa ESPN como fuente alternativa.
+Se ejecuta desde el planificador interno de Render cada seis horas. La
+actualizacion usa ESPN como fuente de datos porque ``stats.nba.com`` no responde
+de forma fiable desde todos los servidores.
 
 La foto publicada sigue teniendo el mismo esquema que la descarga original de
 la NBA para que la app no necesite cambios.
