@@ -3976,29 +3976,25 @@ def player_card(
             for code, name in names.items()
         }
         name_to_code = {name: code for code, name in opponent_names.items()}
-        history_opponents = (
-            player_history["opponent"]
-            .astype(str)
-            .str.upper()
-            .str.strip()
-            .map(lambda value: name_to_code.get(value, value))
-        )
+
+        def normalize_h2h_team(value: Any) -> str:
+            raw = str(value or "").upper().strip()
+            # Los game logs de ESPN usan abreviaturas distintas para NYK,
+            # GSW, NOP, SAS y WAS. La agenda de la app usa códigos NBA.
+            named = name_to_code.get(raw, raw)
+            return _nba_abbreviation(named)
+
+        history_opponents = player_history["opponent"].map(normalize_h2h_team)
         h2h_mask = history_opponents.eq(opponent)
         if "matchup" in player_history.columns:
             matchup = player_history["matchup"].astype(str).str.upper().str.strip()
-            # El equipo rival puede aparecer a la izquierda o derecha del separador:
-            # "MIL @ TOR", "TOR vs. MIL", etc. No asumimos el orden del matchup.
-            matchup_teams = matchup.str.split(r"\s*(?:@|VS\.?)\s*", regex=True)
-            matchup_mask = matchup_teams.apply(
-                lambda teams: opponent
-                in [name_to_code.get(team.strip(), team.strip()) for team in teams]
-            )
-            # Respaldo para fuentes que guardan el matchup con separadores
-            # distintos o abreviaturas dentro de una cadena más larga.
-            matchup_mask |= matchup.str.contains(
-                rf"(?<![A-Z]){re.escape(opponent)}(?![A-Z])",
-                regex=True,
-                na=False,
+            # Extraemos códigos aunque ESPN cambie el separador o agregue texto.
+            matchup_mask = matchup.apply(
+                lambda value: opponent
+                in [
+                    normalize_h2h_team(token)
+                    for token in re.findall(r"[A-Z]{2,4}", value)
+                ]
             )
             h2h_mask |= matchup_mask
         h2h_rows = player_history.loc[h2h_mask].sort_values(
