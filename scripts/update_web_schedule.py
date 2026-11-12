@@ -1,6 +1,6 @@
-"""Actualiza el calendario/resultados que consume la web de Vercel.
+"""Actualiza el calendario/resultados que consume la API desplegada en Render.
 
-Se ejecuta desde GitHub Actions cada pocos minutos durante la temporada. Los
+Se ejecuta desde el planificador interno de Render cada 15 minutos. El
 runners no alcanzan ``stats.nba.com``, asi que se consultan los marcadores de
 ESPN y se fusionan con el calendario completo ya publicado. Solo se copia el
 CSV cuando hay finales nuevos o cambios estructurales; los cambios de cuarto
