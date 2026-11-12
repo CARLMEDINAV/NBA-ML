@@ -68,7 +68,8 @@
       </div>
     </section>
 
-    <nav class="tabs" role="tablist" aria-label="Secciones">
+    <main id="main">
+      <nav class="tabs" role="tablist" aria-label="Secciones">
       <button class="tab is-active" role="tab" id="tab-btn-upcoming" aria-selected="true" aria-controls="tab-upcoming" data-tab="upcoming">Próximos</button>
       <button class="tab" role="tab" id="tab-btn-betbuilder" aria-selected="false" aria-controls="tab-betbuilder" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-analysis" aria-selected="false" aria-controls="tab-analysis" data-tab="analysis">Análisis</button>
@@ -77,9 +78,7 @@
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
-    </nav>
-
-    <main id="main">
+      </nav>
       <section id="tab-upcoming" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-btn-upcoming">
         <div class="section-head">
           <div>
@@ -117,7 +116,7 @@
             <span class="k">Modelo</span><span class="v">—</span><span class="s">Cargando</span>
           </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Tabla de próximos partidos. Usa las flechas del teclado para desplazarte horizontalmente.">
           <table aria-label="Próximos partidos con proyección de total y hándicap">
             <thead>
               <tr>
