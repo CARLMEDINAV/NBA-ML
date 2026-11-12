@@ -3082,3 +3082,181 @@ button.injury-player-name:hover {
     font-size: .76rem;
   }
 }
+
+
+/* Player card refresh — visual language aligned with the supplied NBA Model Pro reference. */
+:root {
+  --font: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+.pd-modal {
+  width: min(1240px, 100%);
+  padding: 0;
+  border-color: rgba(148, 163, 184, .2);
+  border-radius: 24px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: var(--font);
+}
+.pd-modal-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 54px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, .16);
+  background: rgba(15, 23, 42, .96);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.pd-modal-brand { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.pd-modal-kicker {
+  color: #fbbf24;
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+.pd-modal-title {
+  color: #f8fafc;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.pd-source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(16, 185, 129, .3);
+  border-radius: 6px;
+  background: rgba(16, 185, 129, .1);
+  color: #6ee7b7;
+  font-size: .58rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+.pd-source-pill span { width: 6px; height: 6px; border-radius: 50%; background: #34d399; }
+.pd-modal .pd-close {
+  position: static;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-color: rgba(148, 163, 184, .2);
+  border-radius: 10px;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+.pd-modal-body { padding: 18px; }
+.pd-modal .pd-loading { min-height: 340px; color: #94a3b8; }
+.pd-hero {
+  gap: 18px;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 18px;
+  background: linear-gradient(105deg, rgba(30, 41, 59, .96), rgba(15, 23, 42, .98) 70%);
+}
+.pd-avatar {
+  width: 82px;
+  height: 82px;
+  padding: 0;
+  border: 2px solid #475569;
+  border-radius: 17px;
+  background: #1e293b;
+  box-shadow: 0 12px 28px rgba(0,0,0,.28);
+}
+.pd-avatar .pd-headshot { border-radius: 14px; }
+.pd-headshot-fallback { inset: 0; border-radius: 14px; background: #1e293b; color: #fbbf24; }
+.pd-team-badge { right: -9px; bottom: -8px; border-color: #334155; background: #0f172a; }
+.pd-name-row h2 {
+  font-family: "Chakra Petch", var(--font);
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.pd-chip { border-color: rgba(245, 158, 11, .25); background: rgba(245, 158, 11, .12); color: #fcd34d; }
+.pd-chip-soft { border-color: rgba(148, 163, 184, .16); background: rgba(30, 41, 59, .8); color: #94a3b8; }
+.pd-stat {
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 9px;
+  background: rgba(30, 41, 59, .82);
+  color: #94a3b8;
+}
+.pd-stat b { color: #f8fafc; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pd-tabs { gap: 7px; padding: 3px 0 13px; border-bottom: 1px solid rgba(148, 163, 184, .13); margin-bottom: 14px; }
+.pd-tab {
+  padding: 8px 13px;
+  border-color: rgba(148, 163, 184, .15);
+  border-radius: 9px;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: .7rem;
+}
+.pd-tab.is-active {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #111827;
+  box-shadow: 0 5px 16px rgba(245, 158, 11, .16);
+}
+.pd-layout {
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(245px, 280px);
+  gap: 12px;
+}
+.pd-card {
+  border-color: rgba(148, 163, 184, .15);
+  border-radius: 15px;
+  background: rgba(2, 6, 23, .45);
+}
+.pd-games-panel { padding: 11px; }
+.pd-game-list { max-height: 470px; }
+.pd-game {
+  border: 1px solid rgba(148, 163, 184, .08);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, .78);
+}
+.pd-game:hover { border-color: rgba(245, 158, 11, .3); background: #1e293b; }
+.pd-game.is-next { border-color: rgba(245, 158, 11, .4); background: rgba(245, 158, 11, .08); }
+.pd-game-value { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pd-chart-card { padding: 13px; }
+.pd-chart-head { color: #94a3b8; }
+.pd-line-card, .pd-hit-card, .pd-quick-card, .pd-team-card,
+.pd-efficiency-card, .pd-h2h-card, .pd-defenders-card { padding: 13px; }
+.pd-line-input button, .pd-line-input input { border-color: rgba(148, 163, 184, .18); border-radius: 10px; background: #1e293b; }
+.pd-line-input input { color: #fbbf24; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pd-hit { color: #f8fafc; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pd-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pd-efficiency-card, .pd-h2h-card, .pd-defenders-card { min-width: 0; }
+.pd-note { margin: 14px 2px 0; color: #64748b; font-size: .68rem; line-height: 1.6; }
+.pd-modal button:focus-visible, .pd-modal input:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+@media (max-width: 980px) {
+  .pd-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, .85fr);
+    grid-template-areas: "chart side" "games side" "insights insights";
+  }
+  .pd-game-list { max-height: 330px; }
+}
+@media (max-width: 680px) {
+  .pd-overlay { place-items: start center; padding: 8px; }
+  .pd-modal { max-height: 96vh; border-radius: 17px; }
+  .pd-modal-head { min-height: 48px; padding: 8px 12px; }
+  .pd-modal-brand { gap: 7px; }
+  .pd-modal-kicker { font-size: .55rem; }
+  .pd-modal-title { font-size: .6rem; }
+  .pd-source-pill { font-size: .52rem; padding: 3px 6px; }
+  .pd-modal-body { padding: 11px; }
+  .pd-hero { align-items: flex-start; gap: 12px; padding: 12px; }
+  .pd-avatar { width: 64px; height: 64px; }
+  .pd-name-row h2 { font-size: 1.35rem; }
+  .pd-stats { gap: 5px; }
+  .pd-stat { padding: 5px 7px; font-size: .65rem; }
+  .pd-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chart" "side" "games" "insights"; }
+  .pd-insights { grid-template-columns: minmax(0, 1fr); }
+  .pd-game-list { max-height: 300px; }
+}

@@ -314,12 +314,25 @@ def add_elo(
 
 
 def add_league_context(games: pd.DataFrame) -> pd.DataFrame:
-    """Medias moviles causales del total de la liga (tendencia de epoca)."""
-    result = games.sort_values(["game_date", "game_id"]).copy()
+    """Medias moviles causales del total de la liga (tendencia de epoca).
+
+    Todos los partidos de una misma fecha reciben el mismo contexto: ningun
+    resultado de esa fecha puede entrar en las features de otro partido del dia.
+    """
+    result = games.sort_values(["game_date", "game_id"]).reset_index(drop=True).copy()
+    dates = pd.to_datetime(result["game_date"]).dt.normalize()
+    target_values = pd.to_numeric(result[TARGET], errors="coerce").to_numpy(dtype=float)
+    date_groups = result.groupby(dates, sort=True).indices
+
     for window in LEAGUE_WINDOWS:
-        result[f"league_total_roll{window}"] = (
-            result[TARGET].shift(1).rolling(window, min_periods=20).mean()
-        )
+        values = np.full(len(result), np.nan, dtype=float)
+        for positions in date_groups.values():
+            first_position = int(positions[0])
+            prior = target_values[max(0, first_position - window):first_position]
+            if len(prior) >= 20:
+                values[positions] = float(np.nanmean(prior))
+        result[f"league_total_roll{window}"] = values
+
     return result
 
 

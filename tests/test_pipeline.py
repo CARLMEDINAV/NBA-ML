@@ -12,6 +12,7 @@ from nba_ml.data.build_dataset import (
     LEAGUE_WINDOWS,
     MODEL_FEATURES,
     add_team_features,
+    add_league_context,
     build_feature_row,
     build_team_games,
     build_team_state,
@@ -239,6 +240,27 @@ def test_meta_columns_are_never_features():
 def test_selected_features_exist_in_dataset():
     assert set(SELECTED_FEATURES).issubset(set(MODEL_FEATURES))
     assert len(SELECTED_FEATURES) == len(set(SELECTED_FEATURES))
+
+
+def test_league_context_excludes_all_games_from_the_same_date():
+    dates = list(pd.date_range("2026-01-01", periods=20, freq="D"))
+    frame = pd.DataFrame(
+        {
+            "game_date": dates + [pd.Timestamp("2026-01-21")] * 2,
+            "game_id": [f"{index:03d}" for index in range(22)],
+            "total_points": list(range(200, 220)) + [300, 400],
+        }
+    )
+
+    featured = add_league_context(frame)
+    same_day = featured[featured["game_date"] == pd.Timestamp("2026-01-21")]
+
+    expected = float(np.mean(range(200, 220)))
+    assert len(same_day) == 2
+    for window in LEAGUE_WINDOWS:
+        assert same_day[f"league_total_roll{window}"].tolist() == pytest.approx(
+            [expected, expected]
+        )
 
 
 def test_season_split_is_temporal():

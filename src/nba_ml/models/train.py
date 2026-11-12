@@ -244,6 +244,9 @@ def walk_forward(
     """Entrena con todo el pasado y evalua en cada temporada siguiente."""
     rows: list[dict[str, object]] = []
     residuals: list[np.ndarray] = []
+    # Calibracion estrictamente temporal: cada temporada se evalua usando
+    # solo residuos walk-forward de temporadas anteriores.
+    historical_residuals: list[np.ndarray] = []
 
     for season in seasons:
         train = dataset[dataset["season"].map(season_index) < season_index(season)]
@@ -260,8 +263,20 @@ def walk_forward(
         metrics["season"] = season
         metrics["baseline_mae"] = baseline["mae"]
         metrics["delta_vs_form"] = baseline["mae"] - metrics["mae"]
+        current_residuals = test[TARGET].to_numpy(dtype=float) - predictions
+        if historical_residuals and sum(len(values) for values in historical_residuals) >= 100:
+            calibration_sample = np.concatenate(historical_residuals)
+            q10, q90 = np.quantile(calibration_sample, [0.10, 0.90])
+            metrics["interval_80_coverage"] = float(
+                np.mean((current_residuals >= q10) & (current_residuals <= q90))
+            )
+            metrics["interval_80_width"] = float(q90 - q10)
+        else:
+            metrics["interval_80_coverage"] = float("nan")
+            metrics["interval_80_width"] = float("nan")
         rows.append(metrics)
-        residuals.append(test[TARGET].to_numpy() - predictions)
+        residuals.append(current_residuals)
+        historical_residuals.append(current_residuals)
         LOG.info(
             "Walk-forward %s MAE=%.3f (forma reciente %.3f)",
             season,
@@ -466,11 +481,18 @@ def write_report(
         "",
         _markdown_table(
             walk_rows,
-            ["season", "n", "mae", "baseline_mae", "delta_vs_form", "rmse", "r2", "bias"],
+            [
+                "season", "n", "mae", "baseline_mae", "delta_vs_form",
+                "rmse", "r2", "bias", "interval_80_coverage", "interval_80_width",
+            ],
         ),
         "",
         f"MAE medio walk-forward: **{mean_walk_mae:.2f}** vs **{mean_walk_baseline:.2f}** "
         f"de la forma reciente ({len(walk_rows)} temporadas).",
+        "",
+        "La cobertura del intervalo 80% se evalua secuencialmente: para cada "
+        "temporada se usan exclusivamente residuos de temporadas anteriores. "
+        "Las primeras temporadas sin historial suficiente se muestran como NaN.",
         "",
         "El set completo de 76 features obtuvo un MAE walk-forward medio de 14.90; "
         "el conjunto parsimonioso de 20 features usado aqui, 14.84. Se prioriza el "
