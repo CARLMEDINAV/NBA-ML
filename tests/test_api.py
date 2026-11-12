@@ -492,15 +492,45 @@ def test_results_current_season_uses_only_saved_pregame_predictions(monkeypatch)
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["count"] == 1
+    assert payload["count"] == len(finals)
     assert payload["summary"]["n"] == 1
-    game = payload["games"][0]
-    assert game["actual_margin"] is not None
-    assert game["predicted_margin"] == 3.0
-    assert game["model_handicap"]
-    assert game["possible_winner"]
-    assert game["actual_winner"]
-    assert "snapshot válido" in payload["source"]
+    predicted = next(item for item in payload["games"] if item["predicted_total"] == 225.0)
+    assert predicted["actual_margin"] is not None
+    assert predicted["predicted_margin"] == 3.0
+    assert predicted["model_handicap"]
+    assert predicted["possible_winner"]
+    assert predicted["actual_winner"]
+    assert "predicciones prepartido disponibles" in payload["source"]
+
+
+def test_results_current_season_keeps_finals_without_snapshots(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "_pregame_predictions",
+        lambda: pd.DataFrame(
+            columns=[
+                "game_id",
+                "game_date",
+                "home_team",
+                "away_team",
+                "predicted_total",
+                "predicted_margin",
+                "prediction_created_at",
+            ]
+        ),
+    )
+    response = client.get(
+        "/api/results",
+        params={"season": "2026-27", "today": "2026-10-21", "line": 225.5},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] > 0
+    assert payload["games"]
+    assert payload["summary"]["n"] == 0
+    assert all(game["predicted_total"] is None for game in payload["games"])
+    assert all(game["error"] is None for game in payload["games"])
+    assert all(game["total_points"] is not None for game in payload["games"])
 
 
 def test_static_frontend_is_served():
