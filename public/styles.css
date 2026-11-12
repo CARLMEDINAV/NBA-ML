@@ -3699,3 +3699,28 @@ button.injury-player-name:hover {
 @media(max-width:420px){.props-analyzer-controls{grid-template-columns:1fr}.props-analyzer-controls label:first-child{grid-column:auto}.props-hit-results{grid-template-columns:1fr}}
 
 #propsSummary[hidden],.props-player-summary[hidden]{display:none!important}
+
+
+/* Player props: historial y contexto del matchup */
+.props-history-chart,.props-matchup-context{margin-top:14px;padding:15px;border:1px solid rgba(148,163,184,.14);border-radius:14px;background:rgba(2,6,23,.32)}
+.props-chart-head,.props-context-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.props-chart-head>div{display:grid;gap:3px}.props-chart-head strong,.props-context-head strong{color:#eaf0fa;font-size:.82rem}
+.props-chart-head small,.props-context-head span{color:#8493aa;font-size:.66rem}
+.props-chart-legend{display:flex;align-items:center;gap:6px;color:#9eacc2;font-size:.62rem}
+.props-chart-legend i{width:7px;height:7px;border-radius:50%}.props-chart-legend .over{background:#34d399}.props-chart-legend .under{background:#fb7185;margin-left:5px}
+.props-bars{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:7px;align-items:end;min-height:142px}
+.props-bar-item{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;min-width:0;height:142px}
+.props-bar-item>strong{color:#cbd5e1;font:700 .65rem var(--mono)}
+.props-bar-track{display:flex;align-items:flex-end;justify-content:center;width:100%;height:100px;border-bottom:1px solid rgba(148,163,184,.16);background:linear-gradient(to top,rgba(148,163,184,.035),transparent)}
+.props-bar-track i{display:block;width:min(24px,70%);min-height:4px;border-radius:5px 5px 2px 2px}
+.props-bar-track i.over{background:linear-gradient(180deg,#6ee7b7,#059669)}.props-bar-track i.under{background:linear-gradient(180deg,#fda4af,#e11d48)}
+.props-bar-item>small{max-width:100%;overflow:hidden;color:#8795aa;font:600 .58rem var(--mono);text-overflow:ellipsis;white-space:nowrap}
+.props-chart-line-note{margin-top:9px;color:#718096;font-size:.64rem}
+.props-context-head{margin-bottom:10px}.props-context-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.props-context-cell{display:grid;gap:5px;min-width:0;padding:11px;border:1px solid rgba(148,163,184,.12);border-radius:10px;background:rgba(15,23,42,.45)}
+.props-context-cell small{color:#7f8da4;font:750 .58rem var(--mono);letter-spacing:.07em}
+.props-context-cell strong{overflow:hidden;color:#e2e8f0;font-size:.8rem;text-overflow:ellipsis}
+.props-context-cell span{color:#94a3b8;font-size:.64rem;line-height:1.4}
+.props-context-disclaimer{margin:10px 1px 0;color:#718096;font-size:.63rem;line-height:1.5}
+.props-context-empty{padding:16px;color:#8493aa;text-align:center;font-size:.75rem}
+@media(max-width:560px){.props-bars{gap:3px}.props-bar-item{height:126px}.props-bar-track{height:85px}.props-chart-head{align-items:flex-start;flex-direction:column}.props-context-grid{grid-template-columns:1fr}.props-chart-legend{flex-wrap:wrap}}
