@@ -1,7 +1,7 @@
-"""Actualiza las estadisticas de jugadores que consume la web de Vercel.
+"""Actualiza las estadisticas de jugadores que consume NBA Totals en Render.
 
-Se ejecuta desde GitHub Actions unas pocas veces al dia. Vercel no puede
-consultar ``stats.nba.com`` y los runners de GitHub tampoco lo alcanzan de
+Se ejecuta desde el planificador interno de Render cada seis horas. El servicio
+consulta ESPN como fuente alternativa cuando ``stats.nba.com`` no responde de
 forma fiable, asi que la actualizacion usa ESPN como fuente alternativa.
 
 La foto publicada sigue teniendo el mismo esquema que la descarga original de
