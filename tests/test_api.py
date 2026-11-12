@@ -408,9 +408,16 @@ def test_player_card_detail():
     assert efficiency["usage_gp"] >= 1
     h2h = payload["h2h"]
     assert h2h["opponent"] == payload["upcoming"]["opponent"]
-    assert h2h["games"] >= 1
-    assert h2h["meetings"]
-    assert h2h["averages"]["usage"] is not None
+    # El artefacto visual conserva una muestra reciente y puede no incluir
+    # enfrentamientos contra cada rival. No se deben inventar datos H2H.
+    assert h2h["games"] >= 0
+    assert len(h2h["meetings"]) == min(h2h["games"], 5)
+    if h2h["games"]:
+        assert h2h["meetings"]
+        assert h2h["averages"]["usage"] is not None
+    else:
+        assert h2h["meetings"] == []
+        assert h2h["averages"]["usage"] is None
     assert payload["defenders"]
     defender = payload["defenders"][0]
     assert defender["player_name"]
