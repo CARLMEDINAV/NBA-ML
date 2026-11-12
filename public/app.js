@@ -844,27 +844,9 @@ async function loadProps(silent = false) {
     const players = games.flatMap((game) =>
       (game.players || []).map((player) => ({ ...player, game }))
     );
-    const top = players.reduce(
-      (best, player) =>
-        !best || Number(player.projected_pra) > Number(best.projected_pra) ? player : best,
-      null
-    );
-    const metrics = data.metrics || {};
-    const praMetrics = data.pra_metrics || {};
-    const praSigma = Number(praMetrics.sigma || 0);
-    const gradeCount = players.reduce((counts, player) => {
-      const { grade } = propGradeInfo(player, praSigma);
-      counts[grade] += 1;
-      return counts;
-    }, { A: 0, B: 0, C: 0, D: 0 });
-    $("#propsSummary").innerHTML = [
-      summaryCard("Partidos", String(data.count), `${data.player_count} proyecciones`),
-      summaryCard("Mejor PRA", top ? top.player_name : "—", top ? `${num(top.projected_pra)} PRA · ${top.team}` : ""),
-      summaryCard("Nivel A", String(gradeCount.A), `${players.length} props · confianza 80%+`),
-      summaryCard("MAE PRA", num(praMetrics.mae), "validación 2025-26"),
-      summaryCard("Modelo", data.model_name || "Ridge props", `hasta ${data.trained_through || "—"}`),
-    ].join("");
-    $("#propsSummary").hidden = false;
+    // Se omite el resumen de métricas para dar prioridad a los partidos y props.
+    $("#propsSummary").innerHTML = "";
+    $("#propsSummary").hidden = true;
     const missingTeams = data.teams_without_games || [];
     const missingTeamsText = missingTeams.length
       ? `Aún no hay minutos en 2026-27 para ${missingTeams.join(", ")}; esos equipos aparecen sin proyecciones hasta que jueguen.`
