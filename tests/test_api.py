@@ -1273,3 +1273,13 @@ def test_odds_fallback_fills_missing_hoopsapi_prices(monkeypatch):
     assert row["over_odds"] == "-110"
     assert row["under_odds"] == "-108"
     assert row["market_provider"] == "HoopsAPI + ESPN"
+
+
+def test_bet_builder_accepts_decimal_and_american_market_odds():
+    decimal = app_module._bb_option("Over", "OVER", 0.55, 1.91)
+    american = app_module._bb_option("Under", "UNDER", 0.45, -110)
+
+    assert decimal["decimal_odds"] == pytest.approx(1.91)
+    assert decimal["american_odds"] == -9
+    assert american["decimal_odds"] == pytest.approx(1.909091, rel=1e-5)
+    assert american["american_odds"] == -110
