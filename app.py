@@ -35,7 +35,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / "artifacts"
 
-# Vercel no instala el paquete editable; con esto basta para importar src/.
+# Añade el paquete del proyecto al path para imports en Render y local.
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
