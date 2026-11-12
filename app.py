@@ -12,6 +12,7 @@ Ejecutar en local:
 from __future__ import annotations
 
 import math
+import os
 import re
 import sys
 import time
@@ -124,6 +125,8 @@ LIVE_CACHE_SECONDS = 25
 LIVE_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
 ODDS_CACHE_SECONDS = 300
 ODDS_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
+HOOPSAPI_CACHE_SECONDS = 21600
+HOOPSAPI_CACHE: tuple[float, pd.DataFrame] | None = None
 MAX_ODDS_DATES = 8
 ESPN_INJURIES_URL = (
     "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
@@ -955,6 +958,7 @@ def _fetch_espn_odds(day: pd.Timestamp, schedule: pd.DataFrame) -> pd.DataFrame:
         "market_provider",
         "over_odds",
         "under_odds",
+        "market_bookmakers",
     ]
     key = f"odds:{day:%Y-%m-%d}"
     cached = ODDS_CACHE.get(key)
@@ -1036,6 +1040,7 @@ def _fetch_espn_odds(day: pd.Timestamp, schedule: pd.DataFrame) -> pd.DataFrame:
                 "market_provider": (selected.get("provider") or {}).get("displayName"),
                 "over_odds": _espn_price(over_block),
                 "under_odds": _espn_price(under_block),
+                "market_bookmakers": [],
             }
         )
 
@@ -1044,10 +1049,120 @@ def _fetch_espn_odds(day: pd.Timestamp, schedule: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
+def _normalise_team_name(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def _parse_hoopsapi_odds(payload: dict[str, Any], schedule: pd.DataFrame) -> pd.DataFrame:
+    """Normaliza cuotas HoopsAPI y las enlaza con el calendario local."""
+    columns = [
+        "game_id", "market_spread", "market_total", "market_details",
+        "market_provider", "over_odds", "under_odds", "market_bookmakers",
+    ]
+    names = _team_names(_state())
+    abbreviations = {
+        _normalise_team_name(full_name): abbreviation
+        for abbreviation, full_name in names.items()
+    }
+    schedule_frame = schedule.copy()
+    schedule_frame["game_date"] = pd.to_datetime(schedule_frame["game_date"]).dt.normalize()
+    rows: list[dict[str, Any]] = []
+    for event in payload.get("games", []) if isinstance(payload, dict) else []:
+        try:
+            start = pd.Timestamp(event.get("start_time"))
+            if start.tzinfo is None:
+                start = start.tz_localize("UTC")
+            event_day = start.tz_convert(NBA_ET).normalize().tz_localize(None)
+        except Exception:
+            continue
+        home = abbreviations.get(_normalise_team_name(event.get("home")))
+        away = abbreviations.get(_normalise_team_name(event.get("away")))
+        if not home or not away:
+            continue
+        candidates = schedule_frame[
+            schedule_frame["game_date"].eq(event_day)
+            & schedule_frame["home"].eq(home)
+            & schedule_frame["away"].eq(away)
+        ]
+        if candidates.empty:
+            continue
+
+        full_game = (event.get("periods") or {}).get("ft") or {}
+        books: list[dict[str, Any]] = []
+        spreads: list[float] = []
+        for bookmaker, markets in full_game.items():
+            if not isinstance(markets, dict):
+                continue
+            total = markets.get("total")
+            if isinstance(total, list):
+                total = total[0] if total else None
+            if not isinstance(total, dict):
+                continue
+            try:
+                total_line = float(total.get("line"))
+            except (TypeError, ValueError):
+                continue
+            over = pd.to_numeric(total.get("over"), errors="coerce")
+            under = pd.to_numeric(total.get("under"), errors="coerce")
+            books.append({
+                "bookmaker": str(bookmaker),
+                "line": total_line,
+                "over_odds": float(over) if pd.notna(over) else None,
+                "under_odds": float(under) if pd.notna(under) else None,
+            })
+            spread = markets.get("spread") or {}
+            if isinstance(spread, dict):
+                spread_line = pd.to_numeric(spread.get("line"), errors="coerce")
+                if pd.notna(spread_line):
+                    spreads.append(float(spread_line))
+
+        if not books:
+            continue
+        median_line = float(np.median([item["line"] for item in books]))
+        representative = min(books, key=lambda item: abs(item["line"] - median_line))
+        rows.append({
+            "game_id": str(candidates.iloc[0]["game_id"]),
+            "market_spread": float(np.median(spreads)) if spreads else np.nan,
+            "market_total": median_line,
+            "market_details": f"HoopsAPI · {len(books)} casas",
+            "market_provider": "HoopsAPI",
+            "over_odds": representative["over_odds"],
+            "under_odds": representative["under_odds"],
+            "market_bookmakers": books,
+        })
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _fetch_hoopsapi_odds(schedule: pd.DataFrame) -> pd.DataFrame:
+    """Consulta HoopsAPI con caché de seis horas para limitar el consumo gratuito."""
+    global HOOPSAPI_CACHE
+    api_key = os.getenv("HOOPSAPI_API_KEY", "").strip()
+    if not api_key:
+        return pd.DataFrame()
+    if HOOPSAPI_CACHE and time.time() - HOOPSAPI_CACHE[0] < HOOPSAPI_CACHE_SECONDS:
+        return HOOPSAPI_CACHE[1].copy()
+    try:
+        response = httpx.get(
+            "https://hoopsapi.com/api/v1/games",
+            params={"competition": "NBA"},
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+            timeout=LIVE_TIMEOUT,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        frame = _parse_hoopsapi_odds(response.json(), schedule)
+    except Exception:
+        return pd.DataFrame()
+    HOOPSAPI_CACHE = (time.time(), frame.copy())
+    return frame
+
+
 def _odds_for_dates(
     dates: list[pd.Timestamp], schedule: pd.DataFrame
 ) -> pd.DataFrame:
-    """Descarga cuotas de varias fechas en paralelo (máx. 8 fechas)."""
+    """Prioriza HoopsAPI y completa con ESPN los partidos sin mercado."""
     unique: list[pd.Timestamp] = []
     for value in dates:
         day = pd.Timestamp(value).normalize()
@@ -1057,17 +1172,31 @@ def _odds_for_dates(
     if not unique:
         return pd.DataFrame()
 
-    workers = min(6, len(unique))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        frames = list(pool.map(lambda day: _fetch_espn_odds(day, schedule), unique))
+    hoops = _fetch_hoopsapi_odds(schedule)
+    if not hoops.empty:
+        selected_ids = set(schedule.loc[
+            pd.to_datetime(schedule["game_date"]).dt.normalize().isin(unique), "game_id"
+        ].astype(str))
+        hoops = hoops[hoops["game_id"].astype(str).isin(selected_ids)].copy()
+    covered = set(hoops["game_id"].astype(str)) if not hoops.empty else set()
+    missing_schedule = schedule[
+        pd.to_datetime(schedule["game_date"]).dt.normalize().isin(unique)
+        & ~schedule["game_id"].astype(str).isin(covered)
+    ]
+    missing_dates = sorted(pd.to_datetime(missing_schedule["game_date"]).dt.normalize().unique())
+    frames = [hoops] if not hoops.empty else []
+    if len(missing_dates):
+        workers = min(6, len(missing_dates))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            frames.extend(pool.map(
+                lambda day: _fetch_espn_odds(pd.Timestamp(day), schedule),
+                missing_dates,
+            ))
     frames = [frame for frame in frames if not frame.empty]
     if not frames:
         return pd.DataFrame()
-    return (
-        pd.concat(frames, ignore_index=True)
-        .drop_duplicates(subset=["game_id"], keep="last")
-        .reset_index(drop=True)
-    )
+    combined = pd.concat(frames, ignore_index=True, sort=False)
+    return combined.drop_duplicates(subset=["game_id"], keep="first").reset_index(drop=True)
 
 
 def _total_label(lean: str, line: float) -> str:
@@ -3066,6 +3195,7 @@ def upcoming(
             "market_provider": market.get("market_provider") if market is not None else None,
             "over_odds": market.get("over_odds") if market is not None else None,
             "under_odds": market.get("under_odds") if market is not None else None,
+            "market_bookmakers": market.get("market_bookmakers", []) if market is not None else [],
             "possible_winner": handicap_info["possible_winner"],
             "model_handicap": handicap_info["model_handicap"],
             "model_handicap_line": handicap_info["model_handicap_line"],
@@ -3122,9 +3252,11 @@ def upcoming(
             ),
             "injury_adjustment_note": INJURY_MODEL_NOTE if injuries else None,
             "market_source": (
-                "ESPN / DraftKings"
-                if odds and not market_frame.empty
-                else None
+                "HoopsAPI · casas múltiples"
+                if odds and not market_frame.empty and market_frame.get("market_provider", pd.Series(dtype=str)).astype(str).eq("HoopsAPI").all()
+                else "HoopsAPI + ESPN"
+                if odds and not market_frame.empty and market_frame.get("market_provider", pd.Series(dtype=str)).astype(str).eq("HoopsAPI").any()
+                else "ESPN / DraftKings" if odds and not market_frame.empty else None
             ),
             "handicap_note": (
                 "El hándicap sugerido y el ganador probable son estimaciones del "

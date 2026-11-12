@@ -117,6 +117,46 @@ def test_upcoming_merges_market_odds(monkeypatch):
     assert "Mercado" in matched["analysis"]
 
 
+
+def test_parse_hoopsapi_totals_and_bookmakers():
+    schedule = app_module._schedule()
+    game = schedule.iloc[0]
+    names = app_module._team_names(app_module._state())
+    payload = {
+        "games": [{
+            "start_time": f"{pd.Timestamp(game['game_date']):%Y-%m-%d}T22:00:00Z",
+            "home": names[str(game["home"])],
+            "away": names[str(game["away"])],
+            "periods": {"ft": {
+                "pinnacle": {
+                    "total": {"line": 225.5, "over": 1.91, "under": 1.91},
+                    "spread": {"line": -3.5, "home": 1.90, "away": 1.90},
+                },
+                "fanduel": {
+                    "total": {"line": 226.5, "over": 1.95, "under": 1.87},
+                    "spread": {"line": -4.0, "home": 1.91, "away": 1.89},
+                },
+            }},
+        }]
+    }
+    result = app_module._parse_hoopsapi_odds(payload, schedule)
+    assert len(result) == 1
+    row = result.iloc[0]
+    assert row["game_id"] == str(game["game_id"])
+    assert row["market_total"] == pytest.approx(226.0)
+    assert row["market_spread"] == pytest.approx(-3.75)
+    assert row["market_provider"] == "HoopsAPI"
+    assert len(row["market_bookmakers"]) == 2
+    assert row["market_bookmakers"][0]["over_odds"] == pytest.approx(1.91)
+
+
+def test_hoopsapi_requires_server_side_api_key(monkeypatch):
+    monkeypatch.delenv("HOOPSAPI_API_KEY", raising=False)
+    app_module.HOOPSAPI_CACHE = None
+    result = app_module._fetch_hoopsapi_odds(app_module._schedule())
+    assert result.empty
+
+
 def test_predict_single_game():
     response = client.get(
         "/api/predict",
