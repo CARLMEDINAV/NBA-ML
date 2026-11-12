@@ -376,29 +376,19 @@
           <span class="control-note" id="propsRange"></span>
         </div>
         <div id="propsNotice" class="notice" role="status" hidden></div>
-        <div class="summary-grid" id="propsSummary" aria-live="polite"></div>
-        <div class="props-legend">
-          <span><b>PTS</b> puntos</span>
-          <span><b>REB</b> rebotes</span>
-          <span><b>AST</b> asistencias</span>
-          <span><b>PRA</b> PTS + REB + AST</span>
-          <span><b>PJ</b> partidos jugados en 2026-27</span>
-          <span class="props-grade-legend"><b>Nivel</b> confianza del modelo · A 80-100% · B 65-80% · C 50-65% · D &lt;50%</span>
-        </div>
-        <div class="table-wrap">
-          <table class="props-table" aria-label="Predicciones de props por jugador">
-            <thead>
-              <tr>
-                <th scope="col">Fecha</th><th scope="col">Partido</th><th scope="col">Jugador</th><th scope="col">Equipo</th>
-                <th scope="col" class="num">PTS</th><th scope="col" class="num">REB</th>
-                <th scope="col" class="num">AST</th><th scope="col" class="num">PRA</th>
-                <th scope="col" class="num">Nivel</th>
-                <th scope="col" class="num">PJ</th>
-              </tr>
-            </thead>
-            <tbody id="propsBody"></tbody>
-          </table>
-        </div>
+        <div class="summary-grid" id="propsSummary" aria-live="polite" hidden></div>
+        <section class="props-analyzer" aria-labelledby="propsAnalyzerTitle">
+          <div class="props-analyzer-head"><div><p class="eyebrow">HISTORIAL RECIENTE</p><h3 id="propsAnalyzerTitle">Analizador de Props</h3><p>Selecciona un jugador, una estadística y una línea. Comparamos sus últimos 5 y 10 partidos reales.</p></div><span class="props-live-tag"><i></i> DATOS NBA</span></div>
+          <div class="props-analyzer-controls">
+            <label>Jugador<select id="propsPlayer"><option value="">Cargando jugadores…</option></select></label>
+            <label>Estadística<select id="propsStat"><option value="pts">Puntos (PTS)</option><option value="reb">Rebotes (REB)</option><option value="ast">Asistencias (AST)</option><option value="pra">Puntos + rebotes + asistencias (PRA)</option><option value="pts_ast">Puntos + asistencias</option><option value="pts_reb">Puntos + rebotes</option><option value="reb_ast">Rebotes + asistencias</option><option value="fg3m">Triples anotados (3PM)</option><option value="stl">Robos (STL)</option><option value="blk">Tapones (BLK)</option><option value="stl_blk">Robos + tapones</option><option value="min">Minutos (MIN)</option><option value="dd">Doble-doble (DD)</option><option value="td">Triple-doble (TD)</option></select></label>
+            <label class="props-line-control">Línea<div class="props-line-input"><button type="button" id="propsLineDown" aria-label="Bajar línea">−</button><input id="propsLine" type="number" min="0" max="100" step="0.5" value="20.5" inputmode="decimal"><button type="button" id="propsLineUp" aria-label="Subir línea">+</button></div></label>
+          </div>
+          <div id="propsAnalyzerStatus" class="props-analyzer-status" role="status" aria-live="polite">Selecciona un jugador para analizar sus últimos partidos.</div>
+          <div id="propsPlayerSummary" class="props-player-summary" hidden></div>
+          <div id="propsHitResults" class="props-hit-results"><div class="props-hit-card is-empty"><span>ÚLTIMOS 5</span><strong>—</strong><small>Esperando datos</small></div><div class="props-hit-card is-empty"><span>ÚLTIMOS 10</span><strong>—</strong><small>Esperando datos</small></div></div>
+          <p class="props-analyzer-footnote">Acierto histórico = partidos en que el jugador igualó o superó la línea. La muestra depende de los partidos disponibles; no representa una probabilidad garantizada del próximo encuentro.</p>
+        </section>
         <p class="table-note" id="propsNote"></p>
       </section>
 
