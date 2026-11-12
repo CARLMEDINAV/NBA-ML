@@ -388,87 +388,27 @@ con los residuos fuera de muestra del walk-forward (no se asume normalidad).
 
 ---
 
-## Demo pública en Vercel
+## Demo pública en Vercel + Render
 
 La app pública está pensada para abrirla desde el móvil:
 
-- **Frontend:** `public/` (HTML, CSS y JavaScript, sin build). Incluye una
-  pestaña **Análisis** con la tabla partido a partido: puntos proyectados,
-  total, posible ganador, hándicap sugerido y cuotas over/under; y una pestaña
-  **Props** con PTS, REB, AST y PRA proyectados por jugador. Cada jugador tiene
-  una ficha visual con sus últimos partidos, línea ajustable, acierto histórico,
-  minutos, efectividad, uso, H2H y defensores. La pestaña **Lesiones** muestra
-  el parte de ESPN, el peso estadístico de cada baja y el ajuste de margen
-  estimado; ese ajuste se aplica al ganador y al hándicap, no al total.
-- **API:** `app.py` con FastAPI (`/api/upcoming`, `/api/results`,
-  `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`,
-  `/api/injuries`, `/api/bet-builder/events`). `/api/upcoming?odds=1&analysis=1`
-  añade hándicap, proyecciones por equipo y cuotas de ESPN cuando están
-  disponibles. Añade `injuries=1` para aplicar el ajuste por bajas al ganador,
-  margen y hándicap; `POST /api/bet-builder/analyze` acepta `"injuries": true`.
-- **Datos:** `artifacts/` contiene una foto del modelo de totales, el modelo de
-  props, el estado de los equipos y jugadores, el calendario, las estadísticas
-  de jugadores y el backtest. Vercel no escribe en disco ni conserva la caché de
-  `data/`.
-- **Resultados en vivo:** al abrir la pestaña Resultados (temporada en curso),
-  la API consulta el marcador de la NBA (`stats.nba.com`) con ESPN como
-  respaldo y fusiona los partidos finalizados. La página se refresca sola cada
-  60 segundos; si ambos fallan, usa el calendario cacheado.
-- **Cuotas de mercado:** para partidos próximos, la API consulta el scoreboard
-  de ESPN y extrae el hándicap, el total y las cuotas over/under de DraftKings
-  cuando están publicadas. Se cachean 5 minutos y se marcan siempre como
-  informativas; no hay histórico de líneas de cierre.
-- **Persistencia:** un workflow de GitHub Actions
-  (`.github/workflows/update-results.yml`) revisa los marcadores de ESPN cada
-  15 minutos y fusiona los finales nuevos en
-  `artifacts/schedule_2026_27.csv`. Después recalcula `artifacts/team_state.csv`
-  con los boxscores de equipo de ESPN, para que el descanso, los promedios
-  móviles y el Elo no se queden anclados en 2025-26. El calendario completo de la
-  temporada se conserva; solo se actualizan las fechas cercanas a hoy.
-- **Jugadores y props:** otro workflow
-  (`.github/workflows/update-players.yml`) refresca cada 6 horas
-  `player_stats_2026_27_pergame.csv`, `_totals.csv`, `player_state.csv`,
-  `player_game_logs_recent.csv`, `player_defenders_recent.csv` y
-  `player_bio.csv`. Las estadísticas, los boxscores recientes y el calendario
-  salen de ESPN porque los runners de GitHub no alcanzan `stats.nba.com`. Así
-  los equipos actuales (por ejemplo, Giannis en Miami), las medias móviles de
-  los props, los últimos partidos y la efectividad/uso llegan a la web sin que
-  Vercel tenga que consultar `stats.nba.com`. La biografía y los defensores
-  conservan la foto anterior si la NBA no responde; el workflow lo avisa con
-  una anotación de advertencia en lugar de dejar el artefacto obsoleto en
-  silencio.
+- **Frontend:** `public/` (HTML, CSS y JavaScript estáticos), publicado por Vercel.
+- **Backend:** `app.py` con FastAPI, publicado como Web Service en Render. Vercel reenvía las rutas `/api/*` a `https://nba-totals-api.onrender.com`.
+- **API:** `/api/upcoming`, `/api/results`, `/api/players`, `/api/player-props`, `/api/player-card`, `/api/predict`, `/api/injuries` y `/api/bet-builder/*`.
+- **Datos:** los modelos y CSV se conservan en el disco persistente de Render bajo `/var/data/artifacts`. El script de inicio copia artefactos iniciales que falten, sin sobrescribir los ya actualizados.
+- **Actualizaciones:** FastAPI ejecuta los procesos de resultados cada 15 minutos y de jugadores/Props cada 6 horas UTC. Se ejecutan en el mismo servicio que monta el disco para evitar que los cron jobs escriban en un filesystem aislado.
+- **Operación:** el servicio Render usa una instancia Starter con disco persistente de 1 GB; revisar el precio mostrado en Render antes de crear el Blueprint. El disco impide el despliegue zero-downtime y el escalado horizontal.
+- **Configuración:** `render.yaml` define el backend y `vercel.json` publica `public/` y configura el proxy de API.
 
-Para probarla en local:
+Guía paso a paso: [docs/RENDER_MIGRATION.md](docs/RENDER_MIGRATION.md).
+
+Para probar la API localmente:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app:app --reload --port 8000
-# abrir http://localhost:8000
 ```
 
-Para actualizar la foto que ve Vercel después de descargar/entrenar:
-
-```powershell
-# Opcional: reentrenar props y refrescar su foto actual
-.\.venv\Scripts\python.exe scripts\train_player_props.py
-.\.venv\Scripts\python.exe scripts\update_web_player_props.py
-
-.\.venv\Scripts\python.exe scripts\export_vercel_artifacts.py
-git add artifacts
-git commit -m "Actualiza artefactos de Vercel"
-git push
-```
-
-Vercel detecta FastAPI desde `pyproject.toml`/`requirements.txt` y usa
-`app.py` como entrypoint. La app de Streamlit no se puede ejecutar en Vercel
-(necesita un servidor persistente con WebSockets); por eso la demo pública es
-una versión FastAPI + frontend estático. El dashboard completo sigue disponible
-en local con `nba-ml dashboard`.
-
-> La demo usa una foto de los datos, no se actualiza sola. Las predicciones de
-> la temporada en curso asumen el último estado disponible (2025-26) y avisan
-> cuando los datos están desactualizados.
-
----
+Para probar el frontend localmente, sirve la carpeta `public/` con cualquier servidor estático y configura un proxy de `/api` hacia `http://localhost:8000`.
 
 ## Metodología
 
