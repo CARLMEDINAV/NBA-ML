@@ -463,21 +463,44 @@ def test_results_backtest_2025_26():
     assert game["margin_error"] is not None
 
 
-def test_results_current_season_finals():
+def test_results_current_season_uses_only_saved_pregame_predictions(monkeypatch):
+    schedule = app_module._schedule()
+    finals = schedule[
+        schedule["status"].eq(3) & schedule["total_points"].notna()
+    ]
+    assert not finals.empty
+    game = finals.iloc[0]
+    snapshot = pd.DataFrame(
+        [
+            {
+                "game_id": str(game["game_id"]),
+                "game_date": game["game_date"],
+                "home_team": game["home"],
+                "away_team": game["away"],
+                "predicted_total": 225.0,
+                "predicted_margin": 3.0,
+                "prediction_created_at": "2026-10-21T16:00:00-04:00",
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        app_module, "_pregame_predictions", lambda: snapshot.copy()
+    )
     response = client.get(
         "/api/results",
         params={"season": "2026-27", "today": "2026-10-21", "line": 225.5},
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["count"] >= 11
-    assert payload["summary"]["n"] == payload["count"]
+    assert payload["count"] == 1
+    assert payload["summary"]["n"] == 1
     game = payload["games"][0]
     assert game["actual_margin"] is not None
-    assert game["predicted_margin"] is not None
+    assert game["predicted_margin"] == 3.0
     assert game["model_handicap"]
     assert game["possible_winner"]
     assert game["actual_winner"]
+    assert "snapshot válido" in payload["source"]
 
 
 def test_static_frontend_is_served():
