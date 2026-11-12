@@ -4228,10 +4228,12 @@ def results(
             schedule["status"].eq(3) & schedule["total_points"].notna()
         ].copy()
         snapshots = _pregame_predictions()
+        # Mantener todos los marcadores finales aunque falte un snapshot.
+        # Las métricas se calculan únicamente para partidos con predicción pregame.
         matched = finals.merge(
             snapshots,
             on="game_id",
-            how="inner",
+            how="left",
             suffixes=("", "_prediction"),
             validate="one_to_one",
         )
@@ -4279,9 +4281,10 @@ def results(
                 }
             )
         frame = pd.DataFrame(rows)
+        snapshot_count = int(frame["predicted_total"].notna().sum())
         source = (
-            f"Predicciones prepartido guardadas de {season} · "
-            f"{len(frame)} partidos con snapshot válido"
+            f"Resultados reales de {season} · {len(frame)} partidos finalizados · "
+            f"{snapshot_count} predicciones prepartido disponibles"
         )
         if live_updated:
             source += " · resultados en vivo"
