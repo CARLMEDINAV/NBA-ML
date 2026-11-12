@@ -2409,19 +2409,31 @@ def _bb_option(
     label: str,
     side: str,
     probability: float | None = None,
-    american_odds: Any = None,
+    market_odds: Any = None,
 ) -> dict[str, Any]:
+    """Acepta cuotas americanas de ESPN y decimales de HoopsAPI."""
     decimal = None
-    if american_odds is not None and not pd.isna(american_odds):
+    american = None
+    if market_odds is not None and not pd.isna(market_odds):
         try:
-            decimal = american_to_decimal(float(american_odds))
-        except ValueError:
+            raw = float(market_odds)
+            # Las cuotas americanas válidas están fuera del intervalo (-100, 100).
+            # HoopsAPI entrega cuotas decimales (p. ej. 1.91); ESPN entrega
+            # cuotas americanas (p. ej. -110 o +105).
+            if raw >= 100 or raw <= -100:
+                american = raw
+                decimal = american_to_decimal(raw)
+            elif raw > 1:
+                decimal = raw
+                american = round((raw - 1) * 100) if raw >= 2 else round(-100 / (raw - 1))
+        except (TypeError, ValueError, OverflowError):
             decimal = None
+            american = None
     return {
         "side": side,
         "label": label,
         "probability": _rounded(probability, 6),
-        "american_odds": None if american_odds is None else american_odds,
+        "american_odds": None if american is None else american,
         "decimal_odds": _rounded(decimal, 6),
     }
 
