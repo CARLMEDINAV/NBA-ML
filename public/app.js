@@ -435,7 +435,7 @@ async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
-    loadingRows(tbody, 9, 6);
+    loadingRows(tbody, 11, 6);
     setBusy(button, true);
     notice($("#upcomingNotice"), "");
     $("#upcomingNote").textContent = "";
@@ -447,6 +447,7 @@ async function loadUpcoming(silent = false) {
       team: state.upcoming.team,
       line: state.line,
       live: 1,
+      odds: 1,
       injuries: 1,
     });
     state.loaded.upcoming = true;
@@ -463,7 +464,7 @@ async function loadUpcoming(silent = false) {
     $("#upcomingSummary").setAttribute("aria-busy", "false");
 
     if (!data.games.length) {
-      emptyRow(tbody, 9, "No hay partidos programados en ese rango para el filtro elegido.");
+      emptyRow(tbody, 11, "No hay partidos programados en ese rango para el filtro elegido.");
       $("#upcomingNote").textContent = [
         "Prueba a ampliar los días o quitar el filtro de equipo.",
         data.warning || "",
@@ -487,6 +488,8 @@ async function loadUpcoming(silent = false) {
           <td class="num">${winProbabilityCell(game)}</td>
           <td>${leanPill(game.lean)}</td>
           <td>${esc(game.model_handicap || "—")}</td>
+          <td class="num">${game.market_total != null ? num(game.market_total, 1) : "—"}</td>
+          <td class="num">${esc(game.over_odds ?? "—")} / ${esc(game.under_odds ?? "—")}</td>
         </tr>`
       )
       .join("");
@@ -504,7 +507,7 @@ async function loadUpcoming(silent = false) {
     );
   } catch (error) {
     if (!silent) {
-      emptyRow(tbody, 9, "No se pudieron cargar los próximos partidos.");
+      emptyRow(tbody, 11, "No se pudieron cargar los próximos partidos.");
       notice($("#upcomingNotice"), error.message, true);
       showToast(error.message);
     }
