@@ -3988,7 +3988,7 @@ def player_card(
             matchup = player_history["matchup"].astype(str).str.upper().str.strip()
             # El equipo rival puede aparecer a la izquierda o derecha del separador:
             # "MIL @ TOR", "TOR vs. MIL", etc. No asumimos el orden del matchup.
-            matchup_teams = matchup.str.split(r"\\s*(?:@|VS\\.?)\\s*", regex=True)
+            matchup_teams = matchup.str.split(r"\s*(?:@|VS\.?)\s*", regex=True)
             matchup_mask = matchup_teams.apply(
                 lambda teams: opponent
                 in [name_to_code.get(team.strip(), team.strip()) for team in teams]
