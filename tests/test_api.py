@@ -1280,6 +1280,6 @@ def test_bet_builder_accepts_decimal_and_american_market_odds():
     american = app_module._bb_option("Under", "UNDER", 0.45, -110)
 
     assert decimal["decimal_odds"] == pytest.approx(1.91)
-    assert decimal["american_odds"] == -9
+    assert decimal["american_odds"] == -110
     assert american["decimal_odds"] == pytest.approx(1.909091, rel=1e-5)
     assert american["american_odds"] == -110
