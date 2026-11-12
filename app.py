@@ -1,9 +1,7 @@
-"""API FastAPI y frontend publico para Vercel.
+"""API FastAPI de NBA Totals. El frontend estatico se publica por separado en Vercel.
 
-La app de Streamlit sigue siendo el dashboard completo para uso local. Esta
-version es la que se despliega en Vercel: FastAPI sirve un frontend estatico y
-lee una foto de los artefactos incluida en ``artifacts/`` (modelo, estado de
-equipos, calendario, estadisticas de jugadores y predicciones de test).
+En Render, ``scripts/start_render.py`` enlaza ``artifacts/`` con el disco
+persistente y FastAPI ejecuta las actualizaciones programadas.
 
 Ejecutar en local:
     uvicorn app:app --reload --port 8000
@@ -12,10 +10,14 @@ Ejecutar en local:
 from __future__ import annotations
 
 import math
+import logging
+import os
+import subprocess
 import re
 import sys
 import time
 import unicodedata
+from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
@@ -28,12 +30,10 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / "artifacts"
-PUBLIC_DIR = ROOT / "public"
 
 # Vercel no instala el paquete editable; con esto basta para importar src/.
 if str(ROOT / "src") not in sys.path:
@@ -225,17 +225,117 @@ class BetBuilderAnalyzeIn(BaseModel):
     injuries: bool = False
 
 
+LOGGER = logging.getLogger("nba_totals.runtime")
+
+
+def _clear_runtime_caches() -> None:
+    """Invalida las fotos en memoria después de actualizar artefactos."""
+    for value in tuple(globals().values()):
+        if callable(value) and hasattr(value, "cache_clear"):
+            value.cache_clear()
+    for name in ("LIVE_CACHE", "ODDS_CACHE", "INJURY_CACHE"):
+        cache = globals().get(name)
+        if hasattr(cache, "clear"):
+            cache.clear()
+
+
+def _run_refresh_scripts(scripts: list[str], *, player_job: bool = False) -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT / "src")
+    env.setdefault("NBA_BIO_UPDATE", "0")
+    if player_job:
+        env.setdefault("NBA_STATS_TIMEOUT", "20")
+        env.setdefault("NBA_STATS_RETRIES", "1")
+    for script in scripts:
+        path = ROOT / "scripts" / script
+        LOGGER.info("Iniciando actualización NBA: %s", script)
+        subprocess.run(
+            [sys.executable, str(path)],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            timeout=900,
+        )
+    _clear_runtime_caches()
+    LOGGER.info("Actualización completada: %s", ", ".join(scripts))
+
+
+def _refresh_results() -> None:
+    _run_refresh_scripts(
+        [
+            "update_web_schedule.py",
+            "update_web_team_state.py",
+            "update_web_predictions.py",
+        ]
+    )
+
+
+def _refresh_players() -> None:
+    _run_refresh_scripts(
+        [
+            "update_web_players.py",
+            "update_web_player_props.py",
+            "update_web_defenders.py",
+        ],
+        player_job=True,
+    )
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    scheduler = None
+    if os.getenv("NBA_ENABLE_SCHEDULER", "0").strip().lower() in {"1", "true", "yes"}:
+        from apscheduler.schedulers.background import BackgroundScheduler
+
+        scheduler = BackgroundScheduler(timezone="UTC")
+        scheduler.add_job(
+            _refresh_results,
+            trigger="interval",
+            minutes=15,
+            id="nba-results-refresh",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _refresh_players,
+            trigger="cron",
+            hour="0,6,12,18",
+            minute=0,
+            timezone="UTC",
+            id="nba-players-refresh",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=1800,
+            replace_existing=True,
+        )
+        scheduler.start()
+        LOGGER.info("Planificador NBA activo: resultados cada 15 min; jugadores cada 6 h UTC")
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+
+
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "*").split(",")
+    if origin.strip()
+]
 app = FastAPI(
-    title="NBA ML API",
+    title="NBA Totals API",
     description=(
-        "Prediccion de totales, handicap y props de jugadores "
-        "(PTS, REB, AST y PRA)."
+        "API de predicciones NBA, handicap, lesiones, jugadores y props. "
+        "El frontend estatico se aloja por separado."
     ),
-    version="0.6.1",
+    version="0.7.0",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins or ["*"],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -4410,7 +4510,3 @@ def results(
         }
     )
 
-
-if PUBLIC_DIR.exists():
-    # Debe ir al final: las rutas /api tienen prioridad sobre el mount estatico.
-    app.mount("/", StaticFiles(directory=str(PUBLIC_DIR), html=True), name="static")
