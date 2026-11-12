@@ -3,11 +3,11 @@ services:
     name: nba-totals-api
     runtime: python
     region: oregon
-    plan: starter
+    plan: 1c-2g
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/start_render.py
     healthCheckPath: /api/health
-    autoDeploy: true
+    autoDeployTrigger: checksPass
     disk:
       name: nba-totals-artifacts
       mountPath: /var/data
