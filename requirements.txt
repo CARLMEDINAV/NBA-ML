@@ -1,4 +1,4 @@
-# Dependencias de ejecucion de la API y del despliegue en Vercel.
+# Dependencias de ejecucion de NBA Totals en Render.
 # Para el proyecto completo (pipeline + dashboard) usa:
 #   pip install -e ".[dev,app,pipeline]"
 fastapi>=0.115,<1
@@ -8,3 +8,8 @@ numpy>=1.26,<2.5
 pandas>=2.1,<3
 python-dateutil>=2.9
 scikit-learn>=1.5,<1.8
+
+uvicorn[standard]>=0.30,<1
+APScheduler>=3.10,<4
+nba_api>=1.11,<1.12
+requests>=2.31
