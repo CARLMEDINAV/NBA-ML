@@ -12,6 +12,15 @@ SOURCE_ARTIFACTS = ROOT / "artifacts"
 PERSISTENT_ARTIFACTS = Path(
     os.getenv("NBA_ARTIFACTS_DIR", "/var/data/artifacts")
 ).resolve()
+# Modelos y backtests versionados se sincronizan en cada deploy. Los CSV de
+# temporada en curso e historiales actualizados por el scheduler se preservan.
+SYNC_ON_DEPLOY = {
+    "model.joblib",
+    "player_props.joblib",
+    "test_predictions.csv",
+    "player_stats_2025_26_pergame.csv",
+    "player_stats_2025_26_totals.csv",
+}
 
 
 def prepare_artifacts() -> None:
@@ -22,7 +31,9 @@ def prepare_artifacts() -> None:
     # Los datos actualizados en producción nunca se sobrescriben al desplegar.
     for source in SOURCE_ARTIFACTS.iterdir():
         destination = PERSISTENT_ARTIFACTS / source.name
-        if source.is_file() and not destination.exists():
+        if source.is_file() and (
+            not destination.exists() or source.name in SYNC_ON_DEPLOY
+        ):
             shutil.copy2(source, destination)
 
     if SOURCE_ARTIFACTS.is_symlink():
