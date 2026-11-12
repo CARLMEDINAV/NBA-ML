@@ -3760,3 +3760,6 @@ button.injury-player-name:hover {
 .props-list-empty{padding:28px 12px;border:1px dashed rgba(148,163,184,.18);border-radius:12px;color:#94a3b8;text-align:center;font-size:.78rem}
 @media(max-width:620px){.props-board{padding:12px}.props-board-head{align-items:flex-start}.props-board-filters{grid-template-columns:1fr 1fr}.props-list-head,.props-player-row{grid-template-columns:minmax(0,1fr) 66px 58px;gap:6px}.props-list-head span:nth-child(2),.props-player-row .props-row-matchup{display:none}.props-list-head span:nth-child(3){grid-column:2}.props-list-head span:nth-child(4){grid-column:3}.props-row-player{gap:7px}.props-row-player img,.props-avatar-fallback{flex-basis:32px;width:32px;height:32px}.props-row-player strong{font-size:.7rem}.props-row-player small{font-size:.57rem}.props-row-projection strong{font-size:.88rem}.props-row-grade small{font-size:.55rem}}
 @media(max-width:390px){.props-board-filters{grid-template-columns:1fr}.props-board-head{flex-direction:column}.props-board-count{align-self:flex-start}}
+
+/* El jugador se elige desde la lista; el selector se conserva como fallback accesible */
+.props-analyzer-controls label:first-child{display:none}
