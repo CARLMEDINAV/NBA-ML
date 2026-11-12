@@ -59,6 +59,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="No abre el navegador automaticamente",
     )
 
+    pro_parser = subparsers.add_parser(
+        "dashboard-pro", help="Abre la nueva interfaz NBA MODEL PRO (Streamlit)"
+    )
+    pro_parser.add_argument("--port", type=int, default=8502, help="Puerto local")
+    pro_parser.add_argument(
+        "--no-browser", action="store_true", help="No abre el navegador automaticamente"
+    )
+
     all_parser = subparsers.add_parser("all", help="Pipeline completo")
     all_parser.add_argument("--force", action="store_true", help="Fuerza la descarga")
 
@@ -80,6 +88,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "dashboard":
             from .dashboard import run
+
+            run(port=args.port, open_browser=not args.no_browser)
+            return 0
+
+        if args.command == "dashboard-pro":
+            from .dashboard_pro import run
 
             run(port=args.port, open_browser=not args.no_browser)
             return 0
