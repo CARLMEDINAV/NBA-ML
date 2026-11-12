@@ -3993,6 +3993,13 @@ def player_card(
                 lambda teams: opponent
                 in [name_to_code.get(team.strip(), team.strip()) for team in teams]
             )
+            # Respaldo para fuentes que guardan el matchup con separadores
+            # distintos o abreviaturas dentro de una cadena más larga.
+            matchup_mask |= matchup.str.contains(
+                rf"(?<![A-Z]){re.escape(opponent)}(?![A-Z])",
+                regex=True,
+                na=False,
+            )
             h2h_mask |= matchup_mask
         h2h_rows = player_history.loc[h2h_mask].sort_values(
             ["game_date", "game_id"], ascending=False
