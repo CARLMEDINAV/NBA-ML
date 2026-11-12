@@ -1,6 +1,6 @@
 """Actualiza la foto de jugadores que usa el modelo de props en la web.
 
-Se ejecuta en GitHub Actions. Agrega a ``player_game_logs_recent.csv`` los
+Se ejecuta en Render. Agrega a ``player_game_logs_recent.csv`` los
 boxscores de ESPN que aun no esten en el historico y reconstruye
 ``artifacts/player_state.csv`` con las medias moviles mas recientes. No
 reentrena el modelo: usa los promedios de 2025-26 ya publicados para las
