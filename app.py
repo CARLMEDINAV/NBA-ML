@@ -273,6 +273,22 @@ def _test_predictions_cached() -> pd.DataFrame:
         parse_dates=["game_date"],
     )
 
+@lru_cache(maxsize=1)
+def _pregame_predictions_cached() -> pd.DataFrame:
+    path = ARTIFACTS / "pregame_predictions_2026_27.csv"
+    if not path.exists():
+        return pd.DataFrame(
+            columns=[
+                "game_id", "game_date", "home_team", "away_team",
+                "predicted_total", "predicted_margin", "prediction_created_at",
+            ]
+        )
+    return pd.read_csv(
+        path,
+        dtype={"game_id": str},
+        parse_dates=["game_date"],
+    )
+
 
 @lru_cache(maxsize=8)
 def _players_cached(season: str, mode: str) -> pd.DataFrame:
@@ -360,6 +376,10 @@ def _test_predictions() -> pd.DataFrame:
         return _test_predictions_cached().copy()
     except FileNotFoundError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+def _pregame_predictions() -> pd.DataFrame:
+    return _pregame_predictions_cached().copy()
 
 
 def _players(season: str, mode: str) -> pd.DataFrame:
@@ -4207,51 +4227,62 @@ def results(
         finals = schedule[
             schedule["status"].eq(3) & schedule["total_points"].notna()
         ].copy()
-        state = _state()
+        snapshots = _pregame_predictions()
+        matched = finals.merge(
+            snapshots,
+            on="game_id",
+            how="inner",
+            suffixes=("", "_prediction"),
+            validate="one_to_one",
+        )
         rows: list[dict[str, Any]] = []
-        for game in finals.itertuples(index=False):
-            try:
-                result = predict_game(
-                    artifact,
-                    state,
-                    home=game.home,
-                    away=game.away,
-                    as_of=pd.Timestamp(game.game_date),
-                    line=line,
-                    warn_stale=False,
-                )
-            except ValueError:
-                continue
+        for game in matched.itertuples(index=False):
             home_name = names.get(str(game.home), str(game.home))
             away_name = names.get(str(game.away), str(game.away))
             actual_margin = float(game.home_score) - float(game.away_score)
-            predicted_margin = result.get("predicted_margin")
-            handicap_info = _handicap_fields(result, home_name, away_name, None)
+            predicted_margin = (
+                float(game.predicted_margin)
+                if pd.notna(game.predicted_margin)
+                else None
+            )
+            prediction = {
+                "predicted_margin": predicted_margin,
+                "model_home_spread": (
+                    -predicted_margin if predicted_margin is not None else None
+                ),
+            }
+            handicap_info = _handicap_fields(
+                prediction, home_name, away_name, None
+            )
             rows.append(
                 {
                     "game_date": pd.Timestamp(game.game_date),
-                    "home_team": game.home,
-                    "away_team": game.away,
+                    "home_team": str(game.home),
+                    "away_team": str(game.away),
                     "home_name": home_name,
                     "away_name": away_name,
                     "home_score": float(game.home_score),
                     "away_score": float(game.away_score),
                     "total_points": float(game.total_points),
-                    "predicted_total": float(result["predicted_total"]),
+                    "predicted_total": float(game.predicted_total),
                     "predicted_margin": predicted_margin,
                     "actual_margin": actual_margin,
                     "margin_error": (
-                        float(predicted_margin) - actual_margin
+                        predicted_margin - actual_margin
                         if predicted_margin is not None
                         else None
                     ),
                     "possible_winner": handicap_info["possible_winner"],
                     "model_handicap": handicap_info["model_handicap"],
                     "actual_winner": home_name if actual_margin >= 0 else away_name,
+                    "prediction_created_at": game.prediction_created_at,
                 }
             )
         frame = pd.DataFrame(rows)
-        source = f"Partidos finalizados de {season}"
+        source = (
+            f"Predicciones prepartido guardadas de {season} · "
+            f"{len(frame)} partidos con snapshot válido"
+        )
         if live_updated:
             source += " · resultados en vivo"
     else:
