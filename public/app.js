@@ -824,10 +824,8 @@ async function loadPlayers() {
 }
 
 async function loadProps(silent = false) {
-  const tbody = $("#propsBody");
   const button = $("#propsRefresh");
   if (!silent) {
-    loadingRow(tbody, 10);
     setBusy(button, true);
     notice($("#propsNotice"), "");
     $("#propsSummary").innerHTML = "";
@@ -872,21 +870,19 @@ async function loadProps(silent = false) {
       : "";
     notice($("#propsNotice"), [data.warning, missingTeamsText].filter(Boolean).join(" "));
 
-    if (!players.length) {
-      emptyRow(tbody, 10, "No hay jugadores para esos filtros.");
-      $("#propsNote").textContent = "Prueba a ampliar los días o quitar el filtro de equipo.";
-      return;
-    }
-
     state.props.players = players;
-    renderPropsPlayerOptions();
     if (state.props.selectedPlayerId && !players.some((player) => String(player.player_id) === String(state.props.selectedPlayerId))) {
       state.props.selectedPlayerId = "";
       state.props.card = null;
     }
     if (!state.props.selectedPlayerId && players.length) state.props.selectedPlayerId = String(players[0].player_id);
+    renderPropsPlayerOptions();
     if (state.props.selectedPlayerId) await loadPropsPlayerCard(state.props.selectedPlayerId, silent);
-    else renderPropsAnalyzer();
+    else {
+      renderPropsAnalyzer();
+      $("#propsNote").textContent = "No hay jugadores para esos filtros. Prueba a ampliar los días o quitar el filtro de equipo.";
+      return;
+    }
     const validation = data.validation || {};
     const validationText = validation.from
       ? `Validación ${validation.from} → ${validation.to}: MAE PTS ${num(metrics.pts?.mae)}, REB ${num(metrics.reb?.mae)}, AST ${num(metrics.ast?.mae)}, PRA ${num(praMetrics.mae)}.`
@@ -900,7 +896,6 @@ async function loadProps(silent = false) {
   } catch (error) {
     notice($("#propsNotice"), error.message, true);
     $("#propsAnalyzerStatus").textContent = "No se pudieron cargar los jugadores para el análisis.";
-    notice($("#propsNotice"), error.message, true);
     showToast(error.message);
   } finally {
     setBusy(button, false);
