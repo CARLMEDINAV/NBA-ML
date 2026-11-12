@@ -3697,3 +3697,5 @@ button.injury-player-name:hover {
 .props-analyzer-footnote{margin:14px 1px 0;color:#718096;font-size:.68rem;line-height:1.55}
 @media(max-width:700px){.props-analyzer-head{flex-direction:column;gap:10px}.props-analyzer-controls{grid-template-columns:1fr 1fr}.props-analyzer-controls label:first-child{grid-column:1/-1}.props-player-summary{align-items:flex-start;flex-direction:column}.props-hit-results{gap:8px}.props-hit-card{padding:13px}}
 @media(max-width:420px){.props-analyzer-controls{grid-template-columns:1fr}.props-analyzer-controls label:first-child{grid-column:auto}.props-hit-results{grid-template-columns:1fr}}
+
+#propsSummary[hidden],.props-player-summary[hidden]{display:none!important}
