@@ -435,7 +435,7 @@ async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
-    loadingRows(tbody, 11, 6);
+    loadingRows(tbody, 9, 6);
     setBusy(button, true);
     notice($("#upcomingNotice"), "");
     $("#upcomingNote").textContent = "";
@@ -447,7 +447,6 @@ async function loadUpcoming(silent = false) {
       team: state.upcoming.team,
       line: state.line,
       live: 1,
-      odds: 1,
       injuries: 1,
     });
     state.loaded.upcoming = true;
