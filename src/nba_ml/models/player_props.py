@@ -451,7 +451,7 @@ def predict_player_props(
     home: str,
     away: str,
     game_date: str | pd.Timestamp,
-    limit: int = 40,
+    limit: int = 10,
 ) -> list[dict[str, Any]]:
     """Proyecta PTS, REB, AST y PRA de los jugadores de un partido."""
     home = str(home).upper().strip()
