@@ -3,10 +3,10 @@
 La NBA publica datos de matchup por partido. Este script los resume por
 jugador/defensor y conserva solo los defensores con mas minutos de matchup,
 para que la ficha del jugador pueda mostrar quien lo defendio sin consultar
-``stats.nba.com`` desde Vercel.
+``stats.nba.com`` desde el navegador.
 
-Si la descarga falla, se mantiene el artefacto anterior. El proceso programado no se
-rompe por un timeout aislado.
+Si la descarga falla, se mantiene el artefacto anterior. El proceso programado
+no se rompe por un timeout aislado.
 """
 
 from __future__ import annotations
