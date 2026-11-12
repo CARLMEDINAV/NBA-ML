@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: nba-totals-api
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/start_render.py
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: nba-totals-artifacts
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: NBA_ENABLE_SCHEDULER
+        value: "1"
+      - key: NBA_ARTIFACTS_DIR
+        value: /var/data/artifacts
+      - key: NBA_BIO_UPDATE
+        value: "0"
+      - key: CORS_ORIGINS
+        value: https://nba-ml-flax.vercel.app
