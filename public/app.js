@@ -463,7 +463,7 @@ async function loadUpcoming(silent = false) {
     $("#upcomingSummary").setAttribute("aria-busy", "false");
 
     if (!data.games.length) {
-      emptyRow(tbody, 11, "No hay partidos programados en ese rango para el filtro elegido.");
+      emptyRow(tbody, 9, "No hay partidos programados en ese rango para el filtro elegido.");
       $("#upcomingNote").textContent = [
         "Prueba a ampliar los días o quitar el filtro de equipo.",
         data.warning || "",
@@ -487,8 +487,6 @@ async function loadUpcoming(silent = false) {
           <td class="num">${winProbabilityCell(game)}</td>
           <td>${leanPill(game.lean)}</td>
           <td>${esc(game.model_handicap || "—")}</td>
-          <td class="num">${game.market_total != null ? num(game.market_total, 1) : "—"}</td>
-          <td class="num">${esc(game.over_odds ?? "—")} / ${esc(game.under_odds ?? "—")}</td>
         </tr>`
       )
       .join("");
@@ -506,7 +504,7 @@ async function loadUpcoming(silent = false) {
     );
   } catch (error) {
     if (!silent) {
-      emptyRow(tbody, 11, "No se pudieron cargar los próximos partidos.");
+      emptyRow(tbody, 9, "No se pudieron cargar los próximos partidos.");
       notice($("#upcomingNotice"), error.message, true);
       showToast(error.message);
     }
