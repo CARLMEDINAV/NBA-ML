@@ -5,7 +5,7 @@ jugador/defensor y conserva solo los defensores con mas minutos de matchup,
 para que la ficha del jugador pueda mostrar quien lo defendio sin consultar
 ``stats.nba.com`` desde Vercel.
 
-Si la descarga falla, se mantiene el artefacto anterior. El workflow no se
+Si la descarga falla, se mantiene el artefacto anterior. El proceso programado no se
 rompe por un timeout aislado.
 """
 
