@@ -361,22 +361,24 @@
           <label>Equipo
             <select id="propsTeam"><option value="">Todos</option></select>
           </label>
-          <label>Jugadores por partido
-            <select id="propsLimit">
-              <optgroup label="Más comunes">
-                <option value="5">5</option>
-                <option value="8" selected>8</option>
-                <option value="12">12</option>
-              </optgroup>
-              <optgroup label="Todos">
-                <option value="20">20</option>
-              </optgroup>
-            </select>
-          </label>
           <span class="control-note" id="propsRange"></span>
         </div>
         <div id="propsNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="propsSummary" aria-live="polite" hidden></div>
+        <section class="props-board" aria-label="Listado de jugadores y mercados">
+          <div class="props-board-head">
+            <div><p class="eyebrow">PLAYER PROPS · TODOS LOS PARTIDOS</p><h3>Jugadores disponibles</h3><p>Explora las proyecciones del modelo por mercado. Selecciona un jugador para abrir su historial y contexto.</p></div>
+            <span class="props-board-count" id="propsBoardCount">— jugadores</span>
+          </div>
+          <div class="props-board-filters">
+            <label>Mercado
+              <select id="propsMarket"><option value="pts">Puntos · PTS</option><option value="reb">Rebotes · REB</option><option value="ast">Asistencias · AST</option><option value="pra">Puntos + rebotes + asistencias · PRA</option></select>
+            </label>
+            <label class="props-search-label">Buscar jugador<input id="propsSearch" type="search" placeholder="Nombre o equipo…" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <div class="props-list-head"><span>JUGADOR</span><span>PARTIDO</span><span>PROYECCIÓN</span><span>MODELO</span></div>
+          <div id="propsPlayerList" class="props-player-list" aria-live="polite"><div class="props-list-empty">Cargando jugadores…</div></div>
+        </section>
         <section class="props-analyzer" aria-labelledby="propsAnalyzerTitle">
           <div class="props-analyzer-head"><div><p class="eyebrow">HISTORIAL RECIENTE</p><h3 id="propsAnalyzerTitle">Analizador de Props</h3><p>Selecciona un jugador, una estadística y una línea. Comparamos sus últimos 5 y 10 partidos reales.</p></div><span class="props-live-tag"><i></i> DATOS NBA</span></div>
           <div class="props-analyzer-controls">
