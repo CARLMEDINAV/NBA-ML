@@ -3659,7 +3659,7 @@ def player_props(
     days: int = Query(7, ge=1, le=14),
     team: str | None = None,
     today: str | None = None,
-    limit: int = Query(40, ge=1, le=40),
+    limit: int = Query(10, ge=1, le=20),
 ) -> JSONResponse:
     artifact = _player_props()
     player_state = _player_state()
