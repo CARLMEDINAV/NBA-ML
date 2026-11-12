@@ -79,16 +79,16 @@
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
       </nav>
-      <section id="tab-upcoming" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-btn-upcoming">
+      <section id="tab-upcoming" class="tab-panel is-active upcoming-section" role="tabpanel" aria-labelledby="tab-btn-upcoming">
         <div class="section-head">
           <div>
             <p class="eyebrow">Calendario</p>
             <h2>Próximos partidos</h2>
-            <p class="muted">Total previsto, intervalo 80% y señal del modelo. El ganador y el hándicap incluyen un ajuste histórico por bajas confirmadas de ESPN; el total del partido no se ajusta.</p>
+            <p class="muted">Proyecciones de puntos, probabilidades e intervalo de confianza para los próximos encuentros. Las señales son estimaciones del modelo, no garantías de resultado.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="upcomingRefresh">Actualizar</button>
         </div>
-        <div class="controls-row">
+        <div class="controls-row upcoming-filters" aria-label="Filtros de próximos partidos">
           <label>Días
             <select id="upcomingDays">
               <option value="1">1 día</option>
@@ -116,12 +116,12 @@
             <span class="k">Modelo</span><span class="v">—</span><span class="s">Cargando</span>
           </div>
         </div>
-        <div class="table-wrap" tabindex="0" role="region" aria-label="Tabla de próximos partidos. Usa las flechas del teclado para desplazarte horizontalmente.">
-          <table aria-label="Próximos partidos con proyección de total y hándicap">
+        <div class="table-wrap upcoming-table-wrap" tabindex="0" role="region" aria-label="Tabla de próximos partidos. Usa las flechas del teclado para desplazarte horizontalmente.">
+          <table class="upcoming-table" aria-label="Próximos partidos con proyección de total y hándicap">
             <thead>
               <tr>
                 <th scope="col">Fecha</th><th scope="col">Hora ET</th><th scope="col">Partido</th>
-                <th scope="col" class="num">Total</th><th scope="col">IC 80%</th><th scope="col" class="num">P(over)</th><th scope="col" class="num">P(local)</th><th scope="col">Señal</th><th scope="col">Hándicap</th>
+                <th scope="col" class="num">Total</th><th scope="col" title="Intervalo de confianza estimado que contiene el 80% de los resultados esperados">IC 80%</th><th scope="col" class="num" title="Probabilidad estimada de que el total supere la línea de referencia">P(over)</th><th scope="col" class="num" title="Probabilidad estimada de victoria del equipo local">P(local)</th><th scope="col">Señal</th><th scope="col">Hándicap</th>
               </tr>
             </thead>
             <tbody id="upcomingBody">
@@ -137,15 +137,16 @@
         <p class="table-note" id="upcomingNote"></p>
       </section>
 
-      <section id="tab-analysis" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-analysis" hidden>
+      <section id="tab-analysis" class="tab-panel analysis-section" role="tabpanel" aria-labelledby="tab-btn-analysis" hidden>
         <div class="section-head">
           <div>
             <p class="eyebrow">Partido a partido</p>
             <h2>Análisis y hándicap</h2>
+            <p class="muted">Compara proyecciones por equipo, lectura del mercado y ventaja estimada antes de cada partido.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="analysisRefresh">Actualizar</button>
         </div>
-        <div class="controls-row">
+        <div class="controls-row analysis-filters" aria-label="Filtros de análisis">
           <label>Días
             <select id="analysisDays">
               <option value="3">3 días</option>
@@ -159,7 +160,7 @@
         </div>
         <div id="analysisNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="analysisSummary" aria-live="polite"></div>
-        <div class="table-wrap">
+        <div class="table-wrap analysis-table-wrap" tabindex="0" role="region" aria-label="Tabla de análisis por partido. Usa las flechas del teclado para desplazarte horizontalmente.">
           <table class="analysis-table" aria-label="Análisis por partido: proyecciones, ganador y hándicap">
             <thead>
               <tr>
