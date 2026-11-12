@@ -839,6 +839,8 @@ async function loadProps(silent = false) {
       limit: state.props.limit,
     });
     state.loaded.props = true;
+    const metrics = data.metrics || {};
+    const praMetrics = data.pra_metrics || {};
     $("#propsRange").textContent = `${data.start} → ${data.end}`;
     const games = data.games || [];
     const players = games.flatMap((game) =>
