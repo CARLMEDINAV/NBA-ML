@@ -547,7 +547,7 @@ async function loadAnalysis(silent = false) {
     $("#analysisSummary").innerHTML = [
       summaryCard("Partidos", String(games.length), `${overSignals} over · ${underSignals} under`),
       summaryCard("Línea", num(data.line, 1), "referencia"),
-      summaryCard("Cuotas", data.market_source ? "ESPN" : "—", data.market_source || "sin mercado"),
+      summaryCard("Cuotas", data.market_source || "—", data.market_source ? "líneas Over/Under" : "sin mercado"),
     ].join("");
 
     if (!games.length) {
@@ -593,6 +593,9 @@ async function loadAnalysis(silent = false) {
       .map((game) => {
         const hasMarketTotal = game.market_total !== null && game.market_total !== undefined;
         const side = hasMarketTotal ? game.market_total_side : game.total_side;
+        const bookmakerLines = (game.market_bookmakers || [])
+          .map((book) => `${esc(book.bookmaker)} ${num(book.line)} · O ${Number.isFinite(Number(book.over_odds)) ? Number(book.over_odds).toFixed(2) : "—"} / U ${Number.isFinite(Number(book.under_odds)) ? Number(book.under_odds).toFixed(2) : "—"}`)
+          .join(" | ");
         return `
         <article class="analysis-card">
           <div class="analysis-card-head">
@@ -611,6 +614,7 @@ async function loadAnalysis(silent = false) {
             <div><span>Ajuste por bajas</span><strong>${availabilityHtml(game.availability) || "Sin bajas clave"}</strong></div>
             <div><span>Mercado</span><strong>${esc(game.market_handicap || "Sin cuota")}${hasMarketTotal ? ` · ${num(game.market_total)}` : ""}</strong></div>
             <div><span>Cuotas over/under</span><strong>${esc(game.over_odds || "—")} / ${esc(game.under_odds || "—")}</strong></div>
+            <div><span>Comparación de casas</span><strong>${bookmakerLines ? esc(bookmakerLines) : "No disponible"}</strong></div>
           </div>
           <p class="analysis-text">${esc(game.analysis || "Sin análisis disponible.")}</p>
         </article>`;
