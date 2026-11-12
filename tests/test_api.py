@@ -1,6 +1,8 @@
-"""Tests de la API publica que se despliega en Vercel."""
+"""Tests de la API de NBA Totals y del paquete estatico para Vercel."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -10,6 +12,11 @@ import app as app_module
 from app import app
 
 client = TestClient(app)
+PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
+
+
+def _public_text(filename: str) -> str:
+    return (PUBLIC_DIR / filename).read_text(encoding="utf-8")
 
 
 def test_health():
@@ -503,69 +510,69 @@ def test_results_current_season_uses_only_saved_pregame_predictions(monkeypatch)
     assert "snapshot válido" in payload["source"]
 
 
-def test_static_frontend_is_served():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "NBA Totals" in response.text
-    assert "Próximos" in response.text
-    assert "Análisis" in response.text
-    assert "Handicap sugerido" in response.text
-    assert "Jugadores" in response.text
-    assert "Lesiones y bajas" in response.text
-    assert 'id="injuriesList"' in response.text
-    assert "/injuries.js" in response.text
-    assert "Props" in response.text
-    assert "Predicciones de jugadores" in response.text
-    assert 'id="playerDetail"' in response.text
-    assert 'id="pdEfficiency"' in response.text
-    assert 'id="pdH2H"' in response.text
-    assert 'id="pdLikelyDefender"' in response.text
-    assert 'id="pdDefenders"' in response.text
-    assert 'id="upcomingSummary" aria-busy="true"' in response.text
-    assert 'class="loading skeleton-row"' in response.text
-    assert "ajuste histórico por bajas confirmadas" in response.text
-    assert "VER ANÁLISIS DEL PARTIDO" in response.text
+def test_static_frontend_assets_are_bundled_for_vercel():
+    index = _public_text("index.html")
+    assert "NBA Totals" in index
+    assert "Próximos" in index
+    assert "Análisis" in index
+    assert "Handicap sugerido" in index
+    assert "Jugadores" in index
+    assert "Lesiones y bajas" in index
+    assert 'id="injuriesList"' in index
+    assert "/injuries.js" in index
+    assert "Props" in index
+    assert "Predicciones de jugadores" in index
+    assert 'id="playerDetail"' in index
+    assert 'id="pdEfficiency"' in index
+    assert 'id="pdH2H"' in index
+    assert 'id="pdLikelyDefender"' in index
+    assert 'id="pdDefenders"' in index
+    assert 'id="upcomingSummary" aria-busy="true"' in index
+    assert 'class="loading skeleton-row"' in index
+    assert "ajuste histórico por bajas confirmadas" in index
+    assert "VER ANÁLISIS DEL PARTIDO" in index
 
 
 def test_static_javascript_includes_player_headshots():
-    response = client.get("/app.js")
-    assert response.status_code == 200
-    assert "player-headshot" in response.text
-    assert "cdn.nba.com/headshots" in response.text
-    assert "/api/player-props" in response.text
-    assert "/api/player-card" in response.text
-    assert "loadProps" in response.text
-    assert "openPlayerDetail" in response.text
-    assert "renderDetailEfficiency" in response.text
-    assert "renderDetailH2H" in response.text
-    assert "renderDetailDefenders" in response.text
-    assert "loadingRows" in response.text
-    assert "skeleton-row" in response.text
-    assert 'label: "MIN"' in response.text
-    assert "Ajuste por bajas" in response.text
-    assert "injuries: 1" in response.text
+    script = _public_text("app.js")
+    assert "player-headshot" in script
+    assert "cdn.nba.com/headshots" in script
+    assert "/api/player-props" in script
+    assert "/api/player-card" in script
+    assert "loadProps" in script
+    assert "openPlayerDetail" in script
+    assert "renderDetailEfficiency" in script
+    assert "renderDetailH2H" in script
+    assert "renderDetailDefenders" in script
+    assert "loadingRows" in script
+    assert "skeleton-row" in script
+    assert 'label: "MIN"' in script
+    assert "Ajuste por bajas" in script
+    assert "injuries: 1" in script
 
 
 def test_static_styles_reserve_layout_space():
-    response = client.get("/styles.css")
-    assert response.status_code == 200
-    assert "scrollbar-gutter: stable" in response.text
-    assert ".skeleton-bar" in response.text
-    assert ".control-note" in response.text
-    assert "min-height: 1.55em" in response.text
+    styles = _public_text("styles.css")
+    assert "scrollbar-gutter: stable" in styles
+    assert ".skeleton-bar" in styles
+    assert ".control-note" in styles
+    assert "min-height: 1.55em" in styles
 
 
 def test_static_injuries_javascript_contract():
-    response = client.get("/injuries.js")
-    assert response.status_code == 200
-    assert "/api/injuries" in response.text
-    assert "model_note" in response.text
-    assert "data-player-id" in response.text
-    assert "injuries:activate" in response.text
-    assert "injury-adjust" in response.text
-    assert "Ajuste de margen" in response.text
-    assert "Coeficiente aplicado" in response.text
-    assert "holdout_coefficient_points_per_share" in response.text
+    script = _public_text("injuries.js")
+    assert "/api/injuries" in script
+    assert "model_note" in script
+    assert "data-player-id" in script
+    assert "injuries:activate" in script
+    assert "injury-adjust" in script
+    assert "Ajuste de margen" in script
+    assert "Coeficiente aplicado" in script
+    assert "holdout_coefficient_points_per_share" in script
+
+
+def test_api_does_not_serve_frontend_files():
+    assert client.get("/").status_code == 404
 
 
 def test_bet_builder_events_contract(monkeypatch):
