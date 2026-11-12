@@ -1162,7 +1162,7 @@ def _fetch_hoopsapi_odds(schedule: pd.DataFrame) -> pd.DataFrame:
 def _odds_for_dates(
     dates: list[pd.Timestamp], schedule: pd.DataFrame
 ) -> pd.DataFrame:
-    """Prioriza HoopsAPI y completa con ESPN los partidos sin mercado."""
+    """Prioriza HoopsAPI y completa mercados/cuotas incompletos con ESPN."""
     unique: list[pd.Timestamp] = []
     for value in dates:
         day = pd.Timestamp(value).normalize()
@@ -1172,31 +1172,92 @@ def _odds_for_dates(
     if not unique:
         return pd.DataFrame()
 
+    selected_schedule = schedule[
+        pd.to_datetime(schedule["game_date"]).dt.normalize().isin(unique)
+    ].copy()
+    if selected_schedule.empty:
+        return pd.DataFrame()
+
     hoops = _fetch_hoopsapi_odds(schedule)
     if not hoops.empty:
-        selected_ids = set(schedule.loc[
-            pd.to_datetime(schedule["game_date"]).dt.normalize().isin(unique), "game_id"
-        ].astype(str))
+        selected_ids = set(selected_schedule["game_id"].astype(str))
         hoops = hoops[hoops["game_id"].astype(str).isin(selected_ids)].copy()
-    covered = set(hoops["game_id"].astype(str)) if not hoops.empty else set()
-    missing_schedule = schedule[
-        pd.to_datetime(schedule["game_date"]).dt.normalize().isin(unique)
-        & ~schedule["game_id"].astype(str).isin(covered)
+
+    # Una fila de HoopsAPI no basta: a veces trae la línea pero no los precios.
+    # En esos casos también consultamos ESPN para completar Over/Under.
+    hoops_by_id = (
+        hoops.set_index(hoops["game_id"].astype(str), drop=False)
+        if not hoops.empty else pd.DataFrame()
+    )
+    fallback_ids: set[str] = set()
+    for row in selected_schedule.itertuples(index=False):
+        game_id = str(row.game_id)
+        if hoops.empty or game_id not in hoops_by_id.index:
+            fallback_ids.add(game_id)
+            continue
+        market = hoops_by_id.loc[game_id]
+        if isinstance(market, pd.DataFrame):
+            market = market.iloc[0]
+        if (
+            pd.isna(market.get("market_total"))
+            or pd.isna(market.get("over_odds"))
+            or pd.isna(market.get("under_odds"))
+        ):
+            fallback_ids.add(game_id)
+
+    fallback_schedule = selected_schedule[
+        selected_schedule["game_id"].astype(str).isin(fallback_ids)
     ]
-    missing_dates = sorted(pd.to_datetime(missing_schedule["game_date"]).dt.normalize().unique())
-    frames = [hoops] if not hoops.empty else []
-    if len(missing_dates):
-        workers = min(6, len(missing_dates))
+    fallback_dates = sorted(
+        pd.to_datetime(fallback_schedule["game_date"]).dt.normalize().unique()
+    )
+    espn_frames: list[pd.DataFrame] = []
+    if fallback_dates:
+        workers = min(6, len(fallback_dates))
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            frames.extend(pool.map(
+            espn_frames = list(pool.map(
                 lambda day: _fetch_espn_odds(pd.Timestamp(day), schedule),
-                missing_dates,
+                fallback_dates,
             ))
-    frames = [frame for frame in frames if not frame.empty]
-    if not frames:
-        return pd.DataFrame()
-    combined = pd.concat(frames, ignore_index=True, sort=False)
-    return combined.drop_duplicates(subset=["game_id"], keep="first").reset_index(drop=True)
+
+    espn_frames = [frame for frame in espn_frames if not frame.empty]
+    if hoops.empty:
+        return (
+            pd.concat(espn_frames, ignore_index=True, sort=False)
+            .drop_duplicates(subset=["game_id"], keep="first")
+            .reset_index(drop=True)
+            if espn_frames else pd.DataFrame()
+        )
+
+    combined = hoops.copy()
+    if espn_frames:
+        espn = pd.concat(espn_frames, ignore_index=True, sort=False)
+        espn = espn.drop_duplicates(subset=["game_id"], keep="first")
+        combined = combined.set_index(combined["game_id"].astype(str), drop=False)
+        espn = espn.set_index(espn["game_id"].astype(str), drop=False)
+        for game_id, fallback in espn.iterrows():
+            if game_id not in fallback_ids:
+                continue
+            if game_id not in combined.index:
+                combined.loc[game_id] = fallback
+                continue
+            for column in (
+                "market_spread", "market_total", "market_details",
+                "market_provider", "over_odds", "under_odds",
+            ):
+                current = combined.at[game_id, column]
+                if current is None or pd.isna(current):
+                    combined.at[game_id, column] = fallback.get(column)
+            current_books = combined.at[game_id, "market_bookmakers"]
+            if not isinstance(current_books, list) or not current_books:
+                combined.at[game_id, "market_bookmakers"] = fallback.get(
+                    "market_bookmakers", []
+                )
+            if combined.at[game_id, "market_provider"] == "HoopsAPI":
+                combined.at[game_id, "market_provider"] = "HoopsAPI + ESPN"
+        return combined.reset_index(drop=True)
+
+    return combined.reset_index(drop=True)
 
 
 def _total_label(lean: str, line: float) -> str:
