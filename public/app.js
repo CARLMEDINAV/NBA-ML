@@ -953,20 +953,22 @@ function renderPropsAnalyzer() {
   const status = $("#propsAnalyzerStatus");
   const summary = $("#propsPlayerSummary");
   const results = $("#propsHitResults");
+  const chart = $("#propsHistoryChart");
+  const context = $("#propsMatchupContext");
   const lineInput = $("#propsLine");
   if (lineInput && document.activeElement !== lineInput) lineInput.value = line.toFixed(1);
   if (!card) {
     if (summary) summary.hidden = true;
     if (results) results.innerHTML = [5,10].map((n) => '<div class="props-hit-card is-empty"><span>ÚLTIMOS ' + n + '</span><strong>—</strong><small>Esperando datos</small></div>').join("");
+    if (chart) chart.innerHTML = "";
+    if (context) context.innerHTML = "";
     if (status && !status.textContent.includes("No se pudo")) status.textContent = state.props.selectedPlayerId ? "Cargando historial del jugador…" : "Selecciona un jugador para analizar sus últimos partidos.";
     return;
   }
   const player = card.player || {};
-  // La API suele entregar los partidos del más reciente al más antiguo;
-  // ordenamos explícitamente para que L5/L10 siempre representen los juegos recientes.
   const games = (Array.isArray(card.games) ? card.games : [])
     .slice()
-    .sort((a, b) => String(b.game_date || "").localeCompare(String(a.game_date || "")));
+    .sort((a, b) => String(b.game_date || b.date || "").localeCompare(String(a.game_date || a.date || "")));
   const requiredFields = {
     pts: ["pts"], reb: ["reb"], ast: ["ast"], min: ["min"],
     stl: ["stl"], blk: ["blk"], fg3m: ["fg3m"],
@@ -977,8 +979,7 @@ function renderPropsAnalyzer() {
   const hasStatData = (game) => (requiredFields[stat] || [stat]).every((key) =>
     game[key] !== null && game[key] !== undefined && game[key] !== "" && Number.isFinite(Number(game[key]))
   );
-  const values = games
-    .filter(hasStatData)
+  const values = games.filter(hasStatData)
     .map((game) => ({ game, value: pdStatValue(game, stat) }))
     .filter((item) => Number.isFinite(item.value));
   const buildCard = (items, label) => {
@@ -996,7 +997,51 @@ function renderPropsAnalyzer() {
     summary.innerHTML = '<div class="props-player-identity">' + (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.remove()">' : "") + '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + esc(player.season || "") + ' · ' + games.length + ' partidos recientes</small></div></div><span class="props-selected-stat">' + esc(statLabel) + ' · L5 / L10</span>';
   }
   if (results) results.innerHTML = buildCard(values.slice(0,5), "ÚLTIMOS 5") + buildCard(values.slice(0,10), "ÚLTIMOS 10");
-  if (status) status.textContent = values.length ? "Línea de " + num(line) + " " + statLabel + ". Se cuentan valores iguales o superiores a la línea." : "No hay partidos recientes con datos para esta estadística.";
+
+  const lastTen = values.slice(0,10).reverse();
+  if (chart) {
+    if (!lastTen.length) {
+      chart.innerHTML = '<div class="props-context-empty">Sin partidos suficientes para dibujar el historial.</div>';
+    } else {
+      const maxValue = Math.max(line, ...lastTen.map((item) => item.value), 1);
+      const scaleMax = maxValue * 1.18;
+      chart.innerHTML = '<div class="props-chart-head"><div><strong>Últimos ' + lastTen.length + ' partidos</strong><small>Rendimiento real vs. línea ' + num(line) + ' ' + esc(statLabel) + '</small></div><span class="props-chart-legend"><i class="over"></i> Supera línea <i class="under"></i> No alcanza</span></div><div class="props-bars">' +
+        lastTen.map(({game,value},index) => {
+          const hit = value >= line;
+          const height = Math.max(5, Math.round(value / scaleMax * 100));
+          const date = game.game_date || game.date || "";
+          const opponent = game.opponent || game.matchup || game.team_abbreviation || "PJ";
+          return '<div class="props-bar-item" title="' + esc((date ? date + " · " : "") + opponent + " · " + num(value) + " " + statLabel) + '"><strong>' + num(value,0) + '</strong><div class="props-bar-track"><i class="' + (hit ? "over" : "under") + '" style="height:' + height + '%"></i></div><small>' + esc(String(opponent).replace(/^.*?@\s*|^.*?vs\.?\s*/i,"").slice(0,5)) + '</small></div>';
+        }).join("") + '</div><div class="props-chart-line-note">La línea es ' + num(line) + '. Verde = iguala o supera; rojo = queda por debajo.</div>';
+    }
+  }
+
+  const upcoming = card.upcoming || {};
+  const h2h = card.h2h || {};
+  const defender = card.likely_defender || null;
+  const h2hAvg = h2h.averages || {};
+  const h2hValue = (() => {
+    if (stat === "pts_ast") return Number(h2hAvg.pts) + Number(h2hAvg.ast);
+    if (stat === "pts_reb") return Number(h2hAvg.pts) + Number(h2hAvg.reb);
+    if (stat === "reb_ast") return Number(h2hAvg.reb) + Number(h2hAvg.ast);
+    if (stat === "pra") return Number(h2hAvg.pra);
+    if (stat === "stl_blk") return null;
+    return h2hAvg[stat];
+  })();
+  if (context) {
+    const opponent = upcoming.opponent || h2h.opponent || "";
+    const matchup = opponent
+      ? '<div class="props-context-cell"><small>PRÓXIMO RIVAL</small><strong>' + esc(opponent) + '</strong><span>' + (upcoming.is_home ? "Local" : "Visita") + '</span></div>'
+      : '<div class="props-context-cell"><small>PRÓXIMO RIVAL</small><strong>Sin partido próximo</strong></div>';
+    const h2hHtml = opponent && h2h.games
+      ? '<div class="props-context-cell"><small>H2H · ' + esc(opponent) + '</small><strong>' + esc(num(h2hValue)) + ' ' + esc(statLabel) + '</strong><span>Media en ' + esc(String(h2h.games)) + ' enfrentamientos</span></div>'
+      : '<div class="props-context-cell"><small>H2H</small><strong>Sin muestra</strong><span>No hay enfrentamientos registrados</span></div>';
+    const defenderHtml = defender
+      ? '<div class="props-context-cell"><small>POSIBLE DEFENSOR</small><strong>' + esc(defender.player_name || "—") + '</strong><span>' + esc(defender.basis === "historial" ? "Identificado por historial de marcajes" : "Estimado por rol y minutos") + ' · confianza ' + esc(defender.confidence || "baja") + '</span></div>'
+      : '<div class="props-context-cell"><small>DEFENSOR</small><strong>Sin dato disponible</strong><span>La API no identificó un emparejamiento</span></div>';
+    context.innerHTML = '<div class="props-context-head"><strong>Contexto del enfrentamiento</strong><span>Datos disponibles del jugador</span></div><div class="props-context-grid">' + matchup + h2hHtml + defenderHtml + '</div><p class="props-context-disclaimer">El H2H es una muestra histórica y el posible defensor no es una asignación oficial. El repositorio aún no dispone de una tabla DvP (puntos/rebotes/asistencias permitidos por posición); no se muestra un ranking defensivo ficticio.</p>';
+  }
+  if (status) status.textContent = values.length ? "Línea de " + num(line) + " " + statLabel + ". Se cuentan valores iguales o superiores a la línea; la gráfica muestra los últimos 10 disponibles." : "No hay partidos recientes con datos para esta estadística.";
 }
 
 function formatDetailValue(value) {
