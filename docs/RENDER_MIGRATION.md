@@ -13,12 +13,12 @@ Los workflows de actualización de GitHub Actions quedan disponibles solo para e
 
 ## Primera instalación
 
-1. Fusionar el PR de migración a `main`.
-2. En Render, seleccionar **New → Blueprint** y conectar `CARLMEDINAV/NBA-ML`, rama `main`.
-3. Revisar el Blueprint `render.yaml`. Crea el servicio `nba-totals-api`, plan de 1 CPU / 2 GB de RAM y disco persistente de 1 GB montado en `/var/data`. Este servicio con disco es de pago; confirmar el coste mostrado por Render antes de crear.
-4. Esperar a que termine el primer deploy.
-5. Comprobar `https://nba-totals-api.onrender.com/api/health`. Debe devolver `{"status":"ok", ...}`.
-6. En Vercel, conservar el proyecto actual y desplegar el mismo repositorio. `vercel.json` ya indica `public` como directorio de salida y envía `/api/*` a Render.
+1. Mantener el PR abierto y, en Render, seleccionar **New → Blueprint**. Conectar `CARLMEDINAV/NBA-ML` usando la rama `feat/render-backend-migration`. Esto permite desplegar el backend nuevo sin cambiar todavía el frontend de producción.
+2. Revisar el Blueprint `render.yaml`. Crea el servicio `nba-totals-api`, plan de 1 CPU / 2 GB de RAM y disco persistente de 1 GB montado en `/var/data`. Este servicio con disco es de pago; confirmar el coste mostrado por Render antes de crear.
+3. Esperar a que termine el primer deploy y comprobar `https://nba-totals-api.onrender.com/api/health`. Debe devolver `{"status":"ok", ...}`.
+4. Probar endpoints esenciales del backend: `/api/meta`, `/api/upcoming`, `/api/results`, `/api/players` y `/api/player-props`.
+5. Solo cuando Render responda correctamente, fusionar el PR a `main`. Vercel publicará entonces `public/` como sitio estático y enviará `/api/*` a Render.
+6. Como el Blueprint se creó desde la rama del PR, entrar a Render → servicio → **Settings → Build & Deploy** y cambiar la rama de despliegue a `main`. Guardar y esperar el deploy.
 7. Verificar la página principal y las secciones Próximos, Análisis, Resultados, Jugadores, Lesiones y Props.
 
 ## Almacenamiento persistente
