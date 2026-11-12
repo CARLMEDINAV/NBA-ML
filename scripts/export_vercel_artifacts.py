@@ -1,9 +1,9 @@
 r"""Copia a ``artifacts/`` la foto versionada que inicializa la API de Render.
 
-Vercel no puede escribir en disco ni conservar la cache de ``data/``. Por eso
-versionamos solo el modelo, el estado de los equipos, el calendario, las
-estadisticas de jugadores y las predicciones de test. Este script se ejecuta
-despues de actualizar datos/entrenar y antes de hacer commit:
+Render conserva los artefactos de produccion en un disco persistente. Esta
+foto versionada sirve como semilla inicial y para sincronizar modelos y
+backtests entrenados en cada deploy. Ejecuta este script despues de actualizar
+datos o entrenar:
 
     .\.venv\Scripts\python.exe scripts\export_vercel_artifacts.py
 """
