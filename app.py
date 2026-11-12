@@ -3968,9 +3968,38 @@ def player_card(
     defenders: list[dict[str, Any]] = []
     if upcoming:
         opponent = str(upcoming["opponent"]).upper().strip()
-        h2h_rows = player_history[
-            player_history["opponent"].astype(str).str.upper().str.strip().eq(opponent)
-        ].sort_values(["game_date", "game_id"], ascending=False)
+        # El campo opponent de algunos game logs puede venir vacío o con
+        # el nombre completo del equipo. Normalizamos códigos y usamos matchup
+        # como respaldo para no perder enfrentamientos históricos válidos.
+        opponent_names = {
+            str(code).upper(): str(name).upper()
+            for code, name in names.items()
+        }
+        name_to_code = {name: code for code, name in opponent_names.items()}
+        history_opponents = (
+            player_history["opponent"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+            .map(lambda value: name_to_code.get(value, value))
+        )
+        h2h_mask = history_opponents.eq(opponent)
+        if "matchup" in player_history.columns:
+            matchup = player_history["matchup"].astype(str).str.upper().str.strip()
+            h2h_mask |= matchup.str.contains(
+                rf"(?:@|VS\\.? )\\s*{re.escape(opponent)}\\b",
+                regex=True,
+                na=False,
+            )
+            # Algunos proveedores omiten el espacio después de "VS".
+            h2h_mask |= matchup.str.contains(
+                rf"(?:@|VS\\.?)\\s*{re.escape(opponent)}\\b",
+                regex=True,
+                na=False,
+            )
+        h2h_rows = player_history.loc[h2h_mask].sort_values(
+            ["game_date", "game_id"], ascending=False
+        )
         h2h_shooting = _shooting_from_box(h2h_rows)
         h2h_games = int(len(h2h_rows))
         wins = int(
