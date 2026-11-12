@@ -27,7 +27,7 @@ const state = {
     limit: 25,
     q: "",
   },
-  props: { days: 7, team: "", limit: 8, players: [], selectedPlayerId: "", selectedStat: "pts", line: null, card: null, cardCache: {}, requestId: 0 },
+  props: { days: 5, team: "", limit: 8, players: [], selectedPlayerId: "", selectedStat: "pts", line: null, card: null, cardCache: {}, requestId: 0 },
   detail: {
     playerId: null,
     data: null,
