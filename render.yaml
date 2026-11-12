@@ -22,5 +22,7 @@ services:
         value: /var/data/artifacts
       - key: NBA_BIO_UPDATE
         value: "0"
+      - key: HOOPSAPI_API_KEY
+        sync: false
       - key: CORS_ORIGINS
         value: "*"
