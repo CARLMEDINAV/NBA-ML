@@ -1,10 +1,10 @@
 """Actualiza el calendario/resultados que consume la API desplegada en Render.
 
-Se ejecuta desde el planificador interno de Render cada 15 minutos. El
-runners no alcanzan ``stats.nba.com``, asi que se consultan los marcadores de
-ESPN y se fusionan con el calendario completo ya publicado. Solo se copia el
-CSV cuando hay finales nuevos o cambios estructurales; los cambios de cuarto
-en un partido en juego no generan un commit.
+Se ejecuta desde el planificador interno de Render cada 15 minutos. Como
+``stats.nba.com`` no siempre responde desde el servidor, se consultan los
+marcadores de ESPN y se fusionan con el calendario completo ya publicado. Solo
+se actualiza el CSV cuando hay finales nuevos o cambios estructurales; los
+cambios de cuarto en un partido en juego no fuerzan una escritura.
 """
 
 from __future__ import annotations
