@@ -12,6 +12,7 @@ existen y enlaza esta ruta con el directorio persistente.
 - `player_stats_*.csv`, `player_state.csv`, `player_game_logs_recent.csv`, `player_defenders_recent.csv` y `player_bio.csv`: estadísticas y contexto de jugadores.
 
 Los procesos programados viven dentro del servicio FastAPI de Render y escriben
-en el mismo disco persistente. Los archivos existentes en producción no se
-sobrescriben al desplegar una nueva versión; solo se copian archivos iniciales
-que falten.
+en el mismo disco persistente. Los modelos versionados (`model.joblib`, `player_props.joblib`), el backtest y
+las estadísticas históricas 2025-26 se sincronizan en cada deploy. Los CSV de
+la temporada en curso, estados e historiales actualizados por el scheduler se
+preservan y solo se copian si todavía faltan.
