@@ -3933,3 +3933,108 @@ button:disabled { cursor: not-allowed; }
   }
 }
 
+/* NBA TOTALS · compact horizontal header bar */
+.topbar {
+  min-height: 76px;
+  gap: 20px;
+  padding: 11px 20px;
+  margin-bottom: 16px;
+  border-radius: 17px;
+  border-color: rgba(116, 168, 255, .24);
+  background:
+    linear-gradient(100deg, rgba(8, 16, 31, .98), rgba(12, 25, 46, .96) 58%, rgba(7, 14, 27, .98));
+  box-shadow: 0 12px 34px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.045);
+}
+
+.topbar::before {
+  top: 13px;
+  bottom: 13px;
+  width: 3px;
+}
+
+.topbar::after {
+  right: 28%;
+  top: -80%;
+  height: 260%;
+  width: 130px;
+  opacity: .55;
+}
+
+.brand { gap: 13px; }
+
+.brand-mark {
+  width: 48px;
+  height: 48px;
+  border-width: 1.5px;
+  font-size: 1.25rem;
+  box-shadow: 0 0 0 3px rgba(255,133,27,.055), 0 0 18px rgba(255,133,27,.12), inset 0 5px 12px rgba(0,0,0,.65);
+}
+
+.brand-divider { height: 36px; }
+
+.brand-copy { gap: 3px; }
+
+.brand-name {
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  letter-spacing: -.045em;
+}
+
+.brand-sub {
+  font-size: .57rem;
+  letter-spacing: .18em;
+}
+
+.model-pill {
+  min-height: 42px;
+  gap: 9px;
+  padding: 0 14px;
+  font-size: .78rem;
+}
+
+.model-dot {
+  width: 8px;
+  height: 8px;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    min-height: 0;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 14px;
+  }
+
+  .topbar::before { top: 10px; bottom: 10px; }
+  .brand { gap: 9px; flex: 0 1 auto; }
+  .brand-mark { width: 39px; height: 39px; font-size: 1.05rem; }
+  .brand-divider { height: 30px; }
+  .brand-name { font-size: clamp(1.05rem, 4.2vw, 1.4rem); }
+  .brand-sub { font-size: .48rem; letter-spacing: .12em; }
+  .model-select { width: auto; flex: 0 1 auto; margin-left: auto; min-width: 0; }
+  .model-pill {
+    width: auto;
+    min-height: 38px;
+    max-width: 46vw;
+    gap: 7px;
+    padding: 0 10px;
+    overflow: hidden;
+    font-size: .68rem;
+  }
+  #statusBadgeText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .model-chevron { width: 15px; height: 15px; }
+  .model-menu { left: auto; right: 0; width: min(310px, calc(100vw - 24px)); }
+}
+
+@media (max-width: 380px) {
+  .brand-mark { width: 34px; height: 34px; font-size: .92rem; }
+  .brand-name { font-size: 1rem; }
+  .brand-sub { font-size: .42rem; letter-spacing: .09em; }
+  .model-pill { max-width: 43vw; padding-inline: 8px; }
+}
+
