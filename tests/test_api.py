@@ -1235,3 +1235,41 @@ def test_bet_builder_analyze_injury_adjustment(monkeypatch):
     assert selection["availability"]["model_adjusted"] is True
     assert selection["probability"] == pytest.approx(home_option["probability"])
     assert payload["data_quality"]["injury_adjusted_selections"] == 1
+
+
+def test_odds_fallback_fills_missing_hoopsapi_prices(monkeypatch):
+    schedule = app_module._schedule()
+    game = schedule.iloc[0]
+    game_id = str(game["game_id"])
+    day = pd.Timestamp(game["game_date"]).normalize()
+    hoops = pd.DataFrame([{
+        "game_id": game_id,
+        "market_spread": -3.5,
+        "market_total": 228.5,
+        "market_details": "HoopsAPI · 2 casas",
+        "market_provider": "HoopsAPI",
+        "over_odds": None,
+        "under_odds": None,
+        "market_bookmakers": [],
+    }])
+    espn = pd.DataFrame([{
+        "game_id": game_id,
+        "market_spread": -4.0,
+        "market_total": 229.5,
+        "market_details": "ESPN",
+        "market_provider": "TestBook",
+        "over_odds": "-110",
+        "under_odds": "-108",
+        "market_bookmakers": [],
+    }])
+    monkeypatch.setattr(app_module, "_fetch_hoopsapi_odds", lambda _schedule: hoops.copy())
+    monkeypatch.setattr(app_module, "_fetch_espn_odds", lambda _day, _schedule: espn.copy())
+
+    result = app_module._odds_for_dates([day], schedule)
+    row = result.loc[result["game_id"].astype(str).eq(game_id)].iloc[0]
+
+    assert row["market_total"] == pytest.approx(228.5)
+    assert row["market_spread"] == pytest.approx(-3.5)
+    assert row["over_odds"] == "-110"
+    assert row["under_odds"] == "-108"
+    assert row["market_provider"] == "HoopsAPI + ESPN"
