@@ -962,8 +962,25 @@ function renderPropsAnalyzer() {
     return;
   }
   const player = card.player || {};
-  const games = Array.isArray(card.games) ? card.games : [];
-  const values = games.map((game) => ({ game, value: pdStatValue(game, stat) })).filter((item) => Number.isFinite(item.value));
+  // La API suele entregar los partidos del más reciente al más antiguo;
+  // ordenamos explícitamente para que L5/L10 siempre representen los juegos recientes.
+  const games = (Array.isArray(card.games) ? card.games : [])
+    .slice()
+    .sort((a, b) => String(b.game_date || "").localeCompare(String(a.game_date || "")));
+  const requiredFields = {
+    pts: ["pts"], reb: ["reb"], ast: ["ast"], min: ["min"],
+    stl: ["stl"], blk: ["blk"], fg3m: ["fg3m"],
+    pts_ast: ["pts", "ast"], pts_reb: ["pts", "reb"],
+    reb_ast: ["reb", "ast"], pra: ["pts", "reb", "ast"],
+    stl_blk: ["stl", "blk"], dd: ["pts", "reb", "ast"], td: ["pts", "reb", "ast"],
+  };
+  const hasStatData = (game) => (requiredFields[stat] || [stat]).every((key) =>
+    game[key] !== null && game[key] !== undefined && game[key] !== "" && Number.isFinite(Number(game[key]))
+  );
+  const values = games
+    .filter(hasStatData)
+    .map((game) => ({ game, value: pdStatValue(game, stat) }))
+    .filter((item) => Number.isFinite(item.value));
   const buildCard = (items, label) => {
     const hits = items.filter((item) => item.value >= line).length;
     const total = items.length;
