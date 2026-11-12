@@ -27,7 +27,7 @@ const state = {
     limit: 25,
     q: "",
   },
-  props: { days: 7, team: "", limit: 8 },
+  props: { days: 7, team: "", limit: 8, players: [], selectedPlayerId: "", selectedStat: "pts", line: null, card: null, cardCache: {}, requestId: 0 },
   detail: {
     playerId: null,
     data: null,
@@ -878,45 +878,15 @@ async function loadProps(silent = false) {
       return;
     }
 
-    tbody.innerHTML = players
-      .map((player) => {
-        const game = player.game;
-        const headshotUrl =
-          player.headshot_url ||
-          (player.player_id
-            ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png`
-            : "");
-        const time = game.time_et ? `${game.time_et} ET` : "Hora por confirmar";
-        return `
-        <tr data-player-id="${esc(player.player_id)}" data-game-id="${esc(game.game_id)}" class="is-clickable" title="Abrir ficha del jugador">
-          <td>${esc(shortDate(game.date))}</td>
-          <td>
-            <div class="matchup">${esc(game.away)} @ ${esc(game.home)}<small>${esc(time)}</small></div>
-          </td>
-          <td>
-            <div class="player-cell">
-              <span class="player-avatar" aria-hidden="true">
-                <span class="player-initials">${esc(initials(player.player_name))}</span>
-                ${
-                  headshotUrl
-                    ? `<img class="player-headshot" src="${esc(headshotUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
-                    : ""
-                }
-              </span>
-              <button class="player-link" type="button" data-player-id="${esc(player.player_id)}">${esc(player.player_name)}</button>
-            </div>
-          </td>
-          <td>${esc(player.team)}</td>
-          <td class="num">${num(player.projected_pts)}</td>
-          <td class="num">${num(player.projected_reb)}</td>
-          <td class="num">${num(player.projected_ast)}</td>
-          <td class="num pra-value">${num(player.projected_pra)}</td>
-          <td class="num">${propGradeBadge(player, praSigma)}</td>
-          <td class="num">${num(player.gp, 0)}</td>
-        </tr>`;
-      })
-      .join("");
-
+    state.props.players = players;
+    renderPropsPlayerOptions();
+    if (state.props.selectedPlayerId && !players.some((player) => String(player.player_id) === String(state.props.selectedPlayerId))) {
+      state.props.selectedPlayerId = "";
+      state.props.card = null;
+    }
+    if (!state.props.selectedPlayerId && players.length) state.props.selectedPlayerId = String(players[0].player_id);
+    if (state.props.selectedPlayerId) await loadPropsPlayerCard(state.props.selectedPlayerId, silent);
+    else renderPropsAnalyzer();
     const validation = data.validation || {};
     const validationText = validation.from
       ? `Validación ${validation.from} → ${validation.to}: MAE PTS ${num(metrics.pts?.mae)}, REB ${num(metrics.reb?.mae)}, AST ${num(metrics.ast?.mae)}, PRA ${num(praMetrics.mae)}.`
@@ -928,12 +898,93 @@ async function loadProps(silent = false) {
         : "";
     $("#propsNote").textContent = `${data.note || ""} ${data.grade_note || ""} ${validationText} ${earlySeasonText}`.trim();
   } catch (error) {
-    emptyRow(tbody, 10, "No se pudieron cargar las proyecciones de jugadores.");
+    notice($("#propsNotice"), error.message, true);
+    $("#propsAnalyzerStatus").textContent = "No se pudieron cargar los jugadores para el análisis.";
     notice($("#propsNotice"), error.message, true);
     showToast(error.message);
   } finally {
     setBusy(button, false);
   }
+}
+
+function renderPropsPlayerOptions() {
+  const select = $("#propsPlayer");
+  if (!select) return;
+  select.innerHTML = state.props.players.map((player) => {
+    const game = player.game || {};
+    const matchup = game.away && game.home ? " · " + game.away + "@" + game.home : "";
+    return '<option value="' + esc(player.player_id) + '">' + esc(player.player_name) + " · " + esc(player.team || "") + esc(matchup) + "</option>";
+  }).join("") || '<option value="">No hay jugadores disponibles</option>';
+  select.value = state.props.selectedPlayerId || "";
+}
+
+async function loadPropsPlayerCard(playerId, silent = false) {
+  if (!playerId) return;
+  if (state.props.cardCache[playerId]) {
+    state.props.card = state.props.cardCache[playerId];
+    if (state.props.line === null) state.props.line = pdDefaultLine(state.props.card, state.props.selectedStat);
+    renderPropsAnalyzer();
+    return;
+  }
+  const requestId = ++state.props.requestId;
+  state.props.card = null;
+  if (!silent) $("#propsAnalyzerStatus").textContent = "Cargando historial del jugador…";
+  renderPropsAnalyzer();
+  try {
+    const data = await api("/api/player-card", { player_id: Number(playerId) });
+    if (requestId !== state.props.requestId || String(state.props.selectedPlayerId) !== String(playerId)) return;
+    state.props.cardCache[playerId] = data;
+    state.props.card = data;
+    state.props.line = pdDefaultLine(data, state.props.selectedStat);
+    renderPropsAnalyzer();
+  } catch (error) {
+    if (requestId !== state.props.requestId) return;
+    state.props.card = null;
+    $("#propsAnalyzerStatus").textContent = "No se pudo cargar el historial: " + error.message;
+    renderPropsAnalyzer();
+  }
+}
+
+function propsLineValue() {
+  const value = Number(state.props.line);
+  return Number.isFinite(value) && value >= 0 ? value : 0.5;
+}
+
+function renderPropsAnalyzer() {
+  const card = state.props.card;
+  const stat = state.props.selectedStat || "pts";
+  const line = propsLineValue();
+  const statLabel = DETAIL_STATS.find((item) => item.key === stat)?.label || stat.toUpperCase();
+  const status = $("#propsAnalyzerStatus");
+  const summary = $("#propsPlayerSummary");
+  const results = $("#propsHitResults");
+  const lineInput = $("#propsLine");
+  if (lineInput && document.activeElement !== lineInput) lineInput.value = line.toFixed(1);
+  if (!card) {
+    if (summary) summary.hidden = true;
+    if (results) results.innerHTML = [5,10].map((n) => '<div class="props-hit-card is-empty"><span>ÚLTIMOS ' + n + '</span><strong>—</strong><small>Esperando datos</small></div>').join("");
+    if (status && !status.textContent.includes("No se pudo")) status.textContent = state.props.selectedPlayerId ? "Cargando historial del jugador…" : "Selecciona un jugador para analizar sus últimos partidos.";
+    return;
+  }
+  const player = card.player || {};
+  const games = Array.isArray(card.games) ? card.games : [];
+  const values = games.map((game) => ({ game, value: pdStatValue(game, stat) })).filter((item) => Number.isFinite(item.value));
+  const buildCard = (items, label) => {
+    const hits = items.filter((item) => item.value >= line).length;
+    const total = items.length;
+    const rate = total ? hits / total : null;
+    const average = total ? items.reduce((sum, item) => sum + item.value, 0) / total : null;
+    const tone = rate === null ? "is-empty" : rate >= .7 ? "is-strong" : rate >= .5 ? "is-mid" : "is-low";
+    const bar = rate === null ? 0 : Math.round(rate * 100);
+    return '<article class="props-hit-card ' + tone + '"><span>' + label + '</span><strong>' + (rate === null ? "—" : pct(rate)) + '</strong><small>' + hits + ' de ' + total + ' partidos · media ' + (average === null ? "—" : num(average)) + '</small><div class="props-hit-track" aria-hidden="true"><i style="width:' + bar + '%"></i></div><em>' + (total ? hits + ' aciertos / ' + (total - hits) + ' fallos' : "Sin partidos disponibles") + '</em></article>';
+  };
+  if (summary) {
+    summary.hidden = false;
+    const headshot = player.headshot_url || "";
+    summary.innerHTML = '<div class="props-player-identity">' + (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.remove()">' : "") + '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + esc(player.season || "") + ' · ' + games.length + ' partidos recientes</small></div></div><span class="props-selected-stat">' + esc(statLabel) + ' · L5 / L10</span>';
+  }
+  if (results) results.innerHTML = buildCard(values.slice(0,5), "ÚLTIMOS 5") + buildCard(values.slice(0,10), "ÚLTIMOS 10");
+  if (status) status.textContent = values.length ? "Línea de " + num(line) + " " + statLabel + ". Se cuentan valores iguales o superiores a la línea." : "No hay partidos recientes con datos para esta estadística.";
 }
 
 function formatDetailValue(value) {
@@ -1710,6 +1761,25 @@ function bindEvents() {
   });
 
   $("#propsRefresh").addEventListener("click", () => loadProps());
+  $("#propsPlayer").addEventListener("change", (event) => {
+    state.props.selectedPlayerId = event.target.value;
+    state.props.card = null;
+    state.props.line = null;
+    loadPropsPlayerCard(state.props.selectedPlayerId);
+  });
+  $("#propsStat").addEventListener("change", (event) => {
+    state.props.selectedStat = event.target.value;
+    state.props.line = state.props.card ? pdDefaultLine(state.props.card, state.props.selectedStat) : 0.5;
+    renderPropsAnalyzer();
+  });
+  $("#propsLine").addEventListener("change", (event) => {
+    const value = Number(event.target.value);
+    if (!Number.isFinite(value) || value < 0) return;
+    state.props.line = Math.round(value * 2) / 2;
+    renderPropsAnalyzer();
+  });
+  $("#propsLineDown").addEventListener("click", () => { state.props.line = Math.max(0, propsLineValue() - 0.5); renderPropsAnalyzer(); });
+  $("#propsLineUp").addEventListener("click", () => { state.props.line = propsLineValue() + 0.5; renderPropsAnalyzer(); });
   $("#propsDays").addEventListener("change", (event) => {
     state.props.days = Number(event.target.value);
     loadProps();
