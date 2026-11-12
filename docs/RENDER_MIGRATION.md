@@ -15,7 +15,7 @@ Los workflows de actualización de GitHub Actions quedan disponibles solo para e
 
 1. Fusionar el PR de migración a `main`.
 2. En Render, seleccionar **New → Blueprint** y conectar `CARLMEDINAV/NBA-ML`, rama `main`.
-3. Revisar el Blueprint `render.yaml`. Crea el servicio `nba-totals-api`, plan Starter y disco persistente de 1 GB montado en `/var/data`. Este servicio con disco es de pago; confirmar el coste mostrado por Render antes de crear.
+3. Revisar el Blueprint `render.yaml`. Crea el servicio `nba-totals-api`, plan de 1 CPU / 2 GB de RAM y disco persistente de 1 GB montado en `/var/data`. Este servicio con disco es de pago; confirmar el coste mostrado por Render antes de crear.
 4. Esperar a que termine el primer deploy.
 5. Comprobar `https://nba-totals-api.onrender.com/api/health`. Debe devolver `{"status":"ok", ...}`.
 6. En Vercel, conservar el proyecto actual y desplegar el mismo repositorio. `vercel.json` ya indica `public` como directorio de salida y envía `/api/*` a Render.
