@@ -3986,17 +3986,8 @@ def player_card(
         h2h_mask = history_opponents.eq(opponent)
         if "matchup" in player_history.columns:
             matchup = player_history["matchup"].astype(str).str.upper().str.strip()
-            h2h_mask |= matchup.str.contains(
-                rf"(?:@|VS\\.? )\\s*{re.escape(opponent)}\\b",
-                regex=True,
-                na=False,
-            )
-            # Algunos proveedores omiten el espacio después de "VS".
-            h2h_mask |= matchup.str.contains(
-                rf"(?:@|VS\\.?)\\s*{re.escape(opponent)}\\b",
-                regex=True,
-                na=False,
-            )
+            # Los game logs suelen usar formatos como "MIL @ TOR" o "MIL vs TOR".
+            h2h_mask |= matchup.str.endswith(opponent)
         h2h_rows = player_history.loc[h2h_mask].sort_values(
             ["game_date", "game_id"], ascending=False
         )
