@@ -1861,7 +1861,11 @@ function bindEvents() {
 
   $("#propsMarket").addEventListener("change", (event) => {
     state.props.market = event.target.value;
+    state.props.selectedStat = event.target.value;
+    state.props.line = state.props.card ? pdDefaultLine(state.props.card, state.props.selectedStat) : null;
+    $("#propsStat").value = state.props.selectedStat;
     renderPropsPlayerList();
+    renderPropsAnalyzer();
   });
   $("#propsSearch").addEventListener("input", (event) => {
     state.props.search = event.target.value || "";
