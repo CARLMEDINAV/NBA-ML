@@ -37,6 +37,7 @@ def prepare_artifacts() -> None:
 
 if __name__ == "__main__":
     prepare_artifacts()
+    os.chdir(ROOT)
     port = os.getenv("PORT", "10000")
     os.execv(
         sys.executable,
