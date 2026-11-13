@@ -169,10 +169,10 @@ game_id,game_date,game_time_et,status,status_text,home,away,arena,is_neutral,hom
 0022600224,2026-11-11,21:00,3,Final,UTA,ORL,Delta Center,False,108,123,231.0
 0022600225,2026-11-11,21:30,3,Final,HOU,GSW,Toyota Center (Houston),False,115,108,223.0
 0022600226,2026-11-11,22:00,3,Final,POR,OKC,Moda Center,False,118,108,226.0
-0022600227,2026-11-12,19:00,1,11/12 - 7:00 PM EST,PHI,TOR,Xfinity Mobile Arena,False,0,0,
-0022600228,2026-11-12,19:00,1,11/12 - 7:00 PM EST,WAS,DET,Capital One Arena,False,0,0,
-0022600229,2026-11-12,20:00,1,11/12 - 8:00 PM EST,MIN,DAL,Target Center,False,0,0,
-0022600230,2026-11-12,21:00,1,11/12 - 9:00 PM EST,PHX,CHA,Mortgage Matchup Center,False,0,0,
+0022600227,2026-11-12,19:00,3,Final,PHI,TOR,Xfinity Mobile Arena,False,123,112,235.0
+0022600228,2026-11-12,19:00,3,Final/2OT,WAS,DET,Capital One Arena,False,140,144,284.0
+0022600229,2026-11-12,20:00,3,Final,MIN,DAL,Target Center,False,133,94,227.0
+0022600230,2026-11-12,21:00,2,9:48 - 4th,PHX,CHA,Mortgage Matchup Center,False,79,78,
 0022600034,2026-11-13,19:00,1,11/13 - 7:00 PM EST,IND,NYK,Gainbridge Fieldhouse,False,0,0,
 0022600035,2026-11-13,19:00,1,11/13 - 7:00 PM EST,ORL,MIL,Kia Center,False,0,0,
 0022600036,2026-11-13,20:00,1,11/13 - 8:00 PM EST,MIA,CLE,Kaseya Center,False,0,0,
