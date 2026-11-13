@@ -383,6 +383,7 @@ async function api(path, params = {}) {
 
 const PREDICTION_HISTORY_KEY = "nba_totals_prediction_history_v1";
 const PREDICTION_HISTORY_LIMIT = 2000;
+const PREDICTION_HISTORY_VISIBLE = 15;
 
 function readPredictionHistory() {
   try {
@@ -402,8 +403,8 @@ function savePredictionHistory(games, source, referenceLine = state.line) {
     const additions = [];
     for (const game of games) {
       const date = game.date || game.game_date || game.as_of || "";
-      const home = game.home || game.home_team || "";
-      const away = game.away || game.away_team || "";
+      const home = game.home_name || game.home || game.home_team || "";
+      const away = game.away_name || game.away || game.away_team || "";
       const predicted = Number(game.predicted_total);
       if (!date || !home || !away || !Number.isFinite(predicted)) continue;
       const line = Number(game.line ?? game.market_total ?? referenceLine);
@@ -453,7 +454,7 @@ function renderPredictionHistory() {
     emptyRow(body, 8, "Todavía no hay predicciones guardadas. Abre Próximos o Análisis para registrar las proyecciones.");
     return;
   }
-  body.innerHTML = history.map((item) => `
+  body.innerHTML = history.slice(0, PREDICTION_HISTORY_VISIBLE).map((item) => `
     <tr>
       <td>${esc(numericDate(item.date))}</td>
       <td><span class="team">${esc(item.away)}</span> @ <span class="team">${esc(item.home)}</span></td>
@@ -1828,7 +1829,10 @@ function activateTab(name) {
   if (name === "upcoming") loadUpcoming(state.loaded.upcoming);
   if (name === "analysis") loadAnalysis(state.loaded.analysis);
   if (name === "results") loadResults(state.loaded.results);
-  if (name === "history") renderPredictionHistory();
+  if (name === "history") {
+    if (!readPredictionHistory().length) loadUpcoming();
+    else renderPredictionHistory();
+  }
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
   if (name === "injuries") {
