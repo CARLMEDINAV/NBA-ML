@@ -1634,13 +1634,6 @@ async function submitPrediction(event) {
     const low = Number(result.interval_80[0]);
     const high = Number(result.interval_80[1]);
     box.dataset.ready = "1";
-    savePredictionHistory([{
-      ...result,
-      date: result.as_of,
-      home,
-      away,
-      line: result.line ?? state.line,
-    }], "Predicción manual", result.line ?? state.line);
     box.innerHTML = `
       <div class="result-hero">
         <div class="result-total">
