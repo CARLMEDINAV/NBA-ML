@@ -483,7 +483,7 @@ function downloadHistoryCsv() {
   };
   const rows = [columns.map(([label]) => cell(label)).join(";")];
   history.forEach((item) => rows.push(columns.map(([, key]) => cell(item[key])).join(";")));
-  const blob = new Blob(["\\uFEFF" + rows.join("\\r\\n")], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
