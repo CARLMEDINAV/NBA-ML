@@ -55,6 +55,7 @@
       <button class="tab" role="tab" id="tab-btn-betbuilder" aria-selected="false" aria-controls="tab-betbuilder" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-analysis" aria-selected="false" aria-controls="tab-analysis" data-tab="analysis">Análisis</button>
       <button class="tab" role="tab" id="tab-btn-results" aria-selected="false" aria-controls="tab-results" data-tab="results">Resultados</button>
+      <button class="tab" role="tab" id="tab-btn-history" aria-selected="false" aria-controls="tab-history" data-tab="history">Historial <span class="tab-count" id="historyCount">0</span></button>
       <button class="tab" role="tab" id="tab-btn-players" aria-selected="false" aria-controls="tab-players" data-tab="players">Jugadores</button>
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
@@ -206,6 +207,25 @@
       </section>
 
       <section id="tab-players" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-players" hidden>
+      <section id="tab-history" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-history" hidden>
+        <div class="section-head">
+          <div><p class="eyebrow">Registro de modelo</p><h2>Historial de predicciones</h2>
+            <p class="muted">Guarda una copia de cada proyección de partido y permite exportarla para analizarla después.</p></div>
+          <div class="history-actions">
+            <button class="btn btn-ghost" type="button" id="historyCsv">Descargar CSV</button>
+            <button class="btn btn-primary" type="button" id="historyPdf">Descargar PDF</button>
+          </div>
+        </div>
+        <div class="summary-grid" id="historySummary" aria-live="polite"></div>
+        <div class="table-wrap">
+          <table class="analysis-table" aria-label="Historial de predicciones guardadas">
+            <thead><tr><th>Fecha</th><th>Partido</th><th class="num">Proyección</th><th class="num">Línea</th><th class="num">P(over)</th><th>Señal</th><th>Origen</th><th>Guardada</th><th>Estado</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+        <p class="table-note">El historial se guarda en el almacenamiento local de este navegador. No se recuperan predicciones anteriores a la activación de esta función ni se sincroniza entre dispositivos. El PDF se genera desde la opción de impresión del navegador.</p>
+      </section>
+
         <div class="section-head">
           <div>
             <p class="eyebrow">Estadísticas</p>
