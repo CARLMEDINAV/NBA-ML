@@ -446,7 +446,7 @@ function renderPredictionHistory() {
   $("#historyCount").textContent = String(count);
   $("#historySummary").innerHTML = [
     summaryCard("Predicciones guardadas", String(count), "en este navegador"),
-    summaryCard("Pendientes", String(count), "sin resultado asociado"),
+    summaryCard("Fuentes", String(new Set(history.map((item) => item.source)).size), "tipos de captura"),
     summaryCard("Almacenamiento", "Local", "no se sincroniza entre dispositivos"),
   ].join("");
   if (!count) {
@@ -463,7 +463,7 @@ function renderPredictionHistory() {
       <td>${leanPill(item.lean)}</td>
       <td>${esc(item.source || "—")}</td>
       <td>${esc(new Date(item.captured_at).toLocaleString("es-CL"))}</td>
-      <td><span class="pill pill-neutral">Pendiente</span></td>
+      
     </tr>`).join("");
 }
 
@@ -509,7 +509,7 @@ function downloadHistoryPdf() {
     @page{size:landscape;margin:12mm}@media print{body{padding:0}}</style></head><body>
     <h1>NBA Totals · Historial de predicciones</h1><p>${history.length} registros · Generado ${esc(new Date().toLocaleString("es-CL"))}</p>
     <table><thead><tr><th>Fecha</th><th>Partido</th><th>Total proyectado</th><th>Línea</th><th>P(Over)</th><th>Señal</th><th>Origen</th></tr></thead>
-    <tbody>${rows}</tbody></table><script>window.onload=()=>window.print();<\\/script></body></html>`);
+    <tbody>${rows}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
   printWindow.document.close();
 }
 
