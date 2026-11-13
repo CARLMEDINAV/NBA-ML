@@ -4110,14 +4110,3 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 }
 
 
-/* Historial de predicciones */
-.history-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-#tab-history .table-wrap{margin-top:16px}
-#historyCount{margin-left:4px}
-@media(max-width:640px){.history-actions{width:100%}.history-actions .btn{flex:1}}
-@media print{
-  body *{visibility:hidden!important}
-  #tab-history,#tab-history *{visibility:visible!important}
-  #tab-history{display:block!important;position:absolute;inset:0;width:100%;padding:12px}
-  #tab-history .history-actions{display:none!important}
-}

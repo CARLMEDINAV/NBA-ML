@@ -381,138 +381,6 @@ async function api(path, params = {}) {
 }
 
 
-const PREDICTION_HISTORY_KEY = "nba_totals_prediction_history_v1";
-const PREDICTION_HISTORY_LIMIT = 2000;
-
-function readPredictionHistory() {
-  try {
-    const value = JSON.parse(localStorage.getItem(PREDICTION_HISTORY_KEY) || "[]");
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function savePredictionHistory(games, source, referenceLine = state.line) {
-  if (!Array.isArray(games) || !games.length) return;
-  try {
-    const history = readPredictionHistory();
-    const known = new Set(history.map((item) => item.id));
-    const addedAt = new Date().toISOString();
-    const additions = [];
-    for (const game of games) {
-      const date = game.date || game.game_date || game.as_of || "";
-      const home = game.home || game.home_team || "";
-      const away = game.away || game.away_team || "";
-      const predicted = Number(game.predicted_total);
-      if (!date || !home || !away || !Number.isFinite(predicted)) continue;
-      const line = Number(game.line ?? game.market_total ?? referenceLine);
-      const id = [date, home, away, Number.isFinite(line) ? line : "", "TOTAL"].join("|").toLowerCase();
-      if (known.has(id)) continue;
-      additions.push({
-        id,
-        captured_at: addedAt,
-        date,
-        time_et: game.time_et || "",
-        home,
-        away,
-        predicted_home_score: game.projected_home_score ?? null,
-        predicted_away_score: game.projected_away_score ?? null,
-        predicted_total: predicted,
-        line: Number.isFinite(line) ? line : null,
-        interval_low: game.interval_low ?? game.interval_80?.[0] ?? null,
-        interval_high: game.interval_high ?? game.interval_80?.[1] ?? null,
-        probability_over: game.probability_over ?? null,
-        lean: game.lean || game.total_side || game.market_total_side || "",
-        source,
-      });
-      known.add(id);
-    }
-    if (!additions.length) return;
-    const merged = [...additions, ...history].slice(0, PREDICTION_HISTORY_LIMIT);
-    localStorage.setItem(PREDICTION_HISTORY_KEY, JSON.stringify(merged));
-    renderPredictionHistory();
-  } catch (error) {
-    console.warn("No se pudo guardar el historial de predicciones:", error);
-    showToast("No se pudo guardar el historial. Revisa el espacio del navegador.");
-  }
-}
-
-function renderPredictionHistory() {
-  const body = $("#historyBody");
-  if (!body) return;
-  const history = readPredictionHistory();
-  const count = history.length;
-  $("#historyCount").textContent = String(count);
-  $("#historySummary").innerHTML = [
-    summaryCard("Predicciones guardadas", String(count), "en este navegador"),
-    summaryCard("Fuentes", String(new Set(history.map((item) => item.source)).size), "tipos de captura"),
-    summaryCard("Almacenamiento", "Local", "no se sincroniza entre dispositivos"),
-  ].join("");
-  if (!count) {
-    emptyRow(body, 8, "Todavía no hay predicciones guardadas. Abre Próximos o Análisis para registrar las proyecciones.");
-    return;
-  }
-  body.innerHTML = history.map((item) => `
-    <tr>
-      <td>${esc(numericDate(item.date))}</td>
-      <td><span class="team">${esc(item.away)}</span> @ <span class="team">${esc(item.home)}</span></td>
-      <td class="num">${num(item.predicted_total)}</td>
-      <td class="num">${num(item.line)}</td>
-      <td class="num">${pct(item.probability_over)}</td>
-      <td>${leanPill(item.lean)}</td>
-      <td>${esc(item.source || "—")}</td>
-      <td>${esc(new Date(item.captured_at).toLocaleString("es-CL"))}</td>
-      
-    </tr>`).join("");
-}
-
-function downloadHistoryCsv() {
-  const history = readPredictionHistory();
-  if (!history.length) return showToast("No hay predicciones para exportar.");
-  const columns = [
-    ["Fecha", "date"], ["Hora ET", "time_et"], ["Local", "home"], ["Visitante", "away"],
-    ["Puntos local proyectados", "predicted_home_score"], ["Puntos visitante proyectados", "predicted_away_score"],
-    ["Total proyectado", "predicted_total"], ["Línea", "line"], ["Límite inferior IC80", "interval_low"],
-    ["Límite superior IC80", "interval_high"], ["Probabilidad Over", "probability_over"],
-    ["Señal", "lean"], ["Origen", "source"], ["Guardada", "captured_at"]
-  ];
-  const cell = (value) => {
-    const text = value === null || value === undefined ? "" : String(value);
-    return '"' + text.replaceAll('"', '""') + '"';
-  };
-  const rows = [columns.map(([label]) => cell(label)).join(";")];
-  history.forEach((item) => rows.push(columns.map(([, key]) => cell(item[key])).join(";")));
-  const blob = new Blob(["\uFEFF" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `nba-totals-historial-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function downloadHistoryPdf() {
-  const history = readPredictionHistory();
-  if (!history.length) return showToast("No hay predicciones para exportar.");
-  const rows = history.map((item) => `
-    <tr><td>${esc(numericDate(item.date))}</td><td>${esc(item.away)} @ ${esc(item.home)}</td>
-    <td>${num(item.predicted_total)}</td><td>${num(item.line)}</td><td>${pct(item.probability_over)}</td>
-    <td>${esc(item.lean || "—")}</td><td>${esc(item.source || "—")}</td></tr>`).join("");
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return showToast("Permite las ventanas emergentes para generar el PDF.");
-  printWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Historial NBA Totals</title>
-    <style>body{font:12px Arial,sans-serif;color:#17202a;padding:24px}h1{font-size:20px;margin:0 0 6px}p{color:#566;margin:0 0 18px}
-    table{width:100%;border-collapse:collapse}th,td{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left}th{background:#f1f3f5}
-    @page{size:landscape;margin:12mm}@media print{body{padding:0}}</style></head><body>
-    <h1>NBA Totals · Historial de predicciones</h1><p>${history.length} registros · Generado ${esc(new Date().toLocaleString("es-CL"))}</p>
-    <table><thead><tr><th>Fecha</th><th>Partido</th><th>Total proyectado</th><th>Línea</th><th>P(Over)</th><th>Señal</th><th>Origen</th></tr></thead>
-    <tbody>${rows}</tbody></table><script>window.onload=()=>window.print();</script></body></html>`);
-  printWindow.document.close();
-}
-
 function fillTeams(select, teams, includeAll = false) {
   const current = select.value;
   select.innerHTML = "";
@@ -583,7 +451,6 @@ async function loadUpcoming(silent = false) {
       injuries: 1,
     });
     state.loaded.upcoming = true;
-    savePredictionHistory(data.games, "Próximos", data.line);
     $("#upcomingRange").textContent = `${data.start} → ${data.end}`;
     const probabilities = data.games.map((game) => game.probability_over).filter((value) => value != null);
     const average = probabilities.length
@@ -670,7 +537,6 @@ async function loadAnalysis(silent = false) {
       injuries: 1,
     });
     state.loaded.analysis = true;
-    savePredictionHistory(data.games, "Análisis", data.line);
     $("#analysisRange").textContent = `${data.start} → ${data.end}`;
     const games = data.games || [];
     const signalSide = (game) =>
@@ -1768,13 +1634,6 @@ async function submitPrediction(event) {
     const low = Number(result.interval_80[0]);
     const high = Number(result.interval_80[1]);
     box.dataset.ready = "1";
-    savePredictionHistory([{
-      ...result,
-      date: result.as_of,
-      home,
-      away,
-      line: result.line ?? state.line,
-    }], "Predicción manual", result.line ?? state.line);
     box.innerHTML = `
       <div class="result-hero">
         <div class="result-total">
@@ -1828,7 +1687,6 @@ function activateTab(name) {
   if (name === "upcoming") loadUpcoming(state.loaded.upcoming);
   if (name === "analysis") loadAnalysis(state.loaded.analysis);
   if (name === "results") loadResults(state.loaded.results);
-  if (name === "history") renderPredictionHistory();
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
   if (name === "injuries") {
@@ -1868,8 +1726,6 @@ function bindEvents() {
   });
 
   $("#resultsRefresh").addEventListener("click", loadResults);
-  $("#historyCsv").addEventListener("click", downloadHistoryCsv);
-  $("#historyPdf").addEventListener("click", downloadHistoryPdf);
   $("#resultsSeason").addEventListener("change", (event) => {
     state.results.season = event.target.value;
     loadResults();
@@ -2053,7 +1909,6 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
-  renderPredictionHistory();
   try {
     const meta = await api("/api/meta");
     state.meta = meta;
