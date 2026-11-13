@@ -450,7 +450,7 @@ function renderPredictionHistory() {
     summaryCard("Almacenamiento", "Local", "no se sincroniza entre dispositivos"),
   ].join("");
   if (!count) {
-    emptyRow(body, 9, "Todavía no hay predicciones guardadas. Abre Próximos o Análisis para registrar las proyecciones.");
+    emptyRow(body, 8, "Todavía no hay predicciones guardadas. Abre Próximos o Análisis para registrar las proyecciones.");
     return;
   }
   body.innerHTML = history.map((item) => `
