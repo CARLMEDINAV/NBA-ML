@@ -4194,6 +4194,11 @@ def player_props(
                         "absent_player": absent["player_name"], "teammate": player["player_name"],
                         "deltas": historical["deltas"], "games_with": historical["games_with"],
                         "games_without": historical["games_without"],
+                        "base_projection": player.get("base_projection", {}),
+                        "adjusted_projection": {
+                            "pts": player.get("projected_pts"), "reb": player.get("projected_reb"),
+                            "ast": player.get("projected_ast"), "pra": player.get("projected_pra"),
+                        },
                     })
         players.sort(key=lambda item: (item.get("projected_pra", 0), item.get("projected_pts", 0)), reverse=True)
         player_count += len(players)
