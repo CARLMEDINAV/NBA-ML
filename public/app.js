@@ -1698,6 +1698,22 @@ async function submitPrediction(event) {
   }
 }
 
+function activateResultsView(name) {
+  const validViews = ["history", "performance", "calibration", "errors"];
+  const view = validViews.includes(name) ? name : "history";
+  $(".results-nav-btn").forEach((button) => {
+    const active = button.dataset.resultsView === view;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
+  $(".results-view").forEach((panel) => {
+    const active = panel.id === `results-view-${view}`;
+    panel.hidden = !active;
+    panel.classList.toggle("is-active", active);
+  });
+}
+
 function activateTab(name) {
   state.active = name;
   $$(".tab").forEach((button) => {
@@ -1755,6 +1771,9 @@ function bindEvents() {
   });
 
   $("#resultsRefresh").addEventListener("click", loadResults);
+  $(".results-nav-btn").forEach((button) => {
+    button.addEventListener("click", () => activateResultsView(button.dataset.resultsView));
+  });
   $("#resultsSeason").addEventListener("change", (event) => {
     state.results.season = event.target.value;
     loadResults();
