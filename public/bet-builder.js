@@ -619,7 +619,7 @@
         '<div class="bb-player-rank">' + (index + 1) + '</div>' +
         '<div class="bb-player-info"><strong>' + esc(player.player_name) + '</strong><small>' + esc(player.team) + ' · ' + num(player.projected_min, 0) + ' min estimados</small></div>' +
         '<div class="bb-player-stats">' + stats + '</div>' +
-        '<div class="bb-player-grade" title="Grado de confianza de la proyección PRA; no es probabilidad de apuesta"><b>' + esc(player.grade || '—') + '</b><small>Grado</small></div>' +
+        '<div class="bb-player-grade" title="Confianza relativa del modelo para su proyección PRA; no es probabilidad de superar una línea"><b>' + esc(player.grade || '—') + '</b><small>' + pct(player.confidence) + ' modelo</small></div>' +
       '</div>';
     }).join('');
     const dateNote = event.player_props_state_date ? 'Datos hasta ' + esc(event.player_props_state_date) : 'Datos de jugadores';
