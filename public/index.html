@@ -189,6 +189,36 @@
         </div>
         <div id="resultsNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="resultsSummary" aria-live="polite"></div>
+        <section class="results-diagnostics" aria-labelledby="resultsDiagnosticsTitle">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">Validación reciente</p>
+              <h3 id="resultsDiagnosticsTitle">Calibración y errores</h3>
+              <p class="muted">Evalúa los últimos partidos finalizados. Las tasas por rango necesitan muestras amplias para ser concluyentes.</p>
+            </div>
+            <label>Muestra
+              <select id="resultsWindow">
+                <option value="100">Últimos 100</option>
+                <option value="200" selected>Últimos 200</option>
+                <option value="0">Temporada completa</option>
+              </select>
+            </label>
+          </div>
+          <div class="summary-grid" id="resultsEvalSummary" aria-live="polite"></div>
+          <div class="table-wrap">
+            <table aria-label="Calibración de probabilidades over">
+              <thead><tr><th>Rango P(over)</th><th class="num">Partidos</th><th class="num">P media</th><th class="num">Over real</th><th class="num">Brecha</th><th class="num">Brier</th></tr></thead>
+              <tbody id="resultsCalibrationBody"></tbody>
+            </table>
+          </div>
+          <div class="table-wrap">
+            <table aria-label="Mayores errores de predicción">
+              <thead><tr><th>Partido</th><th>Fecha</th><th class="num">Predicción</th><th class="num">Real</th><th class="num">Error</th></tr></thead>
+              <tbody id="resultsExtremesBody"></tbody>
+            </table>
+          </div>
+          <p class="table-note" id="resultsEvalNote"></p>
+        </section>
         <div class="table-wrap">
           <table aria-label="Resultados con total real, predicción y acierto">
             <thead>
