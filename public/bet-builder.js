@@ -608,9 +608,10 @@
   function renderPlayerRecommendations(event) {
     const players = Array.isArray(event.player_recommendations) ? event.player_recommendations : [];
     if (!players.length) {
-      return event.player_props_warning
-        ? '<div class="bb-player-picks bb-player-picks-empty">' + esc(event.player_props_warning) + '</div>'
-        : '';
+      const warning = event.injury_verification && !event.injury_verification.verified
+        ? 'No se muestran picks de jugadores: no se pudo verificar un parte de lesiones vigente.'
+        : (event.player_props_warning || 'No hay suficientes jugadores disponibles para recomendar.');
+      return '<div class="bb-player-picks bb-player-picks-empty">' + esc(warning) + '</div>';
     }
     const cards = players.map((player, index) => {
       const stats = [['PTS', player.projected_pts], ['REB', player.projected_reb], ['AST', player.projected_ast], ['PRA', player.projected_pra]]
@@ -623,7 +624,10 @@
       '</div>';
     }).join('');
     const dateNote = event.player_props_state_date ? 'Datos hasta ' + esc(event.player_props_state_date) : 'Datos de jugadores';
-    return '<section class="bb-player-picks"><div class="bb-player-picks-head"><strong>3 jugadores destacados</strong><small>' + dateNote + ' · proyecciones, no probabilidades de apuesta</small></div>' + cards + '</section>';
+    const excluded = (event.excluded_injured_players || []).map((item) => esc(item.player_name) + ' (' + esc(item.status) + ')').join(', ');
+    const injuryNote = excluded ? '<p class="bb-player-injury-note">Excluidos por disponibilidad: ' + excluded + '</p>' : '';
+    const checkedAt = event.injury_verification && event.injury_verification.updated_at ? ' · Lesiones ESPN: ' + esc(event.injury_verification.updated_at) : '';
+    return '<section class="bb-player-picks"><div class="bb-player-picks-head"><strong>3 jugadores destacados</strong><small>' + dateNote + checkedAt + ' · proyecciones, no probabilidades de apuesta</small></div>' + cards + injuryNote + '</section>';
   }
   function renderMarket(event, market) {
     if (!market.available) {
