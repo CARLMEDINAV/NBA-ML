@@ -4110,3 +4110,43 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 }
 
 
+
+
+/* Navegación interna de Resultados */
+.results-nav {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 18px;
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: rgba(0,0,0,.18);
+  scrollbar-width: none;
+}
+.results-nav::-webkit-scrollbar { display: none; }
+.results-nav-btn {
+  flex: 1 0 auto;
+  min-width: max-content;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: 700 .84rem var(--font);
+  cursor: pointer;
+  transition: 160ms ease;
+}
+.results-nav-btn:hover { color: var(--text); background: rgba(255,255,255,.045); }
+.results-nav-btn.is-active {
+  color: #ffd8bd;
+  background: linear-gradient(180deg, rgba(255,155,84,.22), rgba(255,155,84,.1));
+  box-shadow: inset 0 0 0 1px rgba(255,155,84,.25);
+}
+.results-view { animation: fade 180ms ease; }
+.results-view[hidden] { display: none; }
+.results-view > .table-wrap { margin-top: 12px; }
+.results-view .section-head.compact { margin-top: 12px; }
+@media (max-width: 640px) {
+  .results-nav-btn { padding: 10px 12px; font-size: .78rem; }
+}
