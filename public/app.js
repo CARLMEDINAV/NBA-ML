@@ -859,6 +859,50 @@ async function loadPlayers() {
   }
 }
 
+async function loadPositionVsOpponent() {
+  const opponent = $("#positionVsTeam").value;
+  const status = $("#positionVsStatus");
+  const wrap = $("#positionVsTableWrap");
+  const summary = $("#positionVsSummary");
+  if (!opponent) {
+    status.textContent = "Selecciona un equipo rival.";
+    wrap.hidden = true;
+    summary.hidden = true;
+    return;
+  }
+  status.textContent = "Consultando historial y posiciones oficiales…";
+  wrap.hidden = true;
+  summary.hidden = true;
+  try {
+    const data = await api("/api/position-vs-opponent", {
+      opponent, position: $("#positionVsRole").value, window: $("#positionVsWindow").value,
+    });
+    if (!data.available) {
+      status.textContent = data.reason || "No hay datos para esta selección.";
+      return;
+    }
+    const fmt = (value) => value == null ? "—" : Number(value).toFixed(1);
+    summary.innerHTML = [
+      summaryCard("Promedio de puntos", fmt(data.average), "por actuación"),
+      summaryCard("Mediana", fmt(data.median), "puntos"),
+      summaryCard("Máximo", String(data.max ?? "—"), "puntos"),
+      summaryCard("Registros", String(data.sample), `${data.games_checked} partidos del rival`),
+    ].join("");
+    summary.hidden = false;
+    $("#positionVsBody").innerHTML = (data.players || []).map((player) => `<tr>
+      <td><strong>${escapeHtml(player.player_name)}</strong></td>
+      <td>${numericDate(player.date)}</td>
+      <td>${escapeHtml(player.matchup || "—")}</td>
+      <td class="num">${fmt(player.min)}</td>
+      <td class="num"><strong>${player.pts}</strong></td>
+    </tr>`).join("");
+    wrap.hidden = false;
+    status.textContent = `${data.sample} actuaciones encontradas · ${data.position} vs. ${data.opponent}. ${data.note || ""}`;
+  } catch (error) {
+    status.textContent = error.message || "No se pudo consultar el historial.";
+  }
+}
+
 async function loadProps(silent = false) {
   const button = $("#propsRefresh");
   if (!silent) {
