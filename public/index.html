@@ -415,6 +415,22 @@
         </section>
         </section>
 
+        <section class="props-content-section" aria-labelledby="positionVsOpponentTitle">
+          <div class="props-section-heading"><div><p class="eyebrow">02 · HISTORIAL POR POSICIÓN</p><h3 id="positionVsOpponentTitle">Puntos de jugadores vs. rival</h3><p class="muted">Consulta cuántos puntos anotaron los jugadores de una posición contra un equipo en sus últimos partidos.</p></div></div>
+          <section class="advanced-panel position-matchup-panel">
+            <div class="advanced-controls position-matchup-controls">
+              <label>Equipo rival<select id="positionVsTeam"><option value="">Selecciona rival</option></select></label>
+              <label>Posición<select id="positionVsRole"><option value="PG">Base (PG)</option><option value="SG">Escolta (SG)</option><option value="SF" selected>Alero (SF)</option><option value="PF">Ala-pívot (PF)</option><option value="C">Pívot (C)</option></select></label>
+              <label>Partidos del rival<select id="positionVsWindow"><option value="5">Últimos 5</option><option value="10" selected>Últimos 10</option><option value="20">Últimos 20</option></select></label>
+              <button class="btn btn-ghost" id="positionVsRefresh" type="button">Consultar</button>
+            </div>
+            <div id="positionVsSummary" class="summary-grid" hidden></div>
+            <div id="positionVsStatus" class="advanced-result" aria-live="polite">Selecciona un rival y una posición para consultar su historial.</div>
+            <div class="table-wrap" id="positionVsTableWrap" hidden><table class="data-table"><thead><tr><th>Jugador</th><th>Fecha</th><th>Partido</th><th class="num">MIN</th><th class="num">PTS</th></tr></thead><tbody id="positionVsBody"></tbody></table></div>
+            <p class="table-note">Fuente de posición: roster ESPN. La ventana cuenta partidos del equipo rival; un jugador puede aparecer más de una vez si lo enfrentó en distintos encuentros.</p>
+          </section>
+        </section>
+
         <section class="props-content-section" aria-label="Herramientas complementarias">
           <div class="props-section-heading"><div><p class="eyebrow">02 · HERRAMIENTAS COMPLEMENTARIAS</p><h3>Distribución y matchup</h3><p class="muted">Consulta la frecuencia histórica de puntos y el contexto del enfrentamiento.</p></div></div>
           <div class="props-tools-grid">        <section class="advanced-panel" aria-labelledby="nbaCardsTitle">
