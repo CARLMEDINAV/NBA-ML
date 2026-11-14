@@ -420,14 +420,14 @@
           <section class="advanced-panel position-matchup-panel">
             <div class="advanced-controls position-matchup-controls">
               <label>Equipo rival<select id="positionVsTeam"><option value="">Selecciona rival</option></select></label>
-              <label>Posición<select id="positionVsRole"><option value="PG">Base (PG)</option><option value="SG">Escolta (SG)</option><option value="SF" selected>Alero (SF)</option><option value="PF">Ala-pívot (PF)</option><option value="C">Pívot (C)</option></select></label>
+              <label>Posición<select id="positionVsRole"><option value="G" selected>Guard (G) · Base y escolta</option><option value="F">Forward (F) · Alero y ala-pívot</option><option value="C">Pívot (C)</option></select></label>
               <label>Partidos del rival<select id="positionVsWindow"><option value="5">Últimos 5</option><option value="10" selected>Últimos 10</option><option value="20">Últimos 20</option></select></label>
               <button class="btn btn-ghost" id="positionVsRefresh" type="button">Consultar</button>
             </div>
             <div id="positionVsSummary" class="summary-grid" hidden></div>
             <div id="positionVsStatus" class="advanced-result" aria-live="polite">Selecciona un rival y una posición para consultar su historial.</div>
             <div class="table-wrap" id="positionVsTableWrap" hidden><table class="data-table"><thead><tr><th>Jugador</th><th>Fecha</th><th>Partido</th><th class="num">MIN</th><th class="num">PTS</th></tr></thead><tbody id="positionVsBody"></tbody></table></div>
-            <p class="table-note">Fuente de posición: roster ESPN. La ventana cuenta partidos del equipo rival; un jugador puede aparecer más de una vez si lo enfrentó en distintos encuentros.</p>
+            <p class="table-note">Fuente de posición: roster ESPN (G = guards, F = forwards, C = centers). ESPN no siempre distingue PG/SG/SF/PF en el roster actual. La ventana cuenta partidos del equipo rival; un jugador puede aparecer más de una vez si lo enfrentó en distintos encuentros.</p>
           </section>
         </section>
 
