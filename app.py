@@ -4436,8 +4436,8 @@ def quarter_projection(
     home_for, away_for = avg(home_rows, "quarters"), avg(away_rows, "quarters")
     # Combina el ataque de cada equipo con los puntos que permite el rival.
     home_against, away_against = avg(home_rows, "against"), avg(away_rows, "against")
-    home_q = [(home_for[i] + home_against[i])/2 for i in range(4)]
-    away_q = [(away_for[i] + away_against[i])/2 for i in range(4)]
+    home_q = [(home_for[i] + away_against[i])/2 for i in range(4)]
+    away_q = [(away_for[i] + home_against[i])/2 for i in range(4)]
     quarters = [{
         "quarter": f"Q{i+1}", "home": round(home_q[i],1), "away": round(away_q[i],1),
         "total": round(home_q[i]+away_q[i],1)
