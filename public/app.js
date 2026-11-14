@@ -639,6 +639,43 @@ async function loadAnalysis(silent = false) {
   }
 }
 
+async function loadModelComparison() {
+  const validationBody = $("#modelValidationBody");
+  const testBody = $("#modelTestBody");
+  if (!validationBody || !testBody) return;
+  try {
+    const data = await api("/api/model-comparison");
+    if (!data.available) {
+      const message = data.message || "La comparación estará disponible después del próximo entrenamiento.";
+      validationBody.innerHTML = `<tr><td colspan="6">${esc(message)}</td></tr>`;
+      testBody.innerHTML = `<tr><td colspan="6">${esc(message)}</td></tr>`;
+      $("#modelComparisonNote").textContent = "El artefacto desplegado aún no contiene las métricas comparativas. Ejecuta el pipeline de entrenamiento y vuelve a desplegar para poblar esta sección.";
+      return;
+    }
+    $("#modelValidationSeason").textContent = data.validation_season || "Validación";
+    $("#modelTestSeason").textContent = data.test_season || "Test";
+    const label = (name) => ({
+      ridge: "Ridge",
+      random_forest: "Random Forest",
+      hist_gradient_boosting: "HistGradientBoosting",
+    }[name] || name);
+    const rowHtml = (row, includeCv = false) => `<tr class="${row.model === data.best_model ? "model-selected" : ""}">
+      <td><strong>${esc(label(row.model))}</strong>${row.model === data.best_model ? ' <span class="model-best">Seleccionado</span>' : ""}</td>
+      <td class="num">${num(row.mae, 2)}</td>
+      <td class="num">${num(row.rmse, 2)}</td>
+      <td class="num">${num(row.r2, 3)}</td>
+      <td class="num">${signed(row.bias, 2)}</td>
+      ${includeCv ? `<td class="num">${num(row.cv_mae, 2)}</td>` : `<td class="num">${pct(row.within_10)}</td>`}
+    </tr>`;
+    validationBody.innerHTML = (data.validation || []).map((row) => rowHtml(row, true)).join("") || '<tr><td colspan="6">Sin métricas de validación.</td></tr>';
+    testBody.innerHTML = (data.test || []).map((row) => rowHtml(row, false)).join("") || '<tr><td colspan="6">Sin métricas de test.</td></tr>';
+    $("#modelComparisonNote").textContent = `Modelo seleccionado por MAE en validación: ${label(data.best_model)}. El test es una evaluación temporal reservada y no participa en la selección. Sesgo = real − predicho; un valor positivo indica que el modelo tendió a sobrepredecir menos.`;
+  } catch (error) {
+    validationBody.innerHTML = `<tr><td colspan="6">${esc(error.message)}</td></tr>`;
+    testBody.innerHTML = `<tr><td colspan="6">${esc(error.message)}</td></tr>`;
+  }
+}
+
 async function loadResults(silent = false) {
   const tbody = $("#resultsBody");
   const button = $("#resultsRefresh");
@@ -659,6 +696,7 @@ async function loadResults(silent = false) {
       evaluation_window: state.results.window,
     });
     state.loaded.results = true;
+    loadModelComparison();
     const summary = data.summary || {};
     $("#resultsSummary").innerHTML = [
       summaryCard("Partidos", String(summary.n ?? 0), data.season),
@@ -1699,7 +1737,7 @@ async function submitPrediction(event) {
 }
 
 function activateResultsView(name) {
-  const validViews = ["history", "performance", "calibration", "errors"];
+  const validViews = ["history", "performance", "calibration", "errors", "models"];
   const view = validViews.includes(name) ? name : "history";
   $$(".results-nav-btn").forEach((button) => {
     const active = button.dataset.resultsView === view;
