@@ -4546,6 +4546,9 @@ def position_vs_opponent(
     if history.empty:
         return _ok({"available": False, "reason": "No hay historial reciente de partidos de jugadores."})
     rows = history.copy()
+    current_season = _season_for(_et_today())
+    if "season" in rows.columns:
+        rows = rows[rows["season"].astype(str).eq(current_season)].copy()
     rows["opponent"] = rows["opponent"].map(_nba_abbreviation)
     rows = rows[rows["opponent"].eq(opponent_key)].copy()
     if rows.empty:
@@ -4581,7 +4584,7 @@ def position_vs_opponent(
     } for row in rows.itertuples(index=False)]
     return _ok({
         "available": bool(games), "opponent": opponent_key, "position": position,
-        "window": window, "games_checked": int(len(recent_games)), "sample": len(games),
+        "window": window, "season": current_season, "games_checked": int(len(recent_games)), "sample": len(games),
         "average": round(float(values.mean()), 1) if len(values) else None,
         "median": round(float(values.median()), 1) if len(values) else None,
         "max": int(values.max()) if len(values) else None, "players": games,
