@@ -707,6 +707,11 @@
             </section>
           </section>
         </div>
+        <section class="advanced-panel pd-point-distribution" aria-labelledby="pdPointDistTitle">
+          <div class="advanced-panel-head"><div><p class="eyebrow">NBA CARDS · PROBABILIDAD EMPÍRICA</p><h3 id="pdPointDistTitle">Distribución de puntos</h3><p class="muted">Frecuencia de superar distintas líneas en los últimos partidos del jugador.</p></div></div>
+          <div class="advanced-controls"><label>Línea de puntos<input id="pdPointDistLine" type="number" min="0" max="100" step="0.5" value="20.5"></label><button class="btn btn-ghost" id="pdPointDistRefresh" type="button">Actualizar</button></div>
+          <div id="pdPointDistResult" class="advanced-result" aria-live="polite">Cargando distribución del jugador…</div>
+        </section>
         <p class="pd-note" id="pdNote"></p>
         </div>
       </div>
