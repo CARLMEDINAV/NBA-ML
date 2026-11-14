@@ -380,7 +380,15 @@ async function api(path, params = {}) {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.detail || `Error ${response.status} al consultar la API`);
+    const detail = data.detail;
+    const message = typeof detail === "string"
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((item) => typeof item === "string" ? item : item?.msg || JSON.stringify(item)).join(" · ")
+        : detail && typeof detail === "object"
+          ? detail.message || detail.msg || JSON.stringify(detail)
+          : `Error ${response.status} al consultar la API`;
+    throw new Error(message);
   }
   return data;
 }
