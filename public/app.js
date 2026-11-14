@@ -409,6 +409,7 @@ function populateTeams(meta) {
   fillTeams($("#playersTeam"), teams, true);
   fillTeams($("#injuriesTeam"), teams, true);
   fillTeams($("#propsTeam"), teams, true);
+  fillTeams($("#teamImpactTeam"), teams);
   fillTeams($("#predictHome"), teams);
   fillTeams($("#predictAway"), teams);
 
