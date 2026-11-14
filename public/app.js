@@ -1123,6 +1123,10 @@ async function openPlayerDetail(playerId, options = {}) {
     const data = await api("/api/player-card", { player_id: numericId });
     if (requestId !== state.detail.requestId) return;
     state.detail.data = data;
+    window.dispatchEvent(new CustomEvent("nba:player-card-open", { detail: {
+      playerId: numericId,
+      averagePoints: data.player?.averages?.pts ?? null
+    }}));
     state.detail.stat = DETAIL_STATS.some((item) => item.key === options.stat)
       ? options.stat
       : "pts";
