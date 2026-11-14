@@ -1,4 +1,5 @@
 (() => {
+  let cardPlayerId = "";
   const $ = (selector) => document.querySelector(selector);
   const esc = (value) => { const node = document.createElement("span"); node.textContent = String(value ?? ""); return node.innerHTML; };
   const n = (value, digits = 1) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits).replace('.', ',');
@@ -48,7 +49,37 @@
       if (games.length) { select.selectedIndex = 1; await loadQuarterProjection(); } else $('#quarterResult').textContent = 'No hay partidos próximos en el rango seleccionado.';
     } catch (error) { $('#quarterResult').textContent = error.message; }
   }
+  async function loadCardDistribution(playerId) {
+    const target = $('#pdPointDistResult');
+    if (!target || !playerId) return;
+    const line = Number($('#pdPointDistLine')?.value || 20.5);
+    target.textContent = 'Calculando distribución de puntos…';
+    try {
+      const data = await api('/api/player-prop-distribution', {player_id:playerId,line:line,window:20});
+      if (!data.available) { target.textContent = data.reason || 'No hay muestra suficiente para este jugador.'; return; }
+      const rows = (data.distribution || []).map((item) =>
+        '<div class="advanced-bar-row"><span>' + n(item.line) + '</span><div class="advanced-bar-track"><i style="width:' + Math.max(0,Math.min(100,item.over*100)) + '%"></i></div><b>' + pct(item.over) + ' Over</b></div>'
+      ).join('');
+      target.innerHTML =
+        '<div class="advanced-grid"><div class="advanced-stat"><span>Media · últimos ' + data.sample + '</span><strong>' + n(data.mean) + '</strong><small>puntos por partido</small></div>' +
+        '<div class="advanced-stat"><span>Mediana</span><strong>' + n(data.median) + '</strong><small>puntos</small></div>' +
+        '<div class="advanced-stat"><span>Over ' + n(line) + '</span><strong>' + pct(data.over) + '</strong><small>frecuencia empírica</small></div>' +
+        '<div class="advanced-stat"><span>Under ' + n(line) + '</span><strong>' + pct(data.under) + '</strong><small>frecuencia empírica</small></div></div>' +
+        '<div class="advanced-bars">' + rows + '</div><p class="advanced-foot">' + esc(data.note || '') +
+        ' · Intervalo orientativo 80%: ' + pct(data.over_interval_80?.[0]) + '–' + pct(data.over_interval_80?.[1]) + '.</p>';
+    } catch (error) { target.textContent = error.message; }
+  }
+
   function init() {
+    window.addEventListener('nba:player-card-open', (event) => {
+      cardPlayerId = String(event.detail?.playerId || '');
+      const average = Number(event.detail?.averagePoints);
+      const lineInput = $('#pdPointDistLine');
+      if (lineInput && Number.isFinite(average) && average > 0) lineInput.value = (Math.round(average * 2) / 2).toFixed(1);
+      loadCardDistribution(cardPlayerId);
+    });
+    $('#pdPointDistRefresh')?.addEventListener('click', () => loadCardDistribution(cardPlayerId));
+    $('#pdPointDistLine')?.addEventListener('change', () => loadCardDistribution(cardPlayerId));
     $('#pointDistRefresh')?.addEventListener('click', loadDistribution); $('#matchupRefresh')?.addEventListener('click', loadMatchup); $('#quarterRefresh')?.addEventListener('click', loadQuarterGames); $('#quarterGame')?.addEventListener('change', loadQuarterProjection); $('#pointDistLine')?.addEventListener('change', loadDistribution);
     $('#propsPlayer')?.addEventListener('change', () => { loadDistribution(); loadMatchup(); });
     $('#tab-btn-props')?.addEventListener('click', () => window.setTimeout(() => { if ($('#propsPlayer')?.value) { loadDistribution(); loadMatchup(); } loadQuarterGames(); }, 1200));
