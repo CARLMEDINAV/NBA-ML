@@ -105,17 +105,22 @@ function availabilityHtml(availability) {
 }
 
 function winProbabilityCell(game) {
+  const homeProbability = Number(game.home_win_probability);
+  if (!Number.isFinite(homeProbability)) return "—";
+  const awayProbability = 1 - homeProbability;
   const adjusted = Boolean(game.availability?.model_adjusted);
   const base =
     game.base_home_win_probability === null ||
     game.base_home_win_probability === undefined
       ? null
       : Number(game.base_home_win_probability);
-  const baseLine =
-    adjusted && base !== null
-      ? `<small class="market-line">base ${pct(base)}</small>`
-      : "";
-  return `<strong>${pct(game.home_win_probability)}</strong>${baseLine}`;
+  const baseAway = adjusted && base !== null ? 1 - base : null;
+  const baseLines = (value) =>
+    value === null ? "" : `<small class="win-prob-base">base ${pct(value)}</small>`;
+  return `<div class="win-probability-cell">
+    <span class="win-prob-away"><small>VISITANTE</small><strong>${pct(awayProbability)}</strong>${baseLines(baseAway)}</span>
+    <span class="win-prob-home"><small>LOCAL</small><strong>${pct(homeProbability)}</strong>${baseLines(adjusted ? base : null)}</span>
+  </div>`;
 }
 
 function shortDate(value) {
