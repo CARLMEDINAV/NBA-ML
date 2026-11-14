@@ -22,10 +22,10 @@ def _cache_path(season: str) -> Path:
 def fetch_season(
     season: str,
     season_type: str = SEASON_TYPE,
-    timeout: int = 30,
-    retries: int = 3,
+    timeout: int = 90,
+    retries: int = 5,
 ) -> pd.DataFrame:
-    """Descarga una temporada, con reintentos y espera exponencial."""
+    """Descarga una temporada con timeout amplio y reintentos progresivos."""
     # Import perezoso: la API de Vercel solo lee artefactos y no necesita nba_api.
     from nba_api.stats.endpoints import leaguegamelog
 
@@ -46,16 +46,18 @@ def fetch_season(
             return frame
         except Exception as exc:  # noqa: BLE001 - la API falla de formas variadas
             last_error = exc
-            wait = 2 * attempt
+            wait = min(60, 5 * (2 ** (attempt - 1)))
             LOG.warning(
-                "Error descargando %s (intento %s/%s): %s. Reintento en %ss",
+                "Error descargando %s (intento %s/%s, timeout=%ss): %s. Reintento en %ss",
                 season,
                 attempt,
                 retries,
+                timeout,
                 exc,
                 wait,
             )
-            time.sleep(wait)
+            if attempt < retries:
+                time.sleep(wait)
     raise RuntimeError(f"No se pudo descargar la temporada {season}") from last_error
 
 
