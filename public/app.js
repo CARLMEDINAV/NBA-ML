@@ -17,7 +17,7 @@ const state = {
   loaded: { upcoming: false, analysis: false, results: false, players: false, props: false },
   upcoming: { days: 7, team: "" },
   analysis: { days: 7, team: "" },
-  results: { season: "2025-26", team: "", limit: 25 },
+  results: { season: "2025-26", team: "", limit: 25, window: 200 },
   players: {
     season: "2026-27",
     mode: "pergame",
@@ -656,6 +656,7 @@ async function loadResults(silent = false) {
       limit: state.results.limit,
       line: state.line,
       live: state.results.season === state.meta?.current_season ? 1 : 0,
+      evaluation_window: state.results.window,
     });
     state.loaded.results = true;
     const summary = data.summary || {};
@@ -667,6 +668,34 @@ async function loadResults(silent = false) {
       summaryCard("Brier", num(summary.brier, 3), "probabilidad"),
       summaryCard("Sesgo", signed(summary.bias, 2), "previsto − real"),
     ].join("");
+
+    const evaluation = data.evaluation || {};
+    const evalSummary = evaluation.summary || {};
+    $("#resultsEvalSummary").innerHTML = [
+      summaryCard("Muestra evaluada", String(evaluation.window ?? 0), evaluation.requested_window === 0 ? "temporada completa" : "partidos más recientes"),
+      summaryCard("MAE reciente", num(evalSummary.mae, 2), "puntos"),
+      summaryCard("Brier reciente", num(evalSummary.brier, 3), "probabilidades"),
+      summaryCard("Acierto direccional", pct(evalSummary.hit_rate), `${evalSummary.n_leans ?? 0} señales`),
+      summaryCard("Sesgo reciente", signed(evalSummary.bias, 2), "previsto − real"),
+    ].join("");
+    $("#resultsCalibrationBody").innerHTML = (evaluation.calibration || []).map((bucket) => `
+      <tr>
+        <td>${esc(bucket.range)}</td>
+        <td class="num">${bucket.n}</td>
+        <td class="num">${pct(bucket.mean_probability)}</td>
+        <td class="num">${pct(bucket.observed_over_rate)}</td>
+        <td class="num">${bucket.calibration_gap == null ? "—" : signed(bucket.calibration_gap * 100, 1) + " pp"}</td>
+        <td class="num">${num(bucket.brier, 3)}</td>
+      </tr>`).join("") || '<tr><td colspan="6">Sin datos de calibración.</td></tr>';
+    $("#resultsExtremesBody").innerHTML = (evaluation.error_extremes || []).map((game) => `
+      <tr>
+        <td>${esc(game.matchup)}</td>
+        <td>${esc(shortDate(game.game_date))}</td>
+        <td class="num">${num(game.predicted_total)}</td>
+        <td class="num">${num(game.actual_total, 0)}</td>
+        <td class="num">${signed(game.error, 1)}</td>
+      </tr>`).join("") || '<tr><td colspan="5">Sin errores extremos disponibles.</td></tr>';
+    $("#resultsEvalNote").textContent = "Brecha = porcentaje OVER observado menos P(over) media. Los rangos con pocos partidos son descriptivos, no evidencia de calibración. Los errores extremos identifican partidos para revisar; no demuestran por sí solos qué variable causó el fallo.";
 
     if (!data.games.length) {
       emptyRow(tbody, 11, "Todavía no hay partidos con resultado para esta temporada o filtro.");
@@ -1736,6 +1765,10 @@ function bindEvents() {
   });
   $("#resultsLimit").addEventListener("change", (event) => {
     state.results.limit = Number(event.target.value);
+    loadResults();
+  });
+  $("#resultsWindow").addEventListener("change", (event) => {
+    state.results.window = Number(event.target.value);
     loadResults();
   });
 
