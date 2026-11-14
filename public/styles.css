@@ -4218,3 +4218,13 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 .advanced-foot{margin:10px 0 0;color:#8291a8;font-size:.67rem;line-height:1.5}
 .advanced-game-select{max-width:440px}
 @media(max-width:640px){.advanced-panel-head{flex-direction:column}.advanced-controls{align-items:stretch}.advanced-controls label,.advanced-controls input,.advanced-controls button{width:100%}.advanced-table{display:block;overflow-x:auto;white-space:nowrap}}
+
+/* Favorito del partido y tres jugadores destacados en Bet Builder */
+.bb-prediction-strip{display:flex;align-items:center;gap:10px;margin:10px 0;padding:10px 12px;border:1px solid rgba(96,165,250,.22);border-radius:11px;background:rgba(30,64,175,.10)}
+.bb-prediction-kicker{color:#94a3b8;font-size:.68rem}.bb-prediction-strip strong{color:#e2e8f0;font-size:.82rem}.bb-prediction-strip>b{margin-left:auto;color:#93c5fd;font:800 .9rem var(--mono)}
+.bb-player-picks{margin:10px 0 14px;padding:12px;border:1px solid rgba(148,163,184,.16);border-radius:12px;background:rgba(15,23,42,.34)}
+.bb-player-picks-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px;margin-bottom:9px}.bb-player-picks-head strong{color:#e2e8f0;font-size:.8rem}.bb-player-picks-head small,.bb-player-info small,.bb-player-grade small{color:#94a3b8;font-size:.63rem}
+.bb-player-pick{display:grid;grid-template-columns:24px minmax(100px,1fr) minmax(160px,1.4fr) 36px;gap:9px;align-items:center;padding:9px 0;border-top:1px solid rgba(148,163,184,.1)}
+.bb-player-rank{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:rgba(148,163,184,.12);color:#cbd5e1;font:750 .68rem var(--mono)}.bb-player-info strong{display:block;color:#f1f5f9;font-size:.73rem}
+.bb-player-stats{display:grid;grid-template-columns:repeat(4,minmax(30px,1fr));gap:5px}.bb-player-stats span{text-align:center}.bb-player-stats small{display:block;color:#94a3b8;font-size:.56rem}.bb-player-stats b{color:#e2e8f0;font:750 .72rem var(--mono)}.bb-player-grade{text-align:center}.bb-player-grade b{display:block;color:#86efac;font:800 .85rem var(--mono)}.bb-player-grade small{display:block}.bb-player-picks-empty{color:#94a3b8;font-size:.68rem}
+@media(max-width:560px){.bb-player-pick{grid-template-columns:22px minmax(90px,1fr) 32px;gap:7px}.bb-player-stats{grid-column:2 / 4;grid-row:2}.bb-player-grade{grid-column:3;grid-row:1}.bb-player-info{grid-column:2;grid-row:1}}
