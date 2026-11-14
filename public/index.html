@@ -554,6 +554,17 @@
         <div id="teamImpactCards" class="team-impact-grid"></div>
         <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Rival</th><th>Resultado</th><th class="num">PF</th><th class="num">PC</th><th class="num">Total</th><th class="num">MIN</th><th>Participación</th></tr></thead><tbody id="teamImpactGames"></tbody></table></div>
         <p class="table-note" id="teamImpactNote">La comparación es descriptiva. Rival, localía, descanso, rotaciones y tamaño de muestra también afectan el resultado.</p>
+      <section class="team-impact-secondary">
+        <div class="section-head">
+          <div><p class="eyebrow">Análisis complementario</p><h2>Beneficiarios de ausencias</h2>
+          <p class="muted">Detecta qué compañeros aumentan sus puntos, minutos, asistencias, rebotes y uso cuando falta el jugador seleccionado.</p></div>
+          <button class="btn btn-ghost" type="button" id="teammateImpactRefresh">Analizar compañeros</button>
+        </div>
+        <div id="teammateImpactNotice" class="notice" role="status"></div>
+        <div id="teammateImpactSummary" class="summary-grid"></div>
+        <div class="table-wrap"><table><thead><tr><th>Compañero</th><th class="num">PTS con</th><th class="num">PTS sin</th><th class="num">Δ PTS</th><th class="num">MIN con/sin</th><th class="num">AST sin</th><th class="num">REB sin</th><th class="num">USO Δ</th><th class="num">Muestras</th></tr></thead><tbody id="teammateImpactBody"></tbody></table></div>
+        <p class="table-note">Solo aparecen compañeros con al menos 2 partidos en cada grupo. Los partidos de participación parcial se contabilizan aparte y no se confunden con ausencias completas.</p>
+      </section>
       </section>
 
       <section class="team-impact-secondary">
