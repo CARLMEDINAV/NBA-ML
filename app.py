@@ -4476,7 +4476,7 @@ def player_prop_distribution(
 POSITION_CACHE: dict[str, Any] = {"at": 0.0, "players": {}}
 
 
-def _espn_position_lookup() -> dict[int, str]:
+def _espn_position_lookup() -> dict[str, str]:
     """Obtiene posiciones oficiales de los rosters ESPN y las cachea seis horas."""
     now = time.time()
     cached = POSITION_CACHE.get("players") or {}
@@ -4499,29 +4499,29 @@ def _espn_position_lookup() -> dict[int, str]:
                         teams.append(str(team["id"]))
         if not teams:
             raise ValueError("ESPN no devolvió equipos NBA")
-        def fetch_roster(team_id: str) -> dict[int, str]:
+        def fetch_roster(team_id: str) -> dict[str, str]:
             try:
                 roster_response = httpx.get(
                     f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster",
                     headers=headers, timeout=LIVE_TIMEOUT, follow_redirects=True,
                 )
                 roster_response.raise_for_status()
-                found: dict[int, str] = {}
+                found: dict[str, str] = {}
                 for athlete in roster_response.json().get("athletes", []):
                     entries = athlete.get("items", []) if isinstance(athlete, dict) and isinstance(athlete.get("items"), list) else [athlete]
                     for player in entries:
                         if not isinstance(player, dict) or not player.get("id"):
                             continue
                         position = (player.get("position") or {}).get("abbreviation")
-                        try:
-                            if position:
-                                found[int(player["id"])] = str(position).upper()
-                        except (TypeError, ValueError):
-                            continue
+                        player_name = _name_key(
+                            player.get("fullName") or player.get("displayName") or player.get("name")
+                        )
+                        if position and player_name:
+                            found[player_name] = str(position).upper()
                 return found
             except Exception:
                 return {}
-        positions: dict[int, str] = {}
+        positions: dict[str, str] = {}
         with ThreadPoolExecutor(max_workers=10) as pool:
             for found in pool.map(fetch_roster, teams):
                 positions.update(found)
@@ -4537,10 +4537,13 @@ def _espn_position_lookup() -> dict[int, str]:
 @app.get("/api/position-vs-opponent")
 def position_vs_opponent(
     opponent: str = Query(..., min_length=2, max_length=3),
-    position: str = Query(..., pattern="^(PG|SG|SF|PF|C)$"),
+    position: str = Query(..., min_length=2, max_length=2),
     window: int = Query(10, ge=5, le=20),
 ) -> JSONResponse:
     """Puntos anotados por jugadores de una posición contra un rival en sus últimos N partidos."""
+    position = position.upper()
+    if position not in {"PG", "SG", "SF", "PF", "C"}:
+        raise HTTPException(status_code=400, detail="Posición no válida.")
     opponent_key = _nba_abbreviation(opponent)
     history = _player_history()
     if history.empty:
@@ -4560,9 +4563,7 @@ def position_vs_opponent(
     rows = rows[rows["game_id"].astype(str).isin(recent_games["game_id"].astype(str))].copy()
     positions = _espn_position_lookup()
     rows["player_id_num"] = pd.to_numeric(rows["player_id"], errors="coerce")
-    rows["position"] = rows["player_id_num"].map(
-        lambda value: positions.get(int(value)) if pd.notna(value) else None
-    )
+    rows["position"] = rows["player_name"].map(lambda value: positions.get(_name_key(value)))
     rows = rows[rows["position"].eq(position)].copy()
     if rows.empty:
         return _ok({
