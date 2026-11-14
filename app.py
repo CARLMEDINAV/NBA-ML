@@ -4182,6 +4182,11 @@ def player_props(
                         "player_name": absent["player_name"], "status": "Out",
                         "deltas": historical["deltas"], "games_with": historical["games_with"],
                         "games_without": historical["games_without"],
+                        "base_projection": player.get("base_projection", {}),
+                        "adjusted_projection": {
+                            "pts": player.get("projected_pts"), "reb": player.get("projected_reb"),
+                            "ast": player.get("projected_ast"), "pra": player.get("projected_pra"),
+                        },
                     })
                     adjustment_count += 1
                     adjustment_summary.append({
