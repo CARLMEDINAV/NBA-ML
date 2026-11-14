@@ -58,6 +58,7 @@
       <button class="tab" role="tab" id="tab-btn-players" aria-selected="false" aria-controls="tab-players" data-tab="players">Jugadores</button>
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
+      <button class="tab" role="tab" id="tab-btn-quarters" aria-selected="false" aria-controls="tab-quarters" data-tab="quarters">Cuartos</button>
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
       </nav>
@@ -426,16 +427,24 @@
           <div class="advanced-controls"><label>Línea de referencia<input id="pointDistLine" type="number" min="0" max="100" step="0.5" value="20.5"></label><button class="btn btn-ghost" id="pointDistRefresh" type="button">Calcular distribución</button></div>
           <div id="pointDistResult" class="advanced-result" aria-live="polite">Selecciona un jugador en el analizador de Props.</div>
         </section>
-        <section class="advanced-panel" aria-labelledby="quarterTitle">
-          <div class="advanced-panel-head"><div><p class="eyebrow">PROYECCIÓN POR PERIODOS</p><h3 id="quarterTitle">Predicción por cuartos</h3><p class="muted">Estimación experimental a partir de parciales recientes de ESPN.</p></div><button class="btn btn-ghost" id="quarterRefresh" type="button">Actualizar</button></div>
-          <label class="advanced-game-select">Partido<select id="quarterGame"><option value="">Cargando partidos…</option></select></label>
-          <div id="quarterResult" class="advanced-result" aria-live="polite">Selecciona un partido para proyectar sus cuatro cuartos.</div>
-        </section>
+
         <section class="advanced-panel" aria-labelledby="matchupTitle">
           <div class="advanced-panel-head"><div><p class="eyebrow">ANÁLISIS INDIVIDUAL</p><h3 id="matchupTitle">Matchup del jugador</h3><p class="muted">Historial frente al rival y defensores directos registrados por tracking.</p></div><button class="btn btn-ghost" id="matchupRefresh" type="button">Analizar</button></div>
           <div id="matchupResult" class="advanced-result" aria-live="polite">Selecciona un jugador en el analizador de Props.</div>
         </section>
 <p class="table-note" id="propsNote"></p>
+      </section>
+
+      <section id="tab-quarters" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-quarters" hidden>
+        <div class="section-head">
+          <div><p class="eyebrow">PROYECCIÓN POR PERIODOS</p><h2>Predicción por cuartos</h2>
+          <p class="muted">Estimación experimental de puntos para Q1, Q2, Q3 y Q4 según parciales recientes.</p></div>
+          <button class="btn btn-ghost" id="quarterRefresh" type="button">Actualizar</button>
+        </div>
+        <div class="advanced-panel">
+          <label class="advanced-game-select">Partido<select id="quarterGame"><option value="">Cargando partidos…</option></select></label>
+          <div id="quarterResult" class="advanced-result" aria-live="polite">Selecciona un partido para proyectar sus cuatro cuartos.</div>
+        </div>
       </section>
 
       <section id="tab-betbuilder" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-betbuilder" hidden>
