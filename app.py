@@ -4578,11 +4578,11 @@ def position_vs_opponent(
     )
     values = rows["pts"].astype(float)
     games = [{
-        "player_id": int(row.player_id_num), "player_name": str(row.player_name),
-        "team": str(row.team), "date": row.game_date.strftime("%Y-%m-%d") if pd.notna(row.game_date) else None,
-        "game_id": str(row.game_id), "matchup": str(row.matchup),
-        "pts": int(row.pts), "min": round(float(row.min), 1),
-    } for row in rows.itertuples(index=False)]
+        "player_id": int(row["player_id_num"]), "player_name": str(row["player_name"]),
+        "team": str(row["team"]), "date": row["game_date"].strftime("%Y-%m-%d") if pd.notna(row["game_date"]) else None,
+        "game_id": str(row["game_id"]), "matchup": str(row["matchup"]),
+        "pts": int(row["pts"]), "min": round(float(row["min"]), 1),
+    } for row in rows.to_dict(orient="records")]
     return _ok({
         "available": bool(games), "opponent": opponent_key, "position": position,
         "window": window, "season": current_season, "games_checked": int(len(recent_games)), "sample": len(games),
