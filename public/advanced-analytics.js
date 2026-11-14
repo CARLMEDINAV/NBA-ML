@@ -82,7 +82,8 @@
     $('#pdPointDistLine')?.addEventListener('change', () => loadCardDistribution(cardPlayerId));
     $('#pointDistRefresh')?.addEventListener('click', loadDistribution); $('#matchupRefresh')?.addEventListener('click', loadMatchup); $('#quarterRefresh')?.addEventListener('click', loadQuarterGames); $('#quarterGame')?.addEventListener('change', loadQuarterProjection); $('#pointDistLine')?.addEventListener('change', loadDistribution);
     $('#propsPlayer')?.addEventListener('change', () => { loadDistribution(); loadMatchup(); });
-    $('#tab-btn-props')?.addEventListener('click', () => window.setTimeout(() => { if ($('#propsPlayer')?.value) { loadDistribution(); loadMatchup(); } loadQuarterGames(); }, 1200));
+    $('#tab-btn-props')?.addEventListener('click', () => window.setTimeout(() => { if ($('#propsPlayer')?.value) { loadDistribution(); loadMatchup(); } }, 500));
+    $('#tab-btn-quarters')?.addEventListener('click', () => window.setTimeout(loadQuarterGames, 250));
     const playerSelect = $('#propsPlayer'); if (playerSelect && window.MutationObserver) { const observer = new MutationObserver(() => { if (playerSelect.value) { loadDistribution(); loadMatchup(); } }); observer.observe(playerSelect, {childList:true}); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
