@@ -4168,3 +4168,24 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 
 /* Comparación temporal de modelos */.model-selected{background:rgba(52,211,153,.055)}
 .model-best{display:inline-block;margin-left:5px;padding:3px 6px;border:1px solid rgba(52,211,153,.24);border-radius:5px;color:#6ee7b7;font-size:.58rem;font-weight:800;white-space:nowrap}
+
+/* Team absence impact */
+.team-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.team-impact-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.team-impact-metric span { color: var(--muted); font-size: .82rem; }
+.team-impact-metric b { font-size: 1.55rem; font-variant-numeric: tabular-nums; }
+.team-impact-metric small { color: var(--muted); }
+.team-impact-metric em { color: var(--orange); font-size: .82rem; font-style: normal; }
