@@ -3126,6 +3126,77 @@ def teams() -> JSONResponse:
     return _ok({"teams": _team_payload(_state())})
 
 
+
+@app.get("/api/team-absence-impact")
+def team_absence_impact(
+    team: str = Query(..., min_length=2, max_length=3),
+    player_id: int = Query(..., ge=1),
+    season: str = "2026-27",
+    window: int = Query(20, ge=5, le=82),
+) -> JSONResponse:
+    """Compara al equipo con y sin participación de un jugador; no infiere lesión."""
+    team_key = _nba_abbreviation(team)
+    team_path = ARTIFACTS / "team_games_recent.csv"
+    player_path = ARTIFACTS / "player_game_logs_recent.csv"
+    if not team_path.exists() or not player_path.exists():
+        return _ok({"available": False, "reason": "Faltan historiales de partidos de equipos o jugadores."})
+    teams = pd.read_csv(team_path, dtype={"game_id": str})
+    players = pd.read_csv(player_path, dtype={"game_id": str})
+    if teams.empty or players.empty:
+        return _ok({"available": False, "reason": "El historial de participaciones de jugadores aún no está disponible. Ejecuta la actualización de jugadores y props."})
+    teams = teams[
+        teams["team_abbreviation"].astype(str).str.upper().eq(team_key)
+        & teams["season"].astype(str).eq(season)
+    ].copy()
+    players = players[
+        pd.to_numeric(players["player_id"], errors="coerce").eq(player_id)
+        & players["season"].astype(str).eq(season)
+        & players["team"].astype(str).str.upper().eq(team_key)
+    ].copy()
+    if teams.empty or players.empty:
+        return _ok({"available": False, "reason": "No hay una muestra suficiente del equipo y jugador en esta temporada."})
+    teams["game_id"] = teams["game_id"].astype(str)
+    players["game_id"] = players["game_id"].astype(str)
+    teams["game_date"] = pd.to_datetime(teams["game_date"], errors="coerce")
+    players["game_date"] = pd.to_datetime(players["game_date"], errors="coerce")
+    # Solo se comparan partidos desde la primera aparición registrada del jugador.
+    first_seen = players["game_date"].min()
+    teams = teams[teams["game_date"].ge(first_seen)].sort_values("game_date").tail(window)
+    appeared = set(players["game_id"])
+    teams["participated"] = teams["game_id"].isin(appeared)
+    with_player = teams[teams["participated"]]
+    without_player = teams[~teams["participated"]]
+    def metrics(frame: pd.DataFrame) -> dict[str, Any]:
+        return {
+            "games": int(len(frame)),
+            "wins": int(pd.to_numeric(frame.get("win"), errors="coerce").fillna(0).sum()),
+            "win_rate": _rounded(pd.to_numeric(frame.get("win"), errors="coerce").mean(), 3),
+            "points_for": _mean_value(frame, "pts", 1),
+            "points_against": _mean_value(frame, "opp_pts", 1),
+            "point_diff": _mean_value(frame.assign(_diff=pd.to_numeric(frame["pts"], errors="coerce") - pd.to_numeric(frame["opp_pts"], errors="coerce")), "_diff", 1),
+            "game_total": _mean_value(frame, "game_total", 1),
+            "pace": _mean_value(frame, "pace", 1),
+            "off_rtg": _mean_value(frame, "off_rtg", 1),
+            "def_rtg": _mean_value(frame, "def_rtg", 1),
+        }
+    player_name = str(players.sort_values("game_date").iloc[-1]["player_name"])
+    return _ok({
+        "available": True, "team": team_key, "player_id": player_id,
+        "player_name": player_name, "season": season, "window": int(len(teams)),
+        "coverage_start": first_seen.strftime("%Y-%m-%d"),
+        "with_player": metrics(with_player), "without_player": metrics(without_player),
+        "note": "Sin participación no equivale necesariamente a lesión. El registro distingue partidos con aparición del jugador frente a partidos sin aparición registrada; no atribuye causalidad.",
+        "sample_warning": "Muestra pequeña: interpreta con cautela." if len(without_player) < 3 or len(with_player) < 5 else None,
+        "games": [
+            {"date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
+             "opponent": str(row.matchup), "result": str(row.wl),
+             "points_for": _rounded(row.pts), "points_against": _rounded(row.opp_pts),
+             "game_total": _rounded(row.game_total), "participated": bool(row.participated)}
+            for row in teams.sort_values("game_date", ascending=False).itertuples(index=False)
+        ],
+    })
+
+
 @app.get("/api/injuries")
 def injuries(
     team: str | None = None,
