@@ -4384,6 +4384,7 @@ def results(
     team: str | None = None,
     today: str | None = None,
     live: bool = False,
+    evaluation_window: int = Query(200, ge=0, le=200),
 ) -> JSONResponse:
     artifact = _artifact()
     day = _today(today)
@@ -4476,7 +4477,66 @@ def results(
             ]
 
     summary = summarize_results(frame)
-    view = frame.sort_values("game_date", ascending=False).head(limit)
+    ordered = frame.sort_values("game_date", ascending=False)
+    evaluation_frame = ordered if evaluation_window == 0 else ordered.head(evaluation_window)
+    evaluation_summary = summarize_results(evaluation_frame)
+    probability_bins = [
+        ("0–50 %", 0.0, 0.50),
+        ("50–55 %", 0.50, 0.55),
+        ("55–60 %", 0.55, 0.60),
+        ("60–65 %", 0.60, 0.65),
+        ("65–70 %", 0.65, 0.70),
+        ("70–80 %", 0.70, 0.80),
+        ("80–100 %", 0.80, 1.0000001),
+    ]
+    calibration = []
+    probability_frame = evaluation_frame.dropna(
+        subset=["probability_over", "actual_result"]
+    )
+    for label, lower, upper in probability_bins:
+        bucket = probability_frame[
+            probability_frame["probability_over"].ge(lower)
+            & probability_frame["probability_over"].lt(upper)
+        ]
+        if bucket.empty:
+            calibration.append({
+                "range": label, "n": 0, "mean_probability": None,
+                "observed_over_rate": None, "calibration_gap": None, "brier": None,
+            })
+            continue
+        outcomes = bucket["actual_result"].eq("OVER").astype(float)
+        mean_probability = float(bucket["probability_over"].mean())
+        observed_rate = float(outcomes.mean())
+        calibration.append({
+            "range": label,
+            "n": int(len(bucket)),
+            "mean_probability": mean_probability,
+            "observed_over_rate": observed_rate,
+            "calibration_gap": observed_rate - mean_probability,
+            "brier": float(np.mean((bucket["probability_over"] - outcomes) ** 2)),
+        })
+    extreme_rows = evaluation_frame.assign(
+        absolute_error=(evaluation_frame["predicted_total"] - evaluation_frame["total_points"]).abs()
+    ).nlargest(5, "absolute_error")
+    error_extremes = [
+        {
+            "game_date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
+            "matchup": f"{row.away_team} @ {row.home_team}",
+            "predicted_total": float(row.predicted_total),
+            "actual_total": float(row.total_points),
+            "error": float(row.predicted_total - row.total_points),
+            "absolute_error": float(row.absolute_error),
+        }
+        for row in extreme_rows.itertuples(index=False)
+    ]
+    evaluation = {
+        "window": int(len(evaluation_frame)),
+        "requested_window": evaluation_window,
+        "summary": evaluation_summary,
+        "calibration": calibration,
+        "error_extremes": error_extremes,
+    }
+    view = ordered.head(limit)
     games: list[dict[str, Any]] = []
     for row in view.itertuples(index=False):
         hit = None if pd.isna(row.hit) else int(float(row.hit) == 1.0)
@@ -4562,6 +4622,7 @@ def results(
             "line": line,
             "count": int(len(frame)),
             "summary": summary,
+            "evaluation": evaluation,
             "games": games,
             "live_updated": live_updated,
             "caveat": (
