@@ -899,6 +899,22 @@ async function loadProps(silent = false) {
       $("#propsNote").textContent = "No hay jugadores para esos filtros. Prueba a ampliar los días o quitar el filtro de equipo.";
       return;
     }
+    const absence = data.absence_adjustment || {};
+    const absenceSummary = $("#propsAbsenceSummary");
+    const absenceBody = $("#propsAbsenceBody");
+    if (absenceSummary) absenceSummary.innerHTML = [
+      summaryCard("Bajas Out confirmadas", String(absence.confirmed_out_count || 0), "según ESPN"),
+      summaryCard("Ajustes aplicados", String(absence.adjustment_count || 0), "proyecciones modificadas"),
+      summaryCard("Parte actualizado", absence.stale ? "No" : (absence.source_updated_at || "Sí"), "fuente ESPN")
+    ].join("");
+    if (absenceBody) absenceBody.innerHTML = (absence.adjustments || []).map((item) =>
+      '<tr><td>' + esc(item.absent_player) + ' · ' + esc(item.team) + '</td><td>' + esc(item.teammate) +
+      '</td><td class="num">' + signed(item.deltas?.pts || 0, 1) + '</td><td class="num">' +
+      signed(item.deltas?.reb || 0, 1) + '</td><td class="num">' + signed(item.deltas?.ast || 0, 1) +
+      '</td><td class="num">' + item.games_with + ' / ' + item.games_without + '</td></tr>'
+    ).join("") || '<tr><td colspan="6">No hay bajas confirmadas con muestra histórica suficiente para ajustar estas proyecciones.</td></tr>';
+    const absenceNote = $("#propsAbsenceNote");
+    if (absenceNote) absenceNote.textContent = absence.note || "Sin ajustes históricos activos.";
     const validation = data.validation || {};
     const validationText = validation.from
       ? `Validación ${validation.from} → ${validation.to}: MAE PTS ${num(metrics.pts?.mae)}, REB ${num(metrics.reb?.mae)}, AST ${num(metrics.ast?.mae)}, PRA ${num(praMetrics.mae)}.`
