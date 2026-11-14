@@ -4059,6 +4059,52 @@ def players(
     )
 
 
+def _historical_absence_prop_adjustments(team: str, absent_player_id: int, logs: pd.DataFrame, team_games: pd.DataFrame, season: str) -> dict[int, dict[str, Any]]:
+    """Calcula deltas históricos de compañeros con/sin una baja confirmada."""
+    if logs.empty or team_games.empty:
+        return {}
+    frame = logs.copy()
+    required = {"player_id", "game_id", "team", "season", "pts", "reb", "ast", "min"}
+    if not required.issubset(frame.columns):
+        return {}
+    frame["game_id"] = frame["game_id"].astype(str).str.zfill(10)
+    frame["team"] = frame["team"].astype(str).str.upper().str.strip()
+    frame = frame[frame["season"].astype(str).eq(str(season)) & frame["team"].eq(team)].copy()
+    games = team_games.copy()
+    games["game_id"] = games["game_id"].astype(str).str.zfill(10)
+    games = games[games["season"].astype(str).eq(str(season)) & games["team_abbreviation"].astype(str).str.upper().eq(team)].copy()
+    if frame.empty or games.empty:
+        return {}
+    coverage = frame.groupby("game_id")["player_id"].nunique()
+    valid_ids = set(coverage[coverage >= 8].index)
+    games = games[games["game_id"].isin(valid_ids)].drop_duplicates("game_id")
+    star_ids = set(frame.loc[pd.to_numeric(frame["player_id"], errors="coerce").eq(absent_player_id), "game_id"].astype(str))
+    with_ids = set(games["game_id"]) & star_ids
+    without_ids = set(games["game_id"]) - star_ids
+    if len(with_ids) < 3 or len(without_ids) < 3:
+        return {}
+    for column in ["pts", "reb", "ast", "min"]:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    frame = frame[pd.to_numeric(frame["player_id"], errors="coerce").ne(absent_player_id)]
+    output = {}
+    for pid, group in frame.groupby("player_id"):
+        present, absent = group[group["game_id"].isin(with_ids)], group[group["game_id"].isin(without_ids)]
+        n_present, n_absent = int(present["game_id"].nunique()), int(absent["game_id"].nunique())
+        if n_present < 3 or n_absent < 3:
+            continue
+        deltas = {}
+        for stat in ["pts", "reb", "ast"]:
+            base, without = present[stat].mean(), absent[stat].mean()
+            if pd.isna(base) or pd.isna(without):
+                deltas[stat] = 0.0
+                continue
+            raw_delta = float(without - base)
+            adjusted = raw_delta * (n_absent / (n_absent + 5.0)) * 0.5
+            deltas[stat] = float(np.clip(adjusted, -max(1.0, abs(float(base)) * 0.15), max(1.0, abs(float(base)) * 0.15)))
+        output[int(pid)] = {"deltas": deltas, "games_with": n_present, "games_without": n_absent}
+    return output
+
+
 @app.get("/api/player-props")
 def player_props(
     days: int = Query(7, ge=1, le=14),
@@ -4087,18 +4133,60 @@ def player_props(
     names = _team_names(state)
     payload_games: list[dict[str, Any]] = []
     player_count = 0
+    injury_teams, injury_meta = _injury_report(state)
+    confirmed_out: dict[str, list[dict[str, Any]]] = {}
+    if not injury_meta.get("stale") and not injury_meta.get("warning"):
+        for team_row in injury_teams:
+            outs = [item for item in team_row.get("injuries", []) if item.get("status_class") == "out" and item.get("player_id")]
+            if outs:
+                confirmed_out[str(team_row.get("team") or "").upper()] = outs
+    history = _player_history()
+    team_games_path = ARTIFACTS / "team_games_recent.csv"
+    try:
+        team_games_history = pd.read_csv(team_games_path, dtype={"game_id": str}) if team_games_path.exists() else pd.DataFrame()
+    except Exception:
+        team_games_history = pd.DataFrame()
+    adjustment_count = 0
+    adjustment_summary: list[dict[str, Any]] = []
     for game in games.itertuples(index=False):
         players = predict_player_props(
-            artifact,
-            player_state,
-            state,
-            home=str(game.home),
-            away=str(game.away),
-            game_date=pd.Timestamp(game.game_date),
-            limit=limit,
+            artifact, player_state, state, home=str(game.home), away=str(game.away),
+            game_date=pd.Timestamp(game.game_date), limit=limit,
         )
         if not players:
             continue
+        for team_key in [str(game.home).upper(), str(game.away).upper()]:
+            for absent in confirmed_out.get(team_key, []):
+                try:
+                    deltas = _historical_absence_prop_adjustments(team_key, int(absent["player_id"]), history, team_games_history, _season_for(start))
+                except Exception:
+                    deltas = {}
+                if not deltas:
+                    continue
+                for player in players:
+                    if str(player.get("team", "")).upper() != team_key:
+                        continue
+                    historical = deltas.get(int(player["player_id"]))
+                    if not historical:
+                        continue
+                    before = {stat: float(player[f"projected_{stat}"]) for stat in ["pts", "reb", "ast"]}
+                    for stat in ["pts", "reb", "ast"]:
+                        cap = max(1.0, before[stat] * 0.15)
+                        player[f"projected_{stat}"] = round(max(0.0, before[stat] + float(np.clip(historical["deltas"][stat], -cap, cap))), 1)
+                    player["projected_pra"] = round(player["projected_pts"] + player["projected_reb"] + player["projected_ast"], 1)
+                    player.setdefault("absence_adjustments", []).append({
+                        "player_name": absent["player_name"], "status": "Out",
+                        "deltas": historical["deltas"], "games_with": historical["games_with"],
+                        "games_without": historical["games_without"],
+                    })
+                    adjustment_count += 1
+                    adjustment_summary.append({
+                        "game_id": str(game.game_id), "team": team_key,
+                        "absent_player": absent["player_name"], "teammate": player["player_name"],
+                        "deltas": historical["deltas"], "games_with": historical["games_with"],
+                        "games_without": historical["games_without"],
+                    })
+        players.sort(key=lambda item: (item.get("projected_pra", 0), item.get("projected_pts", 0)), reverse=True)
         player_count += len(players)
         payload_games.append(
             {
@@ -4134,6 +4222,14 @@ def player_props(
             "player_state_date": last_state.strftime("%Y-%m-%d"),
             "team_state_date": team_state_date.strftime("%Y-%m-%d"),
             "teams_without_games": teams_without_games,
+            "absence_adjustment": {
+                "enabled": bool(confirmed_out) and not injury_meta.get("stale") and not injury_meta.get("warning"),
+                "source": "ESPN", "source_updated_at": injury_meta.get("source_updated_at"),
+                "stale": bool(injury_meta.get("stale")),
+                "confirmed_out_count": sum(len(items) for items in confirmed_out.values()),
+                "adjustment_count": adjustment_count, "adjustments": adjustment_summary,
+                "note": "Ajuste conservador con al menos 3 partidos con y 3 sin el jugador ausente. Solo se aplica a estados Out confirmados por ESPN. El delta se reduce por tamaño de muestra y se limita al 15% de la proyección base."
+            },
             "model_name": artifact.get("model_name"),
             "trained_through": artifact.get("trained_through"),
             "metrics": metrics.get("targets"),
