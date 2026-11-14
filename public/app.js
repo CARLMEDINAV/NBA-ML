@@ -909,10 +909,12 @@ async function loadProps(silent = false) {
     ].join("");
     if (absenceBody) absenceBody.innerHTML = (absence.adjustments || []).map((item) =>
       '<tr><td>' + esc(item.absent_player) + ' · ' + esc(item.team) + '</td><td>' + esc(item.teammate) +
-      '</td><td class="num">' + signed(item.deltas?.pts || 0, 1) + '</td><td class="num">' +
-      signed(item.deltas?.reb || 0, 1) + '</td><td class="num">' + signed(item.deltas?.ast || 0, 1) +
+      '</td><td class="num">' + num(item.base_projection?.pts) + ' → ' + num(item.adjusted_projection?.pts) +
+      '</td><td class="num">' + num(item.base_projection?.reb) + ' → ' + num(item.adjusted_projection?.reb) +
+      '</td><td class="num">' + num(item.base_projection?.ast) + ' → ' + num(item.adjusted_projection?.ast) +
+      '</td><td class="num">' + signed(item.deltas?.pts || 0, 1) + ' / ' + signed(item.deltas?.reb || 0, 1) + ' / ' + signed(item.deltas?.ast || 0, 1) +
       '</td><td class="num">' + item.games_with + ' / ' + item.games_without + '</td></tr>'
-    ).join("") || '<tr><td colspan="6">No hay bajas confirmadas con muestra histórica suficiente para ajustar estas proyecciones.</td></tr>';
+    ).join("") || '<tr><td colspan="7">No hay bajas confirmadas con muestra histórica suficiente para ajustar estas proyecciones.</td></tr>';
     const absenceNote = $("#propsAbsenceNote");
     if (absenceNote) absenceNote.textContent = absence.note || "Sin ajustes históricos activos.";
     const validation = data.validation || {};
