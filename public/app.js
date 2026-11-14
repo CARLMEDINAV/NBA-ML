@@ -669,7 +669,7 @@ async function loadModelComparison() {
     </tr>`;
     validationBody.innerHTML = (data.validation || []).map((row) => rowHtml(row, true)).join("") || '<tr><td colspan="6">Sin métricas de validación.</td></tr>';
     testBody.innerHTML = (data.test || []).map((row) => rowHtml(row, false)).join("") || '<tr><td colspan="6">Sin métricas de test.</td></tr>';
-    $("#modelComparisonNote").textContent = `Modelo seleccionado por MAE en validación: ${label(data.best_model)}. El test es una evaluación temporal reservada y no participa en la selección. Sesgo = real − predicho; un valor positivo indica que el modelo tendió a sobrepredecir menos.`;
+    $("#modelComparisonNote").textContent = `Modelo seleccionado por MAE en validación: ${label(data.best_model)}. El test es una evaluación temporal reservada y no participa en la selección. Sesgo = real − predicho; positivo indica subestimación y negativo indica sobreestimación.`;
   } catch (error) {
     validationBody.innerHTML = `<tr><td colspan="6">${esc(error.message)}</td></tr>`;
     testBody.innerHTML = `<tr><td colspan="6">${esc(error.message)}</td></tr>`;
