@@ -493,6 +493,9 @@ def test_results_backtest_2025_26():
     payload = response.json()
     assert payload["count"] == 1225
     assert payload["summary"]["n"] == 1225
+    assert payload["evaluation"]["window"] == 200
+    assert len(payload["evaluation"]["calibration"]) == 7
+    assert "error_extremes" in payload["evaluation"]
     assert len(payload["games"]) == 5
     game = payload["games"][0]
     assert game["actual_result"] in {"OVER", "UNDER", "PUSH"}
