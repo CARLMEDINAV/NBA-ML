@@ -4292,3 +4292,16 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
   font-weight: 500;
   letter-spacing: 0;
 }
+
+
+/* Historial de puntos por posición y rival */
+.position-matchup-panel { display: grid; gap: 14px; }
+.position-matchup-controls { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)) auto; align-items: end; gap: 12px; }
+.position-matchup-controls label { display: grid; gap: 6px; color: var(--muted); font-size: .82rem; }
+.position-matchup-controls select { width: 100%; min-width: 0; }
+#positionVsTableWrap { margin-top: 2px; }
+#positionVsBody td { white-space: nowrap; }
+@media (max-width: 760px) {
+  .position-matchup-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .position-matchup-controls button { grid-column: 1 / -1; width: 100%; }
+}
