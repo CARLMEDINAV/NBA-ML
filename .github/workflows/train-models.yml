@@ -28,7 +28,7 @@ jobs:
         run: pip install -e ".[pipeline]"
 
       - name: Restaurar cache de temporadas históricas
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: data/raw
           key: nba-raw-v1-${{ runner.os }}-${{ github.run_id }}
@@ -39,6 +39,13 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m nba_ml download
+
+      - name: Guardar cache de temporadas (incluso si la descarga falla)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw
+          key: nba-raw-v1-${{ runner.os }}-${{ github.run_id }}
 
       - name: Construir dataset sin fuga temporal
         env:
