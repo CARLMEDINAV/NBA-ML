@@ -4551,7 +4551,7 @@ def _espn_position_lookup() -> dict[str, str]:
 @app.get("/api/position-vs-opponent")
 def position_vs_opponent(
     opponent: str = Query(..., min_length=2, max_length=3),
-    position: str = Query(..., min_length=2, max_length=2),
+    position: str = Query(..., min_length=1, max_length=1),
     window: int = Query(10, ge=5, le=20),
 ) -> JSONResponse:
     """Puntos anotados por jugadores de una posición contra un rival en sus últimos N partidos."""
