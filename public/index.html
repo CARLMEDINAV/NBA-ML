@@ -366,48 +366,40 @@
         <p class="table-note" id="injuriesNote"></p>
       </section>
 
-      <section id="tab-props" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-props" hidden>
-        <div class="section-head">
+      <section id="tab-props" class="tab-panel props-page" role="tabpanel" aria-labelledby="tab-btn-props" hidden>
+        <div class="section-head props-page-head">
           <div>
-            <p class="eyebrow">Player props</p>
+            <p class="eyebrow">PLAYER PROPS · NBA 2026–27</p>
             <h2>Predicciones de jugadores</h2>
+            <p class="muted">Proyecciones por partido, historial frente a líneas y contexto de disponibilidad.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="propsRefresh">Actualizar</button>
         </div>
-        <div class="controls-row">
-          <label>Días
-            <select id="propsDays">
-              <option value="1">1 día</option>
-              <option value="3">3 días</option>
-              <option value="5" selected>5 días</option>
-            </select>
-          </label>
-          <label>Equipo
-            <select id="propsTeam"><option value="">Todos</option></select>
-          </label>
-          <label>Jugadores por partido
-            <select id="propsLimit">
-              <optgroup label="Más comunes">
-                <option value="5">5</option>
-                <option value="8" selected>8</option>
-                <option value="12">12</option>
-              </optgroup>
-              <optgroup label="Todos">
-                <option value="20">20</option>
-              </optgroup>
-            </select>
-          </label>
-          <span class="control-note" id="propsRange"></span>
-        </div>
+
+        <section class="props-toolbar" aria-label="Filtros de predicciones">
+          <div class="props-toolbar-title"><div><p class="eyebrow">FILTROS</p><h3>Partidos y jugadores</h3></div><span class="control-note" id="propsRange"></span></div>
+          <div class="controls-row">
+            <label>Días
+              <select id="propsDays"><option value="1">1 día</option><option value="3">3 días</option><option value="5" selected>5 días</option></select>
+            </label>
+            <label>Equipo
+              <select id="propsTeam"><option value="">Todos</option></select>
+            </label>
+            <label>Jugadores por partido
+              <select id="propsLimit">
+                <optgroup label="Más comunes"><option value="5">5</option><option value="8" selected>8</option><option value="12">12</option></optgroup>
+                <optgroup label="Todos"><option value="20">20</option></optgroup>
+              </select>
+            </label>
+          </div>
+        </section>
+
         <div id="propsNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="propsSummary" aria-live="polite" hidden></div>
-        <section class="props-absence-adjustment" aria-labelledby="propsAbsenceTitle">
-          <div class="section-head"><div><p class="eyebrow">Disponibilidad · ESPN</p><h3 id="propsAbsenceTitle">Ajuste histórico por bajas confirmadas</h3><p class="muted">Las proyecciones se ajustan solo cuando ESPN marca a un jugador como Out y existe una muestra histórica suficiente de sus compañeros.</p></div></div>
-          <div id="propsAbsenceSummary" class="summary-grid"></div>
-          <div class="table-wrap"><table><thead><tr><th>Jugador ausente</th><th>Compañero</th><th class="num">PTS base → ajustado</th><th class="num">REB base → ajustado</th><th class="num">AST base → ajustado</th><th class="num">Δ PTS / REB / AST</th><th class="num">Muestra</th></tr></thead><tbody id="propsAbsenceBody"></tbody></table></div>
-          <p class="table-note" id="propsAbsenceNote">Esperando parte de lesiones y datos históricos.</p>
-        </section>
-        <section class="props-analyzer" aria-labelledby="propsAnalyzerTitle">
+
+        <section class="props-content-section" aria-labelledby="propsAnalyzerTitle">
+          <div class="props-section-heading"><div><p class="eyebrow">01 · ANÁLISIS INDIVIDUAL</p><h3>Rendimiento del jugador</h3><p class="muted">Compara sus últimos partidos con una línea seleccionada y revisa su contexto reciente.</p></div></div>
+                  <section class="props-analyzer" aria-labelledby="propsAnalyzerTitle">
           <div class="props-analyzer-head"><div><p class="eyebrow">HISTORIAL RECIENTE</p><h3 id="propsAnalyzerTitle">Analizador de Props</h3><p>Selecciona un jugador, una estadística y una línea. Comparamos sus últimos 5 y 10 partidos reales.</p></div><span class="props-live-tag"><i></i> DATOS NBA</span></div>
           <div class="props-analyzer-controls">
             <label>Jugador<select id="propsPlayer"><option value="">Cargando jugadores…</option></select></label>
@@ -421,18 +413,30 @@
           <div id="propsMatchupContext" class="props-matchup-context" aria-live="polite"></div>
           <p class="props-analyzer-footnote">Acierto histórico = partidos en que el jugador igualó o superó la línea. La muestra depende de los partidos disponibles; no representa una probabilidad garantizada del próximo encuentro.</p>
         </section>
-        
-        <section class="advanced-panel" aria-labelledby="nbaCardsTitle">
+        </section>
+
+        <section class="props-content-section" aria-label="Herramientas complementarias">
+          <div class="props-section-heading"><div><p class="eyebrow">02 · HERRAMIENTAS COMPLEMENTARIAS</p><h3>Distribución y matchup</h3><p class="muted">Consulta la frecuencia histórica de puntos y el contexto del enfrentamiento.</p></div></div>
+          <div class="props-tools-grid">        <section class="advanced-panel" aria-labelledby="nbaCardsTitle">
           <div class="advanced-panel-head"><div><p class="eyebrow">NBA CARDS · DISTRIBUCIÓN</p><h3 id="nbaCardsTitle">Distribución de puntos por jugador</h3><p class="muted">Frecuencia histórica de superar distintas líneas en los partidos recientes.</p></div></div>
           <div class="advanced-controls"><label>Línea de referencia<input id="pointDistLine" type="number" min="0" max="100" step="0.5" value="20.5"></label><button class="btn btn-ghost" id="pointDistRefresh" type="button">Calcular distribución</button></div>
           <div id="pointDistResult" class="advanced-result" aria-live="polite">Selecciona un jugador en el analizador de Props.</div>
-        </section>
-
-        <section class="advanced-panel" aria-labelledby="matchupTitle">
+        </section>        <section class="advanced-panel" aria-labelledby="matchupTitle">
           <div class="advanced-panel-head"><div><p class="eyebrow">ANÁLISIS INDIVIDUAL</p><h3 id="matchupTitle">Matchup del jugador</h3><p class="muted">Historial frente al rival y defensores directos registrados por tracking.</p></div><button class="btn btn-ghost" id="matchupRefresh" type="button">Analizar</button></div>
           <div id="matchupResult" class="advanced-result" aria-live="polite">Selecciona un jugador en el analizador de Props.</div>
+        </section></div>
         </section>
-<p class="table-note" id="propsNote"></p>
+
+        <section class="props-content-section" aria-labelledby="propsAbsenceTitle">
+          <div class="props-section-heading"><div><p class="eyebrow">03 · DISPONIBILIDAD</p><h3>Impacto de las bajas</h3><p class="muted">Ajustes históricos aplicados solo con ausencias confirmadas y muestras suficientes.</p></div></div>
+                  <section class="props-absence-adjustment" aria-labelledby="propsAbsenceTitle">
+          <div class="section-head"><div><p class="eyebrow">Disponibilidad · ESPN</p><h3 id="propsAbsenceTitle">Ajuste histórico por bajas confirmadas</h3><p class="muted">Las proyecciones se ajustan solo cuando ESPN marca a un jugador como Out y existe una muestra histórica suficiente de sus compañeros.</p></div></div>
+          <div id="propsAbsenceSummary" class="summary-grid"></div>
+          <div class="table-wrap"><table><thead><tr><th>Jugador ausente</th><th>Compañero</th><th class="num">PTS base → ajustado</th><th class="num">REB base → ajustado</th><th class="num">AST base → ajustado</th><th class="num">Δ PTS / REB / AST</th><th class="num">Muestra</th></tr></thead><tbody id="propsAbsenceBody"></tbody></table></div>
+          <p class="table-note" id="propsAbsenceNote">Esperando parte de lesiones y datos históricos.</p>
+        </section>
+        </section>
+        <p class="table-note" id="propsNote"></p>
       </section>
 
       <section id="tab-quarters" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-quarters" hidden>
