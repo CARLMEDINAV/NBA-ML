@@ -4166,11 +4166,5 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 }
 
 
-/* Comparación temporal de modelos */
-.model-comparison-block{margin:18px 0 22px}
-.model-comparison-block h4{margin:0 0 10px;color:#dce6f5;font-size:.88rem}
-.model-comparison-block h4 span{color:#fbad72;font-family:var(--mono)}
-.model-comparison-block .table-wrap{margin-top:0}
-.model-selected{background:rgba(52,211,153,.055)}
+/* Comparación temporal de modelos */.model-selected{background:rgba(52,211,153,.055)}
 .model-best{display:inline-block;margin-left:5px;padding:3px 6px;border:1px solid rgba(52,211,153,.24);border-radius:5px;color:#6ee7b7;font-size:.58rem;font-weight:800;white-space:nowrap}
-@media(max-width:640px){.model-comparison-block .table-wrap{overflow-x:auto}.model-comparison-block table{min-width:620px}}
