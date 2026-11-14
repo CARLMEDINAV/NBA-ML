@@ -887,6 +887,7 @@ async function loadProps(silent = false) {
     notice($("#propsNotice"), [data.warning, missingTeamsText].filter(Boolean).join(" "));
 
     state.props.players = players;
+    window.dispatchEvent(new CustomEvent("nba:props-ready"));
     if (state.props.selectedPlayerId && !players.some((player) => String(player.player_id) === String(state.props.selectedPlayerId))) {
       state.props.selectedPlayerId = "";
       state.props.card = null;
