@@ -873,6 +873,32 @@ async function loadPlayers() {
   }
 }
 
+let positionVsPlayers = [];
+
+function renderPositionVsPlayers() {
+  const [metric, direction] = $("#positionVsSort").value.split("_");
+  const field = metric === "min" ? "min" : "pts";
+  const sign = direction === "asc" ? 1 : -1;
+  const players = [...positionVsPlayers].sort((a, b) => {
+    const av = Number(a[field]);
+    const bv = Number(b[field]);
+    const aValid = Number.isFinite(av);
+    const bValid = Number.isFinite(bv);
+    if (!aValid && !bValid) return 0;
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+    return (av - bv) * sign;
+  });
+  const fmt = (value) => value == null ? "—" : Number(value).toFixed(1);
+  $("#positionVsBody").innerHTML = players.map((player) => `<tr>
+    <td><strong>${esc(player.player_name)}</strong></td>
+    <td>${numericDate(player.date)}</td>
+    <td>${esc(player.matchup || "—")}</td>
+    <td class="num">${fmt(player.min)}</td>
+    <td class="num"><strong>${player.pts}</strong></td>
+  </tr>`).join("");
+}
+
 async function loadPositionVsOpponent() {
   const opponent = $("#positionVsTeam").value;
   const status = $("#positionVsStatus");
@@ -892,6 +918,7 @@ async function loadPositionVsOpponent() {
       opponent, position: $("#positionVsRole").value, window: $("#positionVsWindow").value,
     });
     if (!data.available) {
+      positionVsPlayers = [];
       status.textContent = data.reason || "No hay datos para esta selección.";
       return;
     }
@@ -903,13 +930,8 @@ async function loadPositionVsOpponent() {
       summaryCard("Registros", String(data.sample), `${data.games_checked} partidos del rival`),
     ].join("");
     summary.hidden = false;
-    $("#positionVsBody").innerHTML = (data.players || []).map((player) => `<tr>
-      <td><strong>${esc(player.player_name)}</strong></td>
-      <td>${numericDate(player.date)}</td>
-      <td>${esc(player.matchup || "—")}</td>
-      <td class="num">${fmt(player.min)}</td>
-      <td class="num"><strong>${player.pts}</strong></td>
-    </tr>`).join("");
+    positionVsPlayers = data.players || [];
+    renderPositionVsPlayers();
     wrap.hidden = false;
     status.textContent = `${data.sample} actuaciones encontradas · ${data.position} vs. ${data.opponent} · temporada ${data.season}. ${data.note || ""}`;
   } catch (error) {
@@ -2049,6 +2071,7 @@ function bindEvents() {
 
   $("#propsRefresh").addEventListener("click", () => loadProps());
   $("#positionVsRefresh").addEventListener("click", loadPositionVsOpponent);
+  $("#positionVsSort").addEventListener("change", renderPositionVsPlayers);
   $("#positionVsTeam").addEventListener("change", loadPositionVsOpponent);
   $("#positionVsRole").addEventListener("change", loadPositionVsOpponent);
   $("#positionVsWindow").addEventListener("change", loadPositionVsOpponent);
