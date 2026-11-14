@@ -414,6 +414,12 @@ function populateTeams(meta) {
   fillTeams($("#playersTeam"), teams, true);
   fillTeams($("#injuriesTeam"), teams, true);
   fillTeams($("#propsTeam"), teams, true);
+  fillTeams($("#positionVsTeam"), teams);
+  const positionVsPlaceholder = document.createElement("option");
+  positionVsPlaceholder.value = "";
+  positionVsPlaceholder.textContent = "Selecciona rival";
+  $("#positionVsTeam").prepend(positionVsPlaceholder);
+  $("#positionVsTeam").value = "";
   fillTeams($("#teamImpactTeam"), teams);
   fillTeams($("#predictHome"), teams);
   fillTeams($("#predictAway"), teams);
@@ -897,7 +903,7 @@ async function loadPositionVsOpponent() {
       <td class="num"><strong>${player.pts}</strong></td>
     </tr>`).join("");
     wrap.hidden = false;
-    status.textContent = `${data.sample} actuaciones encontradas · ${data.position} vs. ${data.opponent}. ${data.note || ""}`;
+    status.textContent = `${data.sample} actuaciones encontradas · ${data.position} vs. ${data.opponent} · temporada ${data.season}. ${data.note || ""}`;
   } catch (error) {
     status.textContent = error.message || "No se pudo consultar el historial.";
   }
