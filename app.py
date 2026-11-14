@@ -4512,7 +4512,21 @@ def _espn_position_lookup() -> dict[str, str]:
                     for player in entries:
                         if not isinstance(player, dict) or not player.get("id"):
                             continue
-                        position = (player.get("position") or {}).get("abbreviation")
+                        raw_position = player.get("position") or {}
+                        position = (
+                            raw_position.get("abbreviation")
+                            if isinstance(raw_position, dict)
+                            else str(raw_position)
+                        )
+                        position = str(position or "").strip().upper()
+                        if position not in {"G", "F", "C"} and isinstance(raw_position, dict):
+                            position = str(raw_position.get("name") or "").strip().upper()
+                        if position in {"GUARD", "GUARDS"}:
+                            position = "G"
+                        elif position in {"FORWARD", "FORWARDS"}:
+                            position = "F"
+                        elif position in {"CENTER", "CENTRE", "CENTERS", "CENTRES"}:
+                            position = "C"
                         player_name = _name_key(
                             player.get("fullName") or player.get("displayName") or player.get("name")
                         )
@@ -4542,8 +4556,8 @@ def position_vs_opponent(
 ) -> JSONResponse:
     """Puntos anotados por jugadores de una posición contra un rival en sus últimos N partidos."""
     position = position.upper()
-    if position not in {"PG", "SG", "SF", "PF", "C"}:
-        raise HTTPException(status_code=400, detail="Posición no válida.")
+    if position not in {"G", "F", "C"}:
+        raise HTTPException(status_code=400, detail="Posición no válida. Usa G, F o C.")
     opponent_key = _nba_abbreviation(opponent)
     history = _player_history()
     if history.empty:
@@ -4590,7 +4604,7 @@ def position_vs_opponent(
         "median": round(float(values.median()), 1) if len(values) else None,
         "max": int(values.max()) if len(values) else None, "players": games,
         "position_source": "ESPN roster",
-        "note": "Puntos reales de cada jugador en los últimos partidos del rival. La posición corresponde al roster ESPN disponible; no se infiere por estadísticas.",
+        "note": "Puntos reales de cada jugador en los últimos partidos del rival. ESPN publica actualmente las posiciones agrupadas como G (guards), F (forwards) y C (centers); no se infieren posiciones específicas como PG/SG/SF/PF.",
     })
 
 
