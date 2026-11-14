@@ -59,7 +59,7 @@ HISTORY_COLUMNS = [
     "tov",
     "pra",
 ]
-HISTORY_GAMES = 40
+HISTORY_GAMES = 100
 
 
 def _ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
@@ -124,7 +124,7 @@ def _enrich_history(logs: pd.DataFrame) -> pd.DataFrame:
 
 
 def _update_history(current_logs: pd.DataFrame, player_ids: set[int]) -> pd.DataFrame:
-    """Mantiene una foto corta de partidos para la ficha visual del jugador.
+    """Mantiene hasta 100 partidos por jugador para análisis de participación y ficha visual.
 
     El historico anterior se conserva en el artefacto; solo se reemplazan los
     partidos de la temporada actual para no descargar 2025-26 en cada workflow.
