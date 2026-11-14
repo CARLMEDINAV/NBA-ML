@@ -1,0 +1,65 @@
+name: Entrenar y comparar modelos NBA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nba-model-training
+  cancel-in-progress: false
+
+jobs:
+  train-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias del pipeline
+        run: pip install -e ".[pipeline]"
+
+      - name: Descargar temporadas históricas
+        env:
+          PYTHONPATH: src
+        run: python -m nba_ml download --force
+
+      - name: Construir dataset sin fuga temporal
+        env:
+          PYTHONPATH: src
+        run: python -m nba_ml build
+
+      - name: Entrenar y evaluar candidatos
+        env:
+          PYTHONPATH: src
+        run: python -m nba_ml train
+
+      - name: Publicar artefacto de producción y métricas
+        run: |
+          test -s models/model.joblib
+          mkdir -p artifacts
+          cp models/model.joblib artifacts/model.joblib
+          test -s reports/metrics.json
+          test -s reports/metrics.md
+          echo "Modelo y comparación generados correctamente."
+
+      - name: Guardar artefacto en el repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/model.joblib reports/metrics.json reports/metrics.md
+          if git diff --cached --quiet; then
+            echo "No hubo cambios en los artefactos."
+          else
+            git commit -m "Entrena y publica comparación de modelos NBA"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          fi
