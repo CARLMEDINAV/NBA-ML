@@ -188,14 +188,33 @@
           </label>
         </div>
         <div id="resultsNotice" class="notice" role="status" hidden></div>
-        <div class="summary-grid" id="resultsSummary" aria-live="polite"></div>
-        <section class="results-diagnostics" aria-labelledby="resultsDiagnosticsTitle">
+        <nav class="results-nav" aria-label="Secciones de resultados" role="tablist">
+          <button class="results-nav-btn is-active" type="button" role="tab" id="results-tab-history" aria-selected="true" aria-controls="results-view-history" data-results-view="history">Historial</button>
+          <button class="results-nav-btn" type="button" role="tab" id="results-tab-performance" aria-selected="false" aria-controls="results-view-performance" data-results-view="performance">Rendimiento</button>
+          <button class="results-nav-btn" type="button" role="tab" id="results-tab-calibration" aria-selected="false" aria-controls="results-view-calibration" data-results-view="calibration">Calibración</button>
+          <button class="results-nav-btn" type="button" role="tab" id="results-tab-errors" aria-selected="false" aria-controls="results-view-errors" data-results-view="errors">Errores extremos</button>
+        </nav>
+        <section class="results-view is-active" id="results-view-history" role="tabpanel" aria-labelledby="results-tab-history">
+          <div class="table-wrap">
+            <table aria-label="Resultados con total real, predicción y acierto">
+              <thead><tr>
+                <th scope="col">Fecha</th><th scope="col">Partido</th><th scope="col" class="num">Total real</th>
+                <th scope="col" class="num">Predicción</th><th scope="col" class="num">Error</th>
+                <th scope="col" class="num">P(over)</th><th scope="col">Resultado</th><th scope="col">Modelo</th><th scope="col">Acierto</th>
+                <th scope="col">Hándicap</th><th scope="col" class="num">Margen real</th>
+              </tr></thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+          </div>
+          <p class="table-note" id="resultsNote"></p>
+        </section>
+        <section class="results-view" id="results-view-performance" role="tabpanel" aria-labelledby="results-tab-performance" hidden>
+          <div class="summary-grid" id="resultsSummary" aria-live="polite"></div>
+          <p class="table-note">Métricas calculadas sobre los partidos finalizados disponibles para la temporada y filtros seleccionados.</p>
+        </section>
+        <section class="results-view" id="results-view-calibration" role="tabpanel" aria-labelledby="results-tab-calibration" hidden>
           <div class="section-head compact">
-            <div>
-              <p class="eyebrow">Validación reciente</p>
-              <h3 id="resultsDiagnosticsTitle">Calibración y errores</h3>
-              <p class="muted">Evalúa los últimos partidos finalizados. Las tasas por rango necesitan muestras amplias para ser concluyentes.</p>
-            </div>
+            <div><h3>Calibración de probabilidades</h3><p class="muted">Compara P(over) media con la frecuencia OVER observada en cada rango.</p></div>
             <label>Muestra
               <select id="resultsWindow">
                 <option value="100">Últimos 100</option>
@@ -211,28 +230,20 @@
               <tbody id="resultsCalibrationBody"></tbody>
             </table>
           </div>
+          <p class="table-note" id="resultsEvalNote"></p>
+        </section>
+        <section class="results-view" id="results-view-errors" role="tabpanel" aria-labelledby="results-tab-errors" hidden>
+          <div class="section-head compact">
+            <div><h3>Partidos con mayor desviación</h3><p class="muted">Los cinco errores absolutos más altos de la muestra elegida.</p></div>
+          </div>
           <div class="table-wrap">
             <table aria-label="Mayores errores de predicción">
               <thead><tr><th>Partido</th><th>Fecha</th><th class="num">Predicción</th><th class="num">Real</th><th class="num">Error</th></tr></thead>
               <tbody id="resultsExtremesBody"></tbody>
             </table>
           </div>
-          <p class="table-note" id="resultsEvalNote"></p>
+          <p class="table-note">Estos partidos sirven para investigar posibles causas; una desviación aislada no demuestra qué variable falló.</p>
         </section>
-        <div class="table-wrap">
-          <table aria-label="Resultados con total real, predicción y acierto">
-            <thead>
-              <tr>
-                <th scope="col">Fecha</th><th scope="col">Partido</th><th scope="col" class="num">Total real</th>
-                <th scope="col" class="num">Predicción</th><th scope="col" class="num">Error</th>
-                <th scope="col" class="num">P(over)</th><th scope="col">Resultado</th><th scope="col">Modelo</th><th scope="col">Acierto</th>
-                <th scope="col">Hándicap</th><th scope="col" class="num">Margen real</th>
-              </tr>
-            </thead>
-            <tbody id="resultsBody"></tbody>
-          </table>
-        </div>
-        <p class="table-note" id="resultsNote"></p>
       </section>
 
       <section id="tab-players" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-players" hidden>
