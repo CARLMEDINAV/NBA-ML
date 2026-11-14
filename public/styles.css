@@ -4258,3 +4258,37 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
  .props-analyzer-head{flex-direction:column}
  .props-analyzer-controls{grid-template-columns:1fr}
 }
+
+
+/* Probabilidad de victoria local y visitante en Próximos */
+.win-probability-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 142px;
+}
+.win-probability-cell > span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 58px;
+}
+.win-probability-cell > span > small {
+  color: #94a3b8;
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .045em;
+}
+.win-probability-cell strong {
+  font: 800 .82rem var(--mono);
+  color: #e2e8f0;
+}
+.win-probability-cell .win-prob-away strong { color: #fbbf24; }
+.win-probability-cell .win-prob-home strong { color: #60a5fa; }
+.win-probability-cell .win-prob-base {
+  color: #94a3b8;
+  font-size: .55rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
