@@ -1699,6 +1699,80 @@ async function submitPrediction(event) {
   }
 }
 
+
+async function loadTeamImpactPlayers() {
+  const team = $("#teamImpactTeam").value;
+  const select = $("#teamImpactPlayer");
+  select.innerHTML = '<option value="">Cargando jugadores…</option>';
+  $("#teamImpactSummary").innerHTML = "";
+  $("#teamImpactCards").innerHTML = "";
+  $("#teamImpactGames").innerHTML = "";
+  try {
+    const data = await api("/api/team-impact-players", { team });
+    select.innerHTML = '<option value="">Selecciona jugador</option>';
+    (data.players || []).forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.player_id;
+      option.textContent = player.name + " · " + player.gp + " PJ";
+      select.append(option);
+    });
+    notice($("#teamImpactNotice"), data.players?.length ? "Selecciona un jugador para comparar." : "No hay jugadores disponibles para este equipo.");
+  } catch (error) {
+    select.innerHTML = '<option value="">Sin datos</option>';
+    notice($("#teamImpactNotice"), error.message, true);
+  }
+}
+
+async function loadTeamImpact() {
+  const team = $("#teamImpactTeam").value;
+  const playerId = $("#teamImpactPlayer").value;
+  if (!team || !playerId) {
+    notice($("#teamImpactNotice"), "Selecciona equipo y jugador para comenzar.");
+    return;
+  }
+  const button = $("#teamImpactRefresh");
+  setBusy(button, true);
+  notice($("#teamImpactNotice"), "Analizando partidos disponibles…");
+  try {
+    const data = await api("/api/team-absence-impact", { team, player_id: playerId, window: $("#teamImpactWindow").value });
+    if (!data.available) {
+      $("#teamImpactSummary").innerHTML = "";
+      $("#teamImpactCards").innerHTML = "";
+      $("#teamImpactGames").innerHTML = "";
+      notice($("#teamImpactNotice"), data.reason || "No hay datos suficientes.");
+      return;
+    }
+    const yes = data.with_player;
+    const no = data.without_player;
+    const delta = (a, b) => a == null || b == null ? "—" : signed(b - a, 1);
+    const labels = [["Puntos a favor","points_for"],["Puntos recibidos","points_against"],["Diferencial","point_diff"],["Total del partido","game_total"],["Ritmo (PACE)","pace"],["Eficiencia ofensiva","off_rtg"],["Eficiencia defensiva","def_rtg"]];
+    $("#teamImpactSummary").innerHTML =
+      summaryCard("Equipo", data.team, data.player_name) +
+      summaryCard("Con jugador", yes.games + " PJ", yes.wins + " victorias · " + pct(yes.win_rate)) +
+      summaryCard("Sin participación", no.games + " PJ", no.wins + " victorias · " + pct(no.win_rate)) +
+      summaryCard("Cobertura", data.window + " partidos", "desde " + numericDate(data.coverage_start));
+    $("#teamImpactCards").innerHTML = labels.map(([label,key]) =>
+      '<div class="team-impact-metric"><span>' + label + '</span><b>' + num(yes[key]) +
+      '</b><small>Sin participación: ' + num(no[key]) + '</small><em>Diferencia: ' +
+      delta(yes[key], no[key]) + '</em></div>'
+    ).join("");
+    $("#teamImpactGames").innerHTML = (data.games || []).map((game) =>
+      '<tr><td>' + esc(numericDate(game.date)) + '</td><td>' + esc(game.opponent) +
+      '</td><td>' + esc(game.result || "—") + '</td><td class="num">' + num(game.points_for) +
+      '</td><td class="num">' + num(game.points_against) + '</td><td class="num">' +
+      num(game.game_total) + '</td><td><span class="pill ' +
+      (game.participated ? "pill-over" : "pill-neutral") + '">' +
+      (game.participated ? "Participó" : "Sin participación") + '</span></td></tr>'
+    ).join("");
+    notice($("#teamImpactNotice"), [data.note, data.sample_warning].filter(Boolean).join(" "));
+  } catch (error) {
+    notice($("#teamImpactNotice"), error.message, true);
+    showToast(error.message);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 function activateResultsView(name) {
   const validViews = ["history", "performance", "calibration", "errors", "models"];
   const view = validViews.includes(name) ? name : "history";
@@ -1735,6 +1809,7 @@ function activateTab(name) {
   if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
+  if (name === "teams") loadTeamImpactPlayers();
   if (name === "injuries") {
     window.dispatchEvent(new CustomEvent("injuries:activate"));
   }
@@ -1770,6 +1845,11 @@ function bindEvents() {
     state.analysis.team = event.target.value;
     loadAnalysis();
   });
+
+  $("#teamImpactTeam").addEventListener("change", loadTeamImpactPlayers);
+  $("#teamImpactPlayer").addEventListener("change", loadTeamImpact);
+  $("#teamImpactWindow").addEventListener("change", loadTeamImpact);
+  $("#teamImpactRefresh").addEventListener("click", loadTeamImpact);
 
   $("#resultsRefresh").addEventListener("click", loadResults);
   $$(".results-nav-btn").forEach((button) => {
