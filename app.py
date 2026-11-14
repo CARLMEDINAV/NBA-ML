@@ -3127,6 +3127,18 @@ def teams() -> JSONResponse:
 
 
 
+
+@app.get("/api/team-impact-players")
+def team_impact_players(team: str = Query(..., min_length=2, max_length=3), season: str = "2026-27") -> JSONResponse:
+    team_key = _nba_abbreviation(team)
+    path = ARTIFACTS / f"player_stats_{season.replace('-', '_')}_pergame.csv"
+    if not path.exists():
+        return _ok({"players": []})
+    frame = pd.read_csv(path)
+    frame = frame[frame["team"].astype(str).str.upper().eq(team_key)].copy()
+    frame = frame.sort_values("pra", ascending=False)
+    return _ok({"players": [{"player_id": int(row.player_id), "name": str(row.player_name), "gp": int(row.gp), "pra": _rounded(row.pra)} for row in frame.itertuples(index=False)]})
+
 @app.get("/api/team-absence-impact")
 def team_absence_impact(
     team: str = Query(..., min_length=2, max_length=3),
