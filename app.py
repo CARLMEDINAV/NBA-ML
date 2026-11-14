@@ -2728,6 +2728,20 @@ def _bb_events(
     odds_as_of = pd.Timestamp.now(tz=NBA_ET).strftime("%Y-%m-%d %H:%M ET")
     events: list[dict[str, Any]] = []
     skipped = 0
+    player_state = None
+    player_artifact = None
+    player_state_date = None
+    player_warning = None
+    try:
+        player_state = _player_state()
+        player_artifact = _player_props()
+        player_state_date = pd.to_datetime(player_state["last_game_date"], errors="coerce").max()
+        if pd.notna(player_state_date):
+            player_state_date = player_state_date.normalize()
+            if (start - player_state_date).days > 7:
+                player_warning = f"Datos de jugadores desactualizados: {player_state_date.date()}."
+    except Exception as error:
+        player_warning = f"Proyecciones de jugadores no disponibles: {str(error)[:180]}"
     for game in games.itertuples(index=False):
         market = None
         if not market_frame.empty and game.game_id in market_frame.index:
@@ -2746,11 +2760,62 @@ def _bb_events(
         if result is None:
             skipped += 1
             continue
-        events.append(
-            _bb_event_payload(
-                game, result, market, names, state_date, odds_as_of, artifact
-            )
+        event_payload = _bb_event_payload(
+            game, result, market, names, state_date, odds_as_of, artifact
         )
+        home_probability = result.get("home_win_probability")
+        if home_probability is not None:
+            home_probability = float(home_probability)
+            favorite_home = home_probability >= 0.5
+            favorite_team = str(game.home if favorite_home else game.away)
+            event_payload["favorite"] = {
+                "team": favorite_team,
+                "team_name": names.get(favorite_team, favorite_team),
+                "win_probability": _rounded(home_probability if favorite_home else 1.0 - home_probability, 4),
+                "side": "HOME" if favorite_home else "AWAY",
+                "note": "Probabilidad estimada por el modelo de margen; no es garantía."
+            }
+        else:
+            event_payload["favorite"] = None
+
+        recommendations = []
+        if player_state is not None and player_artifact is not None:
+            try:
+                candidates = predict_player_props(
+                    player_artifact, player_state, state,
+                    home=str(game.home), away=str(game.away),
+                    game_date=pd.Timestamp(game.game_date), limit=20,
+                )
+                candidates.sort(
+                    key=lambda player: (
+                        float(player.get("confidence") or 0.0),
+                        float(player.get("projected_pra") or 0.0),
+                    ),
+                    reverse=True,
+                )
+                for player in candidates[:3]:
+                    recommendations.append({
+                        "player_id": player.get("player_id"),
+                        "player_name": player.get("player_name"),
+                        "team": player.get("team"),
+                        "projected_min": player.get("projected_min"),
+                        "projected_pts": player.get("projected_pts"),
+                        "projected_reb": player.get("projected_reb"),
+                        "projected_ast": player.get("projected_ast"),
+                        "projected_pra": player.get("projected_pra"),
+                        "confidence": player.get("confidence"),
+                        "grade": player.get("grade"),
+                        "confidence_note": "Grado de confianza de la proyección PRA, no probabilidad de superar una línea."
+                    })
+            except Exception:
+                recommendations = []
+        event_payload["player_recommendations"] = recommendations
+        event_payload["player_props_state_date"] = (
+            None if player_state_date is None or pd.isna(player_state_date)
+            else player_state_date.strftime("%Y-%m-%d")
+        )
+        event_payload["player_props_warning"] = player_warning
+        events.append(event_payload)
     return events, skipped, state_date, odds_as_of
 
 
