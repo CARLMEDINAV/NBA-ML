@@ -3153,7 +3153,10 @@ def team_absence_impact(
     if not team_path.exists() or not player_path.exists():
         return _ok({"available": False, "reason": "Faltan historiales de partidos de equipos o jugadores."})
     teams = pd.read_csv(team_path, dtype={"game_id": str})
-    players = pd.read_csv(player_path, dtype={"game_id": str})
+    try:
+        players = pd.read_csv(player_path, dtype={"game_id": str})
+    except pd.errors.EmptyDataError:
+        players = pd.DataFrame()
     if teams.empty or players.empty:
         return _ok({"available": False, "reason": "El historial de participaciones de jugadores aún no está disponible. Ejecuta la actualización de jugadores y props."})
     teams = teams[
