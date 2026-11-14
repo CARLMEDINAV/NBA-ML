@@ -4170,6 +4170,10 @@ def player_props(
                     if not historical:
                         continue
                     before = {stat: float(player[f"projected_{stat}"]) for stat in ["pts", "reb", "ast"]}
+                    player.setdefault("base_projection", {
+                        "pts": before["pts"], "reb": before["reb"], "ast": before["ast"],
+                        "pra": float(player.get("projected_pra", sum(before.values()))),
+                    })
                     for stat in ["pts", "reb", "ast"]:
                         cap = max(1.0, before[stat] * 0.15)
                         player[f"projected_{stat}"] = round(max(0.0, before[stat] + float(np.clip(historical["deltas"][stat], -cap, cap))), 1)
@@ -4246,8 +4250,9 @@ def player_props(
                 "game logs 2023-24 a 2026-27 y validado fuera de muestra en "
                 "2025-26. Usan medias móviles, descanso, localía y contexto "
                 "del rival; el contexto de equipo es la última foto disponible. "
-                "No incluyen lesiones, alineaciones ni cuotas de props; no es "
-                "consejo de apuestas."
+                "Las bajas Out de ESPN pueden activar un ajuste histórico conservador "
+                "cuando hay muestra suficiente; no sustituye una confirmación de alineación. "
+                "No incorpora cuotas de props ni es consejo de apuestas."
             ),
             "games": payload_games,
         }
