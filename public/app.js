@@ -1744,27 +1744,31 @@ async function loadTeamImpact() {
       return;
     }
     const yes = data.with_player;
+    const partial = data.partial_participation || {};
     const no = data.without_player;
     const delta = (a, b) => a == null || b == null ? "—" : signed(b - a, 1);
     const labels = [["Puntos a favor","points_for"],["Puntos recibidos","points_against"],["Diferencial","point_diff"],["Total del partido","game_total"],["Ritmo (PACE)","pace"],["Eficiencia ofensiva","off_rtg"],["Eficiencia defensiva","def_rtg"]];
     $("#teamImpactSummary").innerHTML =
-      summaryCard("Equipo", data.team, data.player_name) +
-      summaryCard("Con jugador", yes.games + " PJ", yes.wins + " victorias · " + pct(yes.win_rate)) +
+      summaryCard("Participación completa", yes.games + " PJ", yes.wins + " victorias · " + pct(yes.win_rate)) +
+      summaryCard("Participación parcial", partial.games + " PJ", "Media de " + num(partial.minutes) + " min") +
       summaryCard("Sin participación", no.games + " PJ", no.wins + " victorias · " + pct(no.win_rate)) +
       summaryCard("Cobertura", data.window + " partidos", "desde " + numericDate(data.coverage_start));
     $("#teamImpactCards").innerHTML = labels.map(([label,key]) =>
       '<div class="team-impact-metric"><span>' + label + '</span><b>' + num(yes[key]) +
-      '</b><small>Sin participación: ' + num(no[key]) + '</small><em>Diferencia: ' +
+      '</b><small>Parcial: ' + num(partial[key]) + ' · Sin participación: ' + num(no[key]) + '</small><em>Completa vs ausencia: ' +
       delta(yes[key], no[key]) + '</em></div>'
     ).join("");
-    $("#teamImpactGames").innerHTML = (data.games || []).map((game) =>
-      '<tr><td>' + esc(numericDate(game.date)) + '</td><td>' + esc(game.opponent) +
-      '</td><td>' + esc(game.result || "—") + '</td><td class="num">' + num(game.points_for) +
-      '</td><td class="num">' + num(game.points_against) + '</td><td class="num">' +
-      num(game.game_total) + '</td><td><span class="pill ' +
-      (game.participated ? "pill-over" : "pill-neutral") + '">' +
-      (game.participated ? "Participó" : "Sin participación") + '</span></td></tr>'
-    ).join("");
+    $("#teamImpactGames").innerHTML = (data.games || []).map((game) => {
+      const label = game.participation_label || (game.participated ? "Participó" : "Sin participación");
+      const detail = game.status_detail ? " · " + game.status_detail : "";
+      return '<tr><td>' + esc(numericDate(game.date)) + '</td><td>' + esc(game.opponent) +
+        '</td><td>' + esc(game.result || "—") + '</td><td class="num">' + num(game.points_for) +
+        '</td><td class="num">' + num(game.points_against) + '</td><td class="num">' +
+        num(game.game_total) + '</td><td class="num">' + num(game.minutes, 1) +
+        '</td><td><span class="pill ' + (game.partial ? "pill-neutral" : game.participated ? "pill-over" : "pill-neutral") +
+        '">' + esc(label) + '</span>' + (detail ? '<small class="market-line">' + esc(detail) + '</small>' : '') +
+        '</td></tr>';
+    }).join("");
     notice($("#teamImpactNotice"), [data.note, data.sample_warning].filter(Boolean).join(" "));
   } catch (error) {
     notice($("#teamImpactNotice"), error.message, true);
