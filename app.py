@@ -4284,6 +4284,7 @@ def _espn_quarter_history(days: int = 14) -> dict[str, list[dict[str, Any]]]:
             competitors = competition.get("competitors") or []
             if len(competitors) != 2:
                 continue
+            parsed = []
             for item in competitors:
                 team = _nba_abbreviation(item.get("team", {}).get("abbreviation"))
                 splits = item.get("linescores") or []
@@ -4295,7 +4296,13 @@ def _espn_quarter_history(days: int = 14) -> dict[str, list[dict[str, Any]]]:
                     continue
                 if any(not math.isfinite(value) or value < 0 for value in quarters):
                     continue
-                rows.append({"team": team, "game_id": str(event.get("id")), "quarters": quarters})
+                parsed.append({"team": team, "quarters": quarters})
+            if len(parsed) == 2:
+                for idx, item in enumerate(parsed):
+                    rows.append({
+                        "team": item["team"], "game_id": str(event.get("id")),
+                        "quarters": item["quarters"], "against": parsed[1-idx]["quarters"]
+                    })
         return rows
 
     rows: list[dict[str, Any]] = []
@@ -4424,12 +4431,11 @@ def quarter_projection(
             "home_games": len(home_rows), "away_games": len(away_rows),
             "reason": "ESPN no entregó al menos 2 partidos recientes con parciales completos por equipo."
         })
-    def avg(rows: list[dict[str, Any]]) -> list[float]:
-        return [sum(row["quarters"][idx] for row in rows)/len(rows) for idx in range(4)]
-    home_for, away_for = avg(home_rows), avg(away_rows)
-    # La media del ataque propio se combina con los puntos que permite el rival.
-    home_against = [sum(row["quarters"][idx] for row in away_rows)/len(away_rows) for idx in range(4)]
-    away_against = [sum(row["quarters"][idx] for row in home_rows)/len(home_rows) for idx in range(4)]
+    def avg(rows: list[dict[str, Any]], field: str) -> list[float]:
+        return [sum(row[field][idx] for row in rows)/len(rows) for idx in range(4)]
+    home_for, away_for = avg(home_rows, "quarters"), avg(away_rows, "quarters")
+    # Combina el ataque de cada equipo con los puntos que permite el rival.
+    home_against, away_against = avg(home_rows, "against"), avg(away_rows, "against")
     home_q = [(home_for[i] + home_against[i])/2 for i in range(4)]
     away_q = [(away_for[i] + away_against[i])/2 for i in range(4)]
     quarters = [{
