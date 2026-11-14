@@ -4254,6 +4254,199 @@ def player_props(
     )
 
 
+
+
+def _espn_quarter_history(days: int = 14) -> dict[str, list[dict[str, Any]]]:
+    """Recoge parciales por cuarto de partidos finalizados desde ESPN."""
+    today = _et_today()
+    dates = [today - pd.Timedelta(days=offset) for offset in range(1, days + 1)]
+
+    def fetch_day(day: pd.Timestamp) -> list[dict[str, Any]]:
+        url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        try:
+            response = httpx.get(
+                url, params={"dates": day.strftime("%Y%m%d")},
+                headers={"User-Agent": "Mozilla/5.0 (compatible; nba-ml/0.6)"},
+                timeout=5.0, follow_redirects=True,
+            )
+            response.raise_for_status()
+            events = response.json().get("events", [])
+        except Exception:
+            return []
+        rows = []
+        for event in events:
+            competitions = event.get("competitions") or []
+            if not competitions:
+                continue
+            competition = competitions[0]
+            if not competition.get("status", {}).get("type", {}).get("completed"):
+                continue
+            competitors = competition.get("competitors") or []
+            if len(competitors) != 2:
+                continue
+            for item in competitors:
+                team = _nba_abbreviation(item.get("team", {}).get("abbreviation"))
+                splits = item.get("linescores") or []
+                if len(splits) < 4:
+                    continue
+                try:
+                    quarters = [float(part.get("value")) for part in splits[:4]]
+                except (TypeError, ValueError):
+                    continue
+                if any(not math.isfinite(value) or value < 0 for value in quarters):
+                    continue
+                rows.append({"team": team, "game_id": str(event.get("id")), "quarters": quarters})
+        return rows
+
+    rows: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=7) as pool:
+        for batch in pool.map(fetch_day, dates):
+            rows.extend(batch)
+    output: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        output.setdefault(row["team"], []).append(row)
+    return output
+
+
+@app.get("/api/player-prop-distribution")
+def player_prop_distribution(
+    player_id: int = Query(..., ge=1),
+    line: float = Query(20.5, ge=0, le=100),
+    window: int = Query(20, ge=5, le=40),
+) -> JSONResponse:
+    """Probabilidades empíricas de puntos a partir de partidos reales recientes."""
+    history = _player_history()
+    if history.empty or "pts" not in history.columns:
+        return _ok({"available": False, "reason": "No hay historial de puntos disponible."})
+    rows = history[pd.to_numeric(history["player_id"], errors="coerce").eq(player_id)].copy()
+    if "min" in rows.columns:
+        rows = rows[pd.to_numeric(rows["min"], errors="coerce").fillna(0).gt(0)]
+    rows = rows.sort_values(["game_date", "game_id"], ascending=False).head(window)
+    values = pd.to_numeric(rows["pts"], errors="coerce").dropna().astype(float)
+    if len(values) < 5:
+        return _ok({"available": False, "sample": int(len(values)), "reason": "Se necesitan al menos 5 partidos con minutos y puntos registrados."})
+    sample = int(len(values))
+    hits = int((values >= line + 0.5).sum())
+    p = hits / sample
+    z = 1.281551565545
+    denom = 1 + z*z/sample
+    center = (p + z*z/(2*sample))/denom
+    margin = z * math.sqrt((p*(1-p)/sample) + z*z/(4*sample*sample))/denom
+    levels = sorted(set([max(0.5, round(float(values.mean())-5.5,1)), max(0.5, round(float(values.mean())-2.5,1)), round(float(values.mean())+0.5,1), round(float(values.mean())+3.5,1), round(float(values.mean())+6.5,1)]))
+    distributions = []
+    for level in levels:
+        count = int((values >= level + 0.5).sum())
+        distributions.append({"line": level, "over": count/sample, "under": 1-count/sample, "hits": count, "sample": sample})
+    return _ok({
+        "available": True, "player_id": player_id, "line": line, "window": window,
+        "sample": sample, "mean": round(float(values.mean()), 1),
+        "median": round(float(values.median()), 1), "std": round(float(values.std(ddof=1)), 1),
+        "over": p, "under": 1-p, "over_interval_80": [max(0, center-margin), min(1, center+margin)],
+        "distribution": distributions,
+        "note": "Frecuencias empíricas de la muestra reciente, no probabilidades calibradas ni garantía del próximo partido. Over cuenta puntos >= línea + 0,5."
+    })
+
+
+@app.get("/api/player-matchup")
+def player_matchup(
+    player_id: int = Query(..., ge=1),
+    opponent: str | None = None,
+) -> JSONResponse:
+    """Cruza historial H2H y datos de defensores directos del jugador."""
+    history = _player_history()
+    state = _player_state()
+    selected = state[pd.to_numeric(state["player_id"], errors="coerce").eq(player_id)]
+    if selected.empty:
+        raise HTTPException(status_code=404, detail="Jugador no encontrado en el estado actual.")
+    team = str(selected.iloc[0]["team"]).upper()
+    schedule = _schedule()
+    today = _et_today()
+    upcoming = schedule[
+        schedule["status"].eq(1)
+        & pd.to_datetime(schedule["game_date"]).dt.normalize().ge(today)
+        & (schedule["home"].eq(team) | schedule["away"].eq(team))
+    ].sort_values(["game_date", "game_time_et"])
+    opp = _nba_abbreviation(opponent or (str(upcoming.iloc[0]["away"] if str(upcoming.iloc[0]["home"]) == team else upcoming.iloc[0]["home"]) if not upcoming.empty else ""))
+    if not opp:
+        return _ok({"available": False, "reason": "No se encontró próximo rival; selecciona uno manualmente."})
+    rows = history[pd.to_numeric(history["player_id"], errors="coerce").eq(player_id)].copy()
+    if "opponent" in rows.columns:
+        rows = rows[rows["opponent"].map(_nba_abbreviation).eq(opp)]
+    rows = rows.sort_values(["game_date", "game_id"], ascending=False)
+    h2h = {"games": int(len(rows)), "pts": _mean_value(rows, "pts"), "reb": _mean_value(rows, "reb"), "ast": _mean_value(rows, "ast"), "min": _mean_value(rows, "min")}
+    defenders = _player_defenders()
+    direct = []
+    if not defenders.empty and {"off_player_id", "def_team"}.issubset(defenders.columns):
+        match = defenders[
+            pd.to_numeric(defenders["off_player_id"], errors="coerce").eq(player_id)
+            & defenders["def_team"].astype(str).str.upper().eq(opp)
+        ].copy()
+        for col in ["gp", "matchup_min", "player_pts", "matchup_ast", "matchup_blk", "matchup_fga", "matchup_fgm"]:
+            if col in match.columns:
+                match[col] = pd.to_numeric(match[col], errors="coerce").fillna(0)
+        if not match.empty:
+            grouped = match.groupby(["def_player_id", "def_player_name"], as_index=False).agg(
+                gp=("gp", "sum"), minutes=("matchup_min", "sum"), pts=("player_pts", "sum"),
+                ast=("matchup_ast", "sum"), blk=("matchup_blk", "sum"),
+                fga=("matchup_fga", "sum"), fgm=("matchup_fgm", "sum")
+            ).sort_values("minutes", ascending=False).head(5)
+            direct = [{
+                "defender_id": int(row.def_player_id), "defender": str(row.def_player_name),
+                "games": int(row.gp), "minutes": round(float(row.minutes),1),
+                "player_pts_per_game": round(float(row.pts)/max(1,float(row.gp)),1),
+                "assists_per_game": round(float(row.ast)/max(1,float(row.gp)),1),
+                "blocks_per_game": round(float(row.blk)/max(1,float(row.gp)),1),
+                "fg_pct": round(float(row.fgm)/float(row.fga),3) if row.fga else None
+            } for row in grouped.itertuples(index=False)]
+    return _ok({
+        "available": bool(h2h["games"] or direct), "player_id": player_id,
+        "team": team, "opponent": opp, "h2h": h2h, "direct_defenders": direct,
+        "sample_warning": "El H2H puede tener pocos partidos y el matchup directo solo incluye defensores registrados en el archivo de tracking.",
+        "note": "Comparación descriptiva: no implica que un defensor vaya a marcar al jugador durante todo el partido."
+    })
+
+
+@app.get("/api/quarter-projection")
+def quarter_projection(
+    home: str = Query(..., min_length=2, max_length=4),
+    away: str = Query(..., min_length=2, max_length=4),
+    days: int = Query(14, ge=7, le=30),
+) -> JSONResponse:
+    """Proyecta parciales usando puntos por cuarto recientes de ESPN."""
+    home_key, away_key = _nba_abbreviation(home), _nba_abbreviation(away)
+    if home_key == away_key:
+        raise HTTPException(status_code=400, detail="Los equipos deben ser distintos.")
+    history = _espn_quarter_history(days)
+    home_rows, away_rows = history.get(home_key, []), history.get(away_key, [])
+    if len(home_rows) < 2 or len(away_rows) < 2:
+        return _ok({
+            "available": False, "home": home_key, "away": away_key,
+            "home_games": len(home_rows), "away_games": len(away_rows),
+            "reason": "ESPN no entregó al menos 2 partidos recientes con parciales completos por equipo."
+        })
+    def avg(rows: list[dict[str, Any]]) -> list[float]:
+        return [sum(row["quarters"][idx] for row in rows)/len(rows) for idx in range(4)]
+    home_for, away_for = avg(home_rows), avg(away_rows)
+    # La media del ataque propio se combina con los puntos que permite el rival.
+    home_against = [sum(row["quarters"][idx] for row in away_rows)/len(away_rows) for idx in range(4)]
+    away_against = [sum(row["quarters"][idx] for row in home_rows)/len(home_rows) for idx in range(4)]
+    home_q = [(home_for[i] + home_against[i])/2 for i in range(4)]
+    away_q = [(away_for[i] + away_against[i])/2 for i in range(4)]
+    quarters = [{
+        "quarter": f"Q{i+1}", "home": round(home_q[i],1), "away": round(away_q[i],1),
+        "total": round(home_q[i]+away_q[i],1)
+    } for i in range(4)]
+    return _ok({
+        "available": True, "home": home_key, "away": away_key,
+        "home_games": len(home_rows), "away_games": len(away_rows),
+        "quarters": quarters,
+        "home_total": round(sum(home_q),1), "away_total": round(sum(away_q),1),
+        "game_total": round(sum(home_q)+sum(away_q),1),
+        "source": "ESPN scoreboard · últimos partidos finalizados",
+        "note": "Estimación experimental con promedios recientes de anotación y puntos permitidos por cuarto. No es un modelo entrenado por periodo; prórrogas y cambios de rotación pueden alterar el resultado."
+    })
+
+
 @app.get("/api/player-card")
 def player_card(
     player_id: int = Query(..., ge=1),
