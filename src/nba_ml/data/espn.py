@@ -48,6 +48,13 @@ ESPN_TO_NBA = {
     "WSH": "WAS",
 }
 
+# Jugadores nuevos que aun no aparecen en los artefactos usados para resolver
+# IDs. Evita el bloqueo circular: ESPN entrega sus stats, pero el cruce de IDs
+# se construye inicialmente desde esos mismos CSV.
+BOOTSTRAP_PLAYERS = {
+    1643407: {"name": "AJ Dybantsa", "team": "WAS"},
+}
+
 PLAYER_STATS_COLUMNS = [
     "player_id",
     "player_name",
@@ -361,6 +368,15 @@ def load_player_lookup(
                 team = nba_team(getattr(row, "team", None))
                 if team:
                     by_name_team.setdefault((key, team), player_id)
+    # Semillas para rookies recientes ausentes de los CSV. Cuando ESPN los
+    # incluya en sus estadísticas o boxscores, se incorporarán con su ID NBA.
+    for player_id, player in BOOTSTRAP_PLAYERS.items():
+        key = normalize_name(player["name"])
+        team = nba_team(player["team"])
+        by_name.setdefault(key, int(player_id))
+        by_name_team.setdefault((key, team), int(player_id))
+        names.setdefault(int(player_id), player["name"])
+
     return PlayerLookup(by_name=by_name, by_name_team=by_name_team, names=names)
 
 
@@ -1323,7 +1339,14 @@ def append_recent_games(
             last_date = parsed.max().date()
 
     start = current - timedelta(days=days_back)
-    if last_date is not None:
+    bootstrap_ids = set(BOOTSTRAP_PLAYERS)
+    known_ids = (
+        set(pd.to_numeric(current_logs["player_id"], errors="coerce").dropna().astype(int))
+        if "player_id" in current_logs.columns
+        else set()
+    )
+    needs_rookie_backfill = bool(bootstrap_ids - known_ids)
+    if last_date is not None and not needs_rookie_backfill:
         # Revisa al menos el dia anterior; asi también recupera un partido
         # cuyo boxscore aun no estaba publicado en la ejecucion previa.
         start = max(start, last_date - timedelta(days=1))
@@ -1344,8 +1367,6 @@ def append_recent_games(
             continue
         game_date = _as_date(game["game_date"])
         key = tuple(sorted([str(game["home"]), str(game["away"])]))
-        if (game_date, key[0], key[1]) in game_keys:
-            continue
         event = {
             "id": game["event_id"],
             "_date": game_date,
@@ -1355,7 +1376,24 @@ def append_recent_games(
             "_away_score": game["away_score"],
         }
         game_id = _event_schedule_id(schedule, event)
-        if game_id in game_ids:
+        already_tracked = (
+            game_id in game_ids or (game_date, key[0], key[1]) in game_keys
+        )
+        # Si el partido ya estaba guardado pero faltaba el rookie semilla,
+        # vuelve a consultar solo los partidos de su equipo para completar su
+        # game log; el deduplicado posterior conserva una sola fila por jugador.
+        missing_bootstrap = any(
+            player["team"] in {str(game["home"]).upper(), str(game["away"]).upper()}
+            and not (
+                current_logs.get("game_id", pd.Series(dtype=str)).astype(str).eq(str(game_id))
+                & pd.to_numeric(
+                    current_logs.get("player_id", pd.Series(dtype=float)),
+                    errors="coerce",
+                ).eq(int(player_id))
+            ).any()
+            for player_id, player in BOOTSTRAP_PLAYERS.items()
+        )
+        if already_tracked and not missing_bootstrap:
             continue
         try:
             frame = fetch_boxscore(
