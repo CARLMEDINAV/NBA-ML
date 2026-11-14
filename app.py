@@ -3146,7 +3146,7 @@ def team_absence_impact(
     season: str = "2026-27",
     window: int = Query(20, ge=5, le=82),
 ) -> JSONResponse:
-    """Compara al equipo con y sin participación de un jugador; no infiere lesión."""
+    """Compara participación completa, parcial y ausencia; no infiere lesión automáticamente."""
     team_key = _nba_abbreviation(team)
     team_path = ARTIFACTS / "team_games_recent.csv"
     player_path = ARTIFACTS / "player_game_logs_recent.csv"
@@ -3170,45 +3170,80 @@ def team_absence_impact(
     ].copy()
     if teams.empty or players.empty:
         return _ok({"available": False, "reason": "No hay una muestra suficiente del equipo y jugador en esta temporada."})
+
     teams["game_id"] = teams["game_id"].astype(str)
     players["game_id"] = players["game_id"].astype(str)
     teams["game_date"] = pd.to_datetime(teams["game_date"], errors="coerce")
     players["game_date"] = pd.to_datetime(players["game_date"], errors="coerce")
-    # Solo se comparan partidos desde la primera aparición registrada del jugador.
+    players["min"] = pd.to_numeric(players.get("min"), errors="coerce")
     first_seen = players["game_date"].min()
-    teams = teams[teams["game_date"].ge(first_seen)].sort_values("game_date").tail(window)
-    appeared = set(players["game_id"])
+    teams = teams[teams["game_date"].ge(first_seen)].sort_values("game_date").tail(window).copy()
+
+    typical_minutes = float(players["min"].dropna().median()) if players["min"].notna().any() else None
+    partial_cutoff = typical_minutes * 0.5 if typical_minutes and typical_minutes > 0 else 0
+    player_rows = players.sort_values("game_date").drop_duplicates("game_id", keep="last")
+    minute_by_game = player_rows.set_index("game_id")["min"].to_dict()
+    appeared = set(player_rows["game_id"])
+    teams["player_minutes"] = teams["game_id"].map(minute_by_game)
     teams["participated"] = teams["game_id"].isin(appeared)
-    with_player = teams[teams["participated"]]
-    without_player = teams[~teams["participated"]]
+    teams["partial"] = teams["participated"] & teams["player_minutes"].notna() & teams["player_minutes"].lt(partial_cutoff)
+
+    # Anotación confirmada por el usuario: Curry salió lesionado en el primer cuarto ante Houston.
+    confirmed_events = {("GSW", 201939, "2026-11-11"): "Lesión en el primer cuarto"}
+    teams["event_note"] = teams.apply(
+        lambda row: confirmed_events.get((team_key, player_id, pd.Timestamp(row.game_date).strftime("%Y-%m-%d"))),
+        axis=1,
+    )
+    teams["partial"] = teams["partial"] | teams["event_note"].notna()
+    full_games = teams[teams["participated"] & ~teams["partial"]]
+    partial_games = teams[teams["partial"]]
+    absent_games = teams[~teams["participated"]]
+
     def metrics(frame: pd.DataFrame) -> dict[str, Any]:
+        diff = pd.to_numeric(frame["pts"], errors="coerce") - pd.to_numeric(frame["opp_pts"], errors="coerce")
         return {
             "games": int(len(frame)),
             "wins": int(pd.to_numeric(frame.get("win"), errors="coerce").fillna(0).sum()),
             "win_rate": _rounded(pd.to_numeric(frame.get("win"), errors="coerce").mean(), 3),
             "points_for": _mean_value(frame, "pts", 1),
             "points_against": _mean_value(frame, "opp_pts", 1),
-            "point_diff": _mean_value(frame.assign(_diff=pd.to_numeric(frame["pts"], errors="coerce") - pd.to_numeric(frame["opp_pts"], errors="coerce")), "_diff", 1),
+            "point_diff": _rounded(diff.mean(), 1) if not frame.empty else None,
             "game_total": _mean_value(frame, "game_total", 1),
             "pace": _mean_value(frame, "pace", 1),
             "off_rtg": _mean_value(frame, "off_rtg", 1),
             "def_rtg": _mean_value(frame, "def_rtg", 1),
+            "minutes": _mean_value(frame, "player_minutes", 1),
         }
-    player_name = str(players.sort_values("game_date").iloc[-1]["player_name"])
+
+    player_name = str(player_rows.iloc[-1]["player_name"])
+    games = []
+    for row in teams.sort_values("game_date", ascending=False).itertuples(index=False):
+        label = "Participación parcial" if row.partial else ("Participación completa" if row.participated else "Sin participación")
+        games.append({
+            "date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
+            "opponent": str(row.matchup),
+            "result": str(row.wl),
+            "points_for": _rounded(row.pts),
+            "points_against": _rounded(row.opp_pts),
+            "game_total": _rounded(row.game_total),
+            "participated": bool(row.participated),
+            "partial": bool(row.partial),
+            "participation_label": label,
+            "minutes": _rounded(row.player_minutes, 1),
+            "status_detail": row.event_note,
+        })
     return _ok({
         "available": True, "team": team_key, "player_id": player_id,
         "player_name": player_name, "season": season, "window": int(len(teams)),
         "coverage_start": first_seen.strftime("%Y-%m-%d"),
-        "with_player": metrics(with_player), "without_player": metrics(without_player),
-        "note": "Sin participación no equivale necesariamente a lesión. El registro distingue partidos con aparición del jugador frente a partidos sin aparición registrada; no atribuye causalidad.",
-        "sample_warning": "Muestra pequeña: interpreta con cautela." if len(without_player) < 3 or len(with_player) < 5 else None,
-        "games": [
-            {"date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
-             "opponent": str(row.matchup), "result": str(row.wl),
-             "points_for": _rounded(row.pts), "points_against": _rounded(row.opp_pts),
-             "game_total": _rounded(row.game_total), "participated": bool(row.participated)}
-            for row in teams.sort_values("game_date", ascending=False).itertuples(index=False)
-        ],
+        "with_player": metrics(full_games),
+        "partial_participation": metrics(partial_games),
+        "without_player": metrics(absent_games),
+        "typical_minutes": _rounded(typical_minutes, 1),
+        "partial_minutes_cutoff": _rounded(partial_cutoff, 1),
+        "note": "La participación parcial se separa por minutos muy inferiores a la carga habitual o por una anotación confirmada. Pocos minutos por sí solos no demuestran una lesión.",
+        "sample_warning": "Muestra pequeña: interpreta con cautela." if len(absent_games) < 3 or len(full_games) < 5 else None,
+        "games": games,
     })
 
 
