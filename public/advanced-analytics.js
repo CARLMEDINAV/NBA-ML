@@ -1,6 +1,6 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
-  const esc = (value) => String(value ?? '').replace(/[&<>\"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[char]));
+  const esc = (value) => { const node = document.createElement("span"); node.textContent = String(value ?? ""); return node.innerHTML; };
   const n = (value, digits = 1) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toFixed(digits).replace('.', ',');
   const pct = (value) => value == null ? '—' : Math.round(Number(value) * 100) + '%';
   const api = async (path, params = {}) => { const query = new URLSearchParams(params); const response = await fetch(path + '?' + query.toString(), {headers:{'Accept':'application/json'}}); const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'No se pudo consultar la API.'); return data; };
