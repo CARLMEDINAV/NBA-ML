@@ -3085,19 +3085,6 @@ def health() -> JSONResponse:
     return _ok({"status": "ok", "service": "nba-ml", "version": app.version})
 
 
-@app.get("/api/model-comparison")
-def model_comparison() -> JSONResponse:
-    """Comparacion temporal de Ridge, Random Forest y HistGradientBoosting."""
-    artifact = _artifact()
-    comparison = artifact.get("model_comparison")
-    if not comparison:
-        return _ok({
-            "available": False,
-            "message": "La comparacion se generara al ejecutar el siguiente entrenamiento.",
-            "best_model": artifact.get("model_name"),
-        })
-    return _ok({"available": True, **comparison})
-
 
 @app.get("/api/meta")
 def meta(today: str | None = None) -> JSONResponse:
