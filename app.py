@@ -2713,6 +2713,7 @@ def _bb_events(
     artifact: dict,
     state: pd.DataFrame,
     injury_index: dict[str, dict[str, Any]] | None = None,
+    injury_meta: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], int, pd.Timestamp | None, str | None]:
     end = start + pd.Timedelta(days=days - 1)
     dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
@@ -2779,21 +2780,49 @@ def _bb_events(
             event_payload["favorite"] = None
 
         recommendations = []
-        if player_state is not None and player_artifact is not None:
+        excluded_injured = []
+        injury_feed_verified = bool(
+            injury_index is not None
+            and injury_meta is not None
+            and not injury_meta.get("stale")
+            and not injury_meta.get("warning")
+        )
+        # Sin un parte vigente y verificable, no publicar recomendaciones de jugadores.
+        if player_state is not None and player_artifact is not None and injury_feed_verified:
             try:
                 candidates = predict_player_props(
                     player_artifact, player_state, state,
                     home=str(game.home), away=str(game.away),
-                    game_date=pd.Timestamp(game.game_date), limit=20,
+                    game_date=pd.Timestamp(game.game_date), limit=30,
                 )
-                candidates.sort(
+                unavailable = {}
+                for team_code in [str(game.home).upper(), str(game.away).upper()]:
+                    team_report = injury_index.get(team_code) or {}
+                    for injured in team_report.get("injuries", []):
+                        if injured.get("status_class") in {"out", "doubtful", "day"}:
+                            key = _name_key(injured.get("player_name"))
+                            if key:
+                                unavailable[(team_code, key)] = {
+                                    "player_name": injured.get("player_name"),
+                                    "status": injured.get("status_label") or injured.get("status"),
+                                    "team": team_code,
+                                }
+                available_candidates = []
+                for player in candidates:
+                    key = (str(player.get("team") or "").upper(), _name_key(player.get("player_name")))
+                    unavailable_player = unavailable.get(key)
+                    if unavailable_player:
+                        excluded_injured.append(unavailable_player)
+                    else:
+                        available_candidates.append(player)
+                available_candidates.sort(
                     key=lambda player: (
                         float(player.get("confidence") or 0.0),
                         float(player.get("projected_pra") or 0.0),
                     ),
                     reverse=True,
                 )
-                for player in candidates[:3]:
+                for player in available_candidates[:3]:
                     recommendations.append({
                         "player_id": player.get("player_id"),
                         "player_name": player.get("player_name"),
@@ -2810,6 +2839,13 @@ def _bb_events(
             except Exception:
                 recommendations = []
         event_payload["player_recommendations"] = recommendations
+        event_payload["excluded_injured_players"] = excluded_injured
+        event_payload["injury_verification"] = {
+            "verified": injury_feed_verified,
+            "source": "ESPN",
+            "updated_at": (injury_meta or {}).get("source_updated_at"),
+            "note": "Se excluyen Out, Doubtful y Day-to-day. Si ESPN no entrega un parte vigente, se ocultan las recomendaciones individuales."
+        }
         event_payload["player_props_state_date"] = (
             None if player_state_date is None or pd.isna(player_state_date)
             else player_state_date.strftime("%Y-%m-%d")
@@ -3664,6 +3700,7 @@ def bet_builder_events(
         artifact,
         state,
         injury_index=injury_index,
+        injury_meta=injury_meta,
     )
     injury_warning = injury_meta.get("warning") if injuries else None
     if injuries:
