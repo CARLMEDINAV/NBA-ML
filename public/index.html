@@ -193,7 +193,6 @@
           <button class="results-nav-btn" type="button" role="tab" id="results-tab-performance" aria-selected="false" aria-controls="results-view-performance" data-results-view="performance">Rendimiento</button>
           <button class="results-nav-btn" type="button" role="tab" id="results-tab-calibration" aria-selected="false" aria-controls="results-view-calibration" data-results-view="calibration">Calibración</button>
           <button class="results-nav-btn" type="button" role="tab" id="results-tab-errors" aria-selected="false" aria-controls="results-view-errors" data-results-view="errors">Errores extremos</button>
-          <button class="results-nav-btn" type="button" role="tab" id="results-tab-models" aria-selected="false" aria-controls="results-view-models" data-results-view="models">Comparación de modelos</button>
         </nav>
         <section class="results-view is-active" id="results-view-history" role="tabpanel" aria-labelledby="results-tab-history">
           <div class="table-wrap">
@@ -244,30 +243,6 @@
             </table>
           </div>
           <p class="table-note">Estos partidos sirven para investigar posibles causas; una desviación aislada no demuestra qué variable falló.</p>
-        </section>
-        <section class="results-view" id="results-view-models" role="tabpanel" aria-labelledby="results-tab-models" hidden>
-          <div class="section-head compact">
-            <div><h3>Comparación de modelos</h3><p class="muted">Ridge, Random Forest e HistGradientBoosting evaluados con las mismas particiones temporales.</p></div>
-          </div>
-          <div class="model-comparison-block">
-            <h4>Validación · <span id="modelValidationSeason">2024-25</span></h4>
-            <div class="table-wrap">
-              <table aria-label="Comparación de modelos en validación">
-                <thead><tr><th>Modelo</th><th class="num">MAE ↓</th><th class="num">RMSE ↓</th><th class="num">R² ↑</th><th class="num">Sesgo</th><th class="num">CV MAE</th></tr></thead>
-                <tbody id="modelValidationBody"><tr><td colspan="6">Cargando comparación…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="model-comparison-block">
-            <h4>Test fuera de muestra · <span id="modelTestSeason">2025-26</span></h4>
-            <div class="table-wrap">
-              <table aria-label="Comparación final de modelos en test">
-                <thead><tr><th>Modelo</th><th class="num">MAE ↓</th><th class="num">RMSE ↓</th><th class="num">R² ↑</th><th class="num">Sesgo</th><th class="num">Dentro de ±10</th></tr></thead>
-                <tbody id="modelTestBody"><tr><td colspan="6">Cargando comparación…</td></tr></tbody>
-              </table>
-            </div>
-          </div>
-          <p class="table-note" id="modelComparisonNote">La selección se realiza con validación; el test queda reservado para medir generalización. Menor MAE/RMSE es mejor. El sesgo se expresa como real − predicho.</p>
         </section>
       </section>
 
