@@ -577,6 +577,10 @@
       ? `<div class="bb-event-warning">${esc(event.data_warning)}</div>`
       : "";
     const injuries = renderEventInjuries(event);
+    const favorite = event.favorite
+      ? `<div class="bb-prediction-strip"><span class="bb-prediction-kicker">Ganador probable</span><strong>${esc(event.favorite.team_name)}</strong><b>${pct(event.favorite.win_probability)}</b></div>`
+      : "";
+    const players = renderPlayerRecommendations(event);
     const status = event.status && event.status !== "Programado" ? event.status : "";
     const meta = [shortDate(event.date), event.time_et ? `${event.time_et} ET` : "", status]
       .filter(Boolean)
@@ -595,10 +599,32 @@
       </header>
       ${warning}
       ${injuries}
+      ${favorite}
+      ${players}
       ${(event.markets || []).map((market) => renderMarket(event, market)).join("")}
     </article>`;
   }
 
+  function renderPlayerRecommendations(event) {
+    const players = Array.isArray(event.player_recommendations) ? event.player_recommendations : [];
+    if (!players.length) {
+      return event.player_props_warning
+        ? '<div class="bb-player-picks bb-player-picks-empty">' + esc(event.player_props_warning) + '</div>'
+        : '';
+    }
+    const cards = players.map((player, index) => {
+      const stats = [['PTS', player.projected_pts], ['REB', player.projected_reb], ['AST', player.projected_ast], ['PRA', player.projected_pra]]
+        .map(([label, value]) => '<span><small>' + label + '</small><b>' + num(value, 1) + '</b></span>').join('');
+      return '<div class="bb-player-pick">' +
+        '<div class="bb-player-rank">' + (index + 1) + '</div>' +
+        '<div class="bb-player-info"><strong>' + esc(player.player_name) + '</strong><small>' + esc(player.team) + ' · ' + num(player.projected_min, 0) + ' min estimados</small></div>' +
+        '<div class="bb-player-stats">' + stats + '</div>' +
+        '<div class="bb-player-grade" title="Grado de confianza de la proyección PRA; no es probabilidad de apuesta"><b>' + esc(player.grade || '—') + '</b><small>Grado</small></div>' +
+      '</div>';
+    }).join('');
+    const dateNote = event.player_props_state_date ? 'Datos hasta ' + esc(event.player_props_state_date) : 'Datos de jugadores';
+    return '<section class="bb-player-picks"><div class="bb-player-picks-head"><strong>3 jugadores destacados</strong><small>' + dateNote + ' · proyecciones, no probabilidades de apuesta</small></div>' + cards + '</section>';
+  }
   function renderMarket(event, market) {
     if (!market.available) {
       const reason = market.reason || "Mercado no disponible.";
