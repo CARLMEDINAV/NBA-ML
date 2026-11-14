@@ -1778,6 +1778,49 @@ async function loadTeamImpact() {
   }
 }
 
+async function loadTeammateAbsenceImpact() {
+  const team = $("#teamImpactTeam").value;
+  const playerId = $("#teamImpactPlayer").value;
+  if (!team || !playerId) {
+    notice($("#teammateImpactNotice"), "Selecciona un equipo y un jugador en Impacto de ausencias.");
+    return;
+  }
+  const button = $("#teammateImpactRefresh");
+  setBusy(button, true);
+  notice($("#teammateImpactNotice"), "Comparando el rendimiento de los compañeros…");
+  try {
+    const data = await api("/api/teammate-absence-impact", {
+      team, player_id: playerId, window: $("#teamImpactWindow").value
+    });
+    $("#teammateImpactSummary").innerHTML = [
+      summaryCard("Con participación", String(data.games_with || 0), "partidos"),
+      summaryCard("Participación parcial", String(data.games_partial || 0), "partidos separados"),
+      summaryCard("Sin participación", String(data.games_without || 0), "partidos"),
+      summaryCard("Compañeros evaluados", String((data.teammates || []).length), "muestras comparables")
+    ].join("");
+    if (!data.available) {
+      $("#teammateImpactBody").innerHTML = "";
+      notice($("#teammateImpactNotice"), data.reason || "No hay datos suficientes.");
+      return;
+    }
+    $("#teammateImpactBody").innerHTML = data.teammates.map((player) => {
+      const delta = player.delta_pts == null ? "—" : signed(player.delta_pts, 1);
+      const cls = player.delta_pts > 0 ? "pill-over" : player.delta_pts < 0 ? "pill-under" : "pill-neutral";
+      return '<tr><td>' + esc(player.name) + '</td><td class="num">' + num(player.with_star.pts) +
+        '</td><td class="num">' + num(player.without_star.pts) + '</td><td class="num"><span class="pill ' + cls + '">' +
+        delta + '</span></td><td class="num">' + num(player.with_star.min) + ' / ' + num(player.without_star.min) +
+        '</td><td class="num">' + num(player.without_star.ast) + '</td><td class="num">' + num(player.without_star.reb) +
+        '</td><td class="num">' + signed((player.delta_usage || 0) * 100, 1) + ' pp</td><td class="num">' +
+        player.with_star.games + ' / ' + player.without_star.games + '</td></tr>';
+    }).join("");
+    notice($("#teammateImpactNotice"), data.note || "");
+  } catch (error) {
+    notice($("#teammateImpactNotice"), error.message, true);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 function activateResultsView(name) {
   const validViews = ["history", "performance", "calibration", "errors", "models"];
   const view = validViews.includes(name) ? name : "history";
@@ -1855,6 +1898,9 @@ function bindEvents() {
   $("#teamImpactPlayer").addEventListener("change", loadTeamImpact);
   $("#teamImpactWindow").addEventListener("change", loadTeamImpact);
   $("#teamImpactRefresh").addEventListener("click", loadTeamImpact);
+  $("#teammateImpactRefresh").addEventListener("click", loadTeammateAbsenceImpact);
+  $("#teamImpactPlayer").addEventListener("change", loadTeammateAbsenceImpact);
+  $("#teamImpactWindow").addEventListener("change", loadTeammateAbsenceImpact);
 
   $("#resultsRefresh").addEventListener("click", loadResults);
   $$(".results-nav-btn").forEach((button) => {
