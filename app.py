@@ -4471,6 +4471,125 @@ def player_prop_distribution(
     })
 
 
+
+
+POSITION_CACHE: dict[str, Any] = {"at": 0.0, "players": {}}
+
+
+def _espn_position_lookup() -> dict[int, str]:
+    """Obtiene posiciones oficiales de los rosters ESPN y las cachea seis horas."""
+    now = time.time()
+    cached = POSITION_CACHE.get("players") or {}
+    if cached and now - float(POSITION_CACHE.get("at") or 0) < 21600:
+        return cached
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; nba-ml/0.3)", "Accept": "application/json"}
+    try:
+        response = httpx.get(
+            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams",
+            params={"limit": 40}, headers=headers, timeout=LIVE_TIMEOUT, follow_redirects=True,
+        )
+        response.raise_for_status()
+        data = response.json()
+        teams = []
+        for sport in data.get("sports", []):
+            for league in sport.get("leagues", []):
+                for item in league.get("teams", []):
+                    team = item.get("team") or item
+                    if team.get("id"):
+                        teams.append(str(team["id"]))
+        if not teams:
+            raise ValueError("ESPN no devolvió equipos NBA")
+        def fetch_roster(team_id: str) -> dict[int, str]:
+            try:
+                roster_response = httpx.get(
+                    f"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/{team_id}/roster",
+                    headers=headers, timeout=LIVE_TIMEOUT, follow_redirects=True,
+                )
+                roster_response.raise_for_status()
+                found: dict[int, str] = {}
+                for athlete in roster_response.json().get("athletes", []):
+                    entries = athlete.get("items", []) if isinstance(athlete, dict) and isinstance(athlete.get("items"), list) else [athlete]
+                    for player in entries:
+                        if not isinstance(player, dict) or not player.get("id"):
+                            continue
+                        position = (player.get("position") or {}).get("abbreviation")
+                        try:
+                            if position:
+                                found[int(player["id"])] = str(position).upper()
+                        except (TypeError, ValueError):
+                            continue
+                return found
+            except Exception:
+                return {}
+        positions: dict[int, str] = {}
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            for found in pool.map(fetch_roster, teams):
+                positions.update(found)
+        if positions:
+            POSITION_CACHE["players"] = positions
+            POSITION_CACHE["at"] = now
+            return positions
+    except Exception:
+        pass
+    return cached
+
+
+@app.get("/api/position-vs-opponent")
+def position_vs_opponent(
+    opponent: str = Query(..., min_length=2, max_length=3),
+    position: str = Query(..., pattern="^(PG|SG|SF|PF|C)$"),
+    window: int = Query(10, ge=5, le=20),
+) -> JSONResponse:
+    """Puntos anotados por jugadores de una posición contra un rival en sus últimos N partidos."""
+    opponent_key = _nba_abbreviation(opponent)
+    history = _player_history()
+    if history.empty:
+        return _ok({"available": False, "reason": "No hay historial reciente de partidos de jugadores."})
+    rows = history.copy()
+    rows["opponent"] = rows["opponent"].map(_nba_abbreviation)
+    rows = rows[rows["opponent"].eq(opponent_key)].copy()
+    if rows.empty:
+        return _ok({"available": False, "opponent": opponent_key, "reason": "No hay enfrentamientos registrados contra ese equipo."})
+    rows["game_date"] = pd.to_datetime(rows["game_date"], errors="coerce")
+    recent_games = rows[["game_id", "game_date"]].drop_duplicates("game_id").sort_values(
+        ["game_date", "game_id"], ascending=False
+    ).head(window)
+    rows = rows[rows["game_id"].astype(str).isin(recent_games["game_id"].astype(str))].copy()
+    positions = _espn_position_lookup()
+    rows["player_id_num"] = pd.to_numeric(rows["player_id"], errors="coerce")
+    rows["position"] = rows["player_id_num"].map(
+        lambda value: positions.get(int(value)) if pd.notna(value) else None
+    )
+    rows = rows[rows["position"].eq(position)].copy()
+    if rows.empty:
+        return _ok({
+            "available": False, "opponent": opponent_key, "position": position,
+            "games_checked": int(len(recent_games)),
+            "reason": "No se encontraron jugadores de esa posición en la ventana seleccionada. Puede faltar información de roster.",
+        })
+    rows["pts"] = pd.to_numeric(rows["pts"], errors="coerce")
+    rows["min"] = pd.to_numeric(rows["min"], errors="coerce")
+    rows = rows[rows["min"].fillna(0).gt(0) & rows["pts"].notna()].sort_values(
+        ["game_date", "player_name"], ascending=[False, True]
+    )
+    values = rows["pts"].astype(float)
+    games = [{
+        "player_id": int(row.player_id_num), "player_name": str(row.player_name),
+        "team": str(row.team), "date": row.game_date.strftime("%Y-%m-%d") if pd.notna(row.game_date) else None,
+        "game_id": str(row.game_id), "matchup": str(row.matchup),
+        "pts": int(row.pts), "min": round(float(row.min), 1),
+    } for row in rows.itertuples(index=False)]
+    return _ok({
+        "available": bool(games), "opponent": opponent_key, "position": position,
+        "window": window, "games_checked": int(len(recent_games)), "sample": len(games),
+        "average": round(float(values.mean()), 1) if len(values) else None,
+        "median": round(float(values.median()), 1) if len(values) else None,
+        "max": int(values.max()) if len(values) else None, "players": games,
+        "position_source": "ESPN roster",
+        "note": "Puntos reales de cada jugador en los últimos partidos del rival. La posición corresponde al roster ESPN disponible; no se infiere por estadísticas.",
+    })
+
+
 @app.get("/api/player-matchup")
 def player_matchup(
     player_id: int = Query(..., ge=1),
