@@ -896,9 +896,9 @@ async function loadPositionVsOpponent() {
     ].join("");
     summary.hidden = false;
     $("#positionVsBody").innerHTML = (data.players || []).map((player) => `<tr>
-      <td><strong>${escapeHtml(player.player_name)}</strong></td>
+      <td><strong>${esc(player.player_name)}</strong></td>
       <td>${numericDate(player.date)}</td>
-      <td>${escapeHtml(player.matchup || "—")}</td>
+      <td>${esc(player.matchup || "—")}</td>
       <td class="num">${fmt(player.min)}</td>
       <td class="num"><strong>${player.pts}</strong></td>
     </tr>`).join("");
