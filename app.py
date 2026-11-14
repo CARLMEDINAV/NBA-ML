@@ -4354,7 +4354,7 @@ def player_prop_distribution(
     denom = 1 + z*z/sample
     center = (p + z*z/(2*sample))/denom
     margin = z * math.sqrt((p*(1-p)/sample) + z*z/(4*sample*sample))/denom
-    levels = sorted(set([max(0.5, round(float(values.mean())-5.5,1)), max(0.5, round(float(values.mean())-2.5,1)), round(float(values.mean())+0.5,1), round(float(values.mean())+3.5,1), round(float(values.mean())+6.5,1)]))
+    levels = sorted(set([max(0.5, round((float(values.mean())-5.5)*2)/2), max(0.5, round((float(values.mean())-2.5)*2)/2), round((float(values.mean())+0.5)*2)/2, round((float(values.mean())+3.5)*2)/2, round((float(values.mean())+6.5)*2)/2]))
     distributions = []
     for level in levels:
         count = int((values >= level + 0.5).sum())
