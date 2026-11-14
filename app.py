@@ -3247,6 +3247,96 @@ def team_absence_impact(
     })
 
 
+@app.get("/api/teammate-absence-impact")
+def teammate_absence_impact(
+    team: str = Query(..., min_length=2, max_length=3),
+    player_id: int = Query(..., ge=1),
+    season: str = "2026-27",
+    window: int = Query(20, ge=5, le=82),
+) -> JSONResponse:
+    """Mide cómo cambian las estadísticas de los compañeros con/sin un jugador."""
+    team_key = _nba_abbreviation(team)
+    team_path = ARTIFACTS / "team_games_recent.csv"
+    player_path = ARTIFACTS / "player_game_logs_recent.csv"
+    if not team_path.exists() or not player_path.exists():
+        return _ok({"available": False, "reason": "Faltan historiales de partidos para este análisis."})
+    teams = pd.read_csv(team_path, dtype={"game_id": str})
+    logs = pd.read_csv(player_path, dtype={"game_id": str})
+    teams = teams[
+        teams["team_abbreviation"].astype(str).str.upper().eq(team_key)
+        & teams["season"].astype(str).eq(season)
+    ].copy()
+    logs = logs[
+        logs["team"].astype(str).str.upper().eq(team_key)
+        & logs["season"].astype(str).eq(season)
+    ].copy()
+    if teams.empty or logs.empty:
+        return _ok({"available": False, "reason": "No hay historiales suficientes para este equipo y temporada."})
+    teams["game_id"] = teams["game_id"].astype(str)
+    logs["game_id"] = logs["game_id"].astype(str)
+    teams["game_date"] = pd.to_datetime(teams["game_date"], errors="coerce")
+    logs["game_date"] = pd.to_datetime(logs["game_date"], errors="coerce")
+    teams = teams.dropna(subset=["game_date"]).sort_values("game_date").tail(window)
+    logs = logs[logs["game_id"].isin(set(teams["game_id"]))].copy()
+    target = logs[pd.to_numeric(logs["player_id"], errors="coerce").eq(player_id)].copy()
+    if target.empty:
+        return _ok({"available": False, "reason": "El jugador seleccionado no tiene partidos registrados en esta muestra."})
+    target["min"] = pd.to_numeric(target["min"], errors="coerce")
+    typical_minutes = float(target["min"].dropna().median()) if target["min"].notna().any() else None
+    partial_cutoff = typical_minutes * 0.5 if typical_minutes and typical_minutes > 0 else 0
+    target = target.sort_values("game_date").drop_duplicates("game_id", keep="last")
+    target_minutes = target.set_index("game_id")["min"].to_dict()
+    target_games = set(target["game_id"])
+    teams["target_minutes"] = teams["game_id"].map(target_minutes)
+    teams["target_status"] = teams["game_id"].map(
+        lambda game_id: "partial" if game_id in target_games and pd.notna(target_minutes.get(game_id)) and target_minutes.get(game_id) < partial_cutoff else ("played" if game_id in target_games else "absent")
+    )
+    logs = logs[pd.to_numeric(logs["player_id"], errors="coerce").ne(player_id)].copy()
+    for col in ["min", "pts", "reb", "ast", "fga", "usage"]:
+        logs[col] = pd.to_numeric(logs.get(col), errors="coerce")
+    game_status = teams.set_index("game_id")["target_status"].to_dict()
+    logs["target_status"] = logs["game_id"].map(game_status)
+    numeric = ["min", "pts", "reb", "ast", "fga", "usage"]
+    teammates = []
+    for pid, group in logs.groupby("player_id"):
+        def averages(frame: pd.DataFrame) -> dict[str, Any]:
+            return {
+                "games": int(frame["game_id"].nunique()),
+                **{col: _rounded(frame[col].mean(), 1) if not frame.empty else None for col in numeric},
+            }
+        full = group[group["target_status"].eq("played")]
+        partial = group[group["target_status"].eq("partial")]
+        absent = group[group["target_status"].eq("absent")]
+        # Exige al menos dos apariciones en ambos grupos para evitar rankings engañosos.
+        if full["game_id"].nunique() < 2 or absent["game_id"].nunique() < 2:
+            continue
+        with_stats, without_stats, partial_stats = averages(full), averages(absent), averages(partial)
+        teammates.append({
+            "player_id": int(pid),
+            "name": str(group.sort_values("game_date").iloc[-1]["player_name"]),
+            "with_star": with_stats,
+            "partial_star": partial_stats,
+            "without_star": without_stats,
+            "delta_pts": _rounded(without_stats["pts"] - with_stats["pts"], 1),
+            "delta_min": _rounded(without_stats["min"] - with_stats["min"], 1),
+            "delta_usage": _rounded(without_stats["usage"] - with_stats["usage"], 3),
+        })
+    teammates.sort(key=lambda row: (row["delta_pts"] is not None, row["delta_pts"] or -999), reverse=True)
+    return _ok({
+        "available": bool(teammates),
+        "team": team_key,
+        "player_id": player_id,
+        "player_name": str(target.iloc[-1]["player_name"]),
+        "games_with": int(teams["target_status"].eq("played").sum()),
+        "games_partial": int(teams["target_status"].eq("partial").sum()),
+        "games_without": int(teams["target_status"].eq("absent").sum()),
+        "window": int(len(teams)),
+        "teammates": teammates,
+        "reason": None if teammates else "No hay compañeros con al menos 2 partidos en cada grupo. Amplía la muestra o espera más partidos.",
+        "note": "Comparación descriptiva de promedios por partido. La ausencia puede deberse a lesión, descanso o decisión técnica; no demuestra causalidad. Los partidos parciales se muestran aparte y no se mezclan con los grupos principales.",
+    })
+
+
 @app.get("/api/injuries")
 def injuries(
     team: str | None = None,
