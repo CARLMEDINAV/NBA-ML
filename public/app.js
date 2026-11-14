@@ -2040,6 +2040,10 @@ function bindEvents() {
   });
 
   $("#propsRefresh").addEventListener("click", () => loadProps());
+  $("#positionVsRefresh").addEventListener("click", loadPositionVsOpponent);
+  $("#positionVsTeam").addEventListener("change", loadPositionVsOpponent);
+  $("#positionVsRole").addEventListener("change", loadPositionVsOpponent);
+  $("#positionVsWindow").addEventListener("change", loadPositionVsOpponent);
   $("#propsPlayer").addEventListener("change", (event) => {
     state.props.selectedPlayerId = event.target.value;
     state.props.card = null;
