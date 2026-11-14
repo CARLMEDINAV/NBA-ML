@@ -4189,3 +4189,32 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 .team-impact-metric b { font-size: 1.55rem; font-variant-numeric: tabular-nums; }
 .team-impact-metric small { color: var(--muted); }
 .team-impact-metric em { color: var(--orange); font-size: .82rem; font-style: normal; }
+
+
+/* NBA Cards: distribution, quarter projections and player matchup */
+.advanced-panel{margin:18px 0;padding:clamp(16px,2.4vw,24px);border:1px solid rgba(148,163,184,.16);border-radius:18px;background:linear-gradient(145deg,rgba(17,28,49,.94),rgba(8,15,29,.96));box-shadow:0 16px 38px rgba(0,0,0,.16)}
+.advanced-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:15px}
+.advanced-panel-head .eyebrow{margin:0 0 6px;color:#fbbf24;font:800 .63rem var(--mono);letter-spacing:.13em}
+.advanced-panel-head h3{margin:0;color:#f8fafc;font-size:1.08rem}
+.advanced-panel-head .muted{margin:6px 0 0;color:#94a3b8;font-size:.76rem;line-height:1.5}
+.advanced-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.advanced-controls label,.advanced-game-select{display:grid;gap:6px;color:#aab6ca;font-size:.7rem;font-weight:750}
+.advanced-controls input,.advanced-game-select select{min-height:40px;min-width:150px;padding:0 10px;border:1px solid rgba(148,163,184,.2);border-radius:9px;background:#0b1426;color:#f8fafc}
+.advanced-result{margin-top:14px;color:#aab6ca;font-size:.78rem;line-height:1.5}
+.advanced-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin:12px 0}
+.advanced-stat{padding:12px;border:1px solid rgba(148,163,184,.14);border-radius:11px;background:rgba(2,6,23,.34)}
+.advanced-stat span,.advanced-stat small{display:block;color:#94a3b8;font-size:.66rem}
+.advanced-stat strong{display:block;margin:4px 0;color:#f8fafc;font:800 1.2rem var(--mono)}
+.advanced-bars{display:grid;gap:9px;margin-top:12px}
+.advanced-bar-row{display:grid;grid-template-columns:58px minmax(90px,1fr) 75px;gap:10px;align-items:center}
+.advanced-bar-row>span{color:#cbd5e1;font:750 .7rem var(--mono)}
+.advanced-bar-track{height:9px;overflow:hidden;border-radius:99px;background:rgba(148,163,184,.15)}
+.advanced-bar-track i{display:block;height:100%;border-radius:inherit;background:#34d399}
+.advanced-bar-row b{color:#e2e8f0;text-align:right;font:750 .72rem var(--mono)}
+.advanced-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.72rem}
+.advanced-table th,.advanced-table td{padding:9px 8px;border-bottom:1px solid rgba(148,163,184,.12);text-align:left}
+.advanced-table th{color:#94a3b8;font-size:.62rem;letter-spacing:.06em}
+.advanced-table td{color:#e2e8f0}
+.advanced-foot{margin:10px 0 0;color:#8291a8;font-size:.67rem;line-height:1.5}
+.advanced-game-select{max-width:440px}
+@media(max-width:640px){.advanced-panel-head{flex-direction:column}.advanced-controls{align-items:stretch}.advanced-controls label,.advanced-controls input,.advanced-controls button{width:100%}.advanced-table{display:block;overflow-x:auto;white-space:nowrap}}
