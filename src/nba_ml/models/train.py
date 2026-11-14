@@ -575,10 +575,22 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         for name, predictions in baseline_predictions.items()
     }
 
+    # Evaluar los tres candidatos en el mismo test temporal, reentrenados
+    # exclusivamente con train + validacion. El test no interviene en la seleccion.
+    test_model_rows: list[dict[str, object]] = []
+    test_model_predictions: dict[str, np.ndarray] = {}
+    for candidate_name, candidate_info in tuned.items():
+        candidate = make_model(candidate_name, candidate_info["params"])
+        candidate.fit(development[FEATURES], development[TARGET])
+        candidate_pred = candidate.predict(test_frame[FEATURES])
+        test_model_predictions[candidate_name] = candidate_pred
+        candidate_metrics = regression_metrics(test_frame[TARGET].to_numpy(), candidate_pred)
+        test_model_rows.append({"model": candidate_name, **candidate_metrics})
+
     test_rows: list[dict[str, object]] = [
         {"model": "baseline_media_liga", **baseline_metrics["league_mean"]},
         {"model": "baseline_forma_reciente", **baseline_metrics["naive_form"]},
-        {"model": f"{best_name}_train+val", **test_metrics},
+        *test_model_rows,
     ]
 
     walk_rows, residuals = walk_forward(dataset, best_name, best_params)
@@ -647,6 +659,15 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         "trained_through": str(dataset["season"].max()),
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "test_metrics": test_metrics,
+        "model_comparison": {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "best_model": best_name,
+            "validation": validation_rows,
+            "test": test_model_rows,
+            "test_season": TEST_SEASON,
+            "validation_season": VAL_SEASON,
+            "selection_note": "Modelo elegido por MAE en validacion; test reservado para evaluacion final.",
+        },
         "margin_model": margin["model"],
         "margin_residuals": margin["residuals"],
         "margin_sigma": margin["sigma"],
