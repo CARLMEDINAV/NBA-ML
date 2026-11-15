@@ -3187,6 +3187,80 @@ def health() -> JSONResponse:
 
 
 
+@app.get("/api/model-comparison")
+def model_comparison(
+    model: str = "ridge",
+    limit: int = Query(30, ge=1, le=100),
+) -> JSONResponse:
+    """Métricas fuera de muestra y predicciones por partido de cada candidato."""
+    comparison = _artifact().get("model_comparison") or {}
+    if not comparison:
+        return _ok(
+            {
+                "available": False,
+                "message": "La comparación todavía no está guardada. Ejecuta un nuevo entrenamiento para generarla.",
+            }
+        )
+
+    allowed_models = {"ridge", "random_forest", "hist_gradient_boosting"}
+    if model not in allowed_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modelo no válido. Opciones: {', '.join(sorted(allowed_models))}",
+        )
+
+    prediction_map = comparison.get("predictions") or {}
+    rows = prediction_map.get(model) or []
+    rows = sorted(rows, key=lambda row: str(row.get("game_date") or ""), reverse=True)
+    validation = comparison.get("validation") or []
+    test = comparison.get("test") or []
+    return _ok(
+        {
+            "available": bool(validation and test),
+            "generated_at": comparison.get("generated_at"),
+            "best_model": comparison.get("best_model"),
+            "validation_season": comparison.get("validation_season"),
+            "test_season": comparison.get("test_season"),
+            "selection_note": comparison.get("selection_note"),
+            "validation": validation,
+            "test": test,
+            "selected_model": model,
+            "predictions_available": model in prediction_map,
+            "count": len(rows),
+            "games": rows[:limit],
+        }
+    )
+
+
+@app.get("/api/model-comparison")
+def model_comparison() -> JSONResponse:
+    """Métricas y predicciones comparables de modelos sobre el test temporal."""
+    artifact = _artifact()
+    comparison = artifact.get("model_comparison") or {}
+    prediction_path = ARTIFACTS / "model_comparison_predictions.csv"
+    predictions: list[dict[str, Any]] = []
+    if prediction_path.exists():
+        frame = pd.read_csv(prediction_path).sort_values("game_date", ascending=False).head(100)
+        model_keys = [key for key in ("ridge", "random_forest", "hist_gradient_boosting") if f"predicted_{key}" in frame.columns]
+        for _, row in frame.iterrows():
+            item: dict[str, Any] = {
+                "date": str(row.get("game_date", "")),
+                "matchup": f"{row.get('away_team', '')} @ {row.get('home_team', '')}",
+                "actual": _clean(row.get("total_points")),
+                "models": {},
+            }
+            for key in model_keys:
+                item["models"][key] = {"predicted": _clean(row.get(f"predicted_{key}")), "error": _clean(row.get(f"error_{key}"))}
+            predictions.append(item)
+    return _ok({
+        "generated_at": comparison.get("generated_at"), "best_model": comparison.get("best_model"),
+        "validation_season": comparison.get("validation_season"), "test_season": comparison.get("test_season"),
+        "selection_note": comparison.get("selection_note"), "validation": comparison.get("validation", []),
+        "test": comparison.get("test", []), "predictions": predictions,
+        "prediction_count": len(predictions), "predictions_available": prediction_path.exists(),
+    })
+
+
 @app.get("/api/meta")
 def meta(today: str | None = None) -> JSONResponse:
     artifact = _artifact()

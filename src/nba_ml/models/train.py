@@ -587,6 +587,23 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         candidate_metrics = regression_metrics(test_frame[TARGET].to_numpy(), candidate_pred)
         test_model_rows.append({"model": candidate_name, **candidate_metrics})
 
+    # Guardar predicciones por partido para inspeccionar cada candidato en la UI.
+    comparison_base = test_frame[
+        ["game_id", "game_date", "home_team", "away_team", TARGET]
+    ].copy()
+    comparison_base["game_date"] = pd.to_datetime(
+        comparison_base["game_date"]
+    ).dt.strftime("%Y-%m-%d")
+    comparison_predictions: dict[str, list[dict[str, object]]] = {}
+    for candidate_name, candidate_pred in test_model_predictions.items():
+        candidate_frame = comparison_base.copy()
+        candidate_frame["predicted_total"] = candidate_pred
+        candidate_frame["error"] = (
+            candidate_frame[TARGET] - candidate_frame["predicted_total"]
+        )
+        candidate_frame = candidate_frame.rename(columns={TARGET: "actual_total"})
+        comparison_predictions[candidate_name] = candidate_frame.to_dict("records")
+
     test_rows: list[dict[str, object]] = [
         {"model": "baseline_media_liga", **baseline_metrics["league_mean"]},
         {"model": "baseline_forma_reciente", **baseline_metrics["naive_form"]},
@@ -633,6 +650,19 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
     predictions_output["predicted_total"] = test_predictions
     predictions_output["error"] = predictions_output[TARGET] - predictions_output["predicted_total"]
 
+    # Predicciones individuales de cada candidato sobre exactamente el mismo test.
+    comparison_output = test_frame[
+        ["game_id", "game_date", "season", "home_team", "away_team", TARGET]
+    ].copy()
+    for candidate_name, candidate_pred in test_model_predictions.items():
+        comparison_output[f"predicted_{candidate_name}"] = candidate_pred
+        comparison_output[f"error_{candidate_name}"] = (
+            comparison_output[TARGET] - comparison_output[f"predicted_{candidate_name}"]
+        )
+    comparison_output.to_csv(
+        REPORTS_DIR / "model_comparison_predictions.csv", index=False, encoding="utf-8"
+    )
+
     # Modelo auxiliar de margen para el hándicap sugerido.
     margin = train_margin_model(dataset)
     margin_table = margin["test_predictions"][
@@ -664,6 +694,7 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
             "best_model": best_name,
             "validation": validation_rows,
             "test": test_model_rows,
+            "predictions": comparison_predictions,
             "test_season": TEST_SEASON,
             "validation_season": VAL_SEASON,
             "selection_note": "Modelo elegido por MAE en validacion; test reservado para evaluacion final.",

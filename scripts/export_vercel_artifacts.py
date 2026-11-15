@@ -22,6 +22,8 @@ FILES = {
     ROOT / "data" / "processed" / "team_state.csv": ARTIFACTS / "team_state.csv",
     ROOT / "data" / "raw" / "schedule_2026_27.csv": ARTIFACTS / "schedule_2026_27.csv",
     ROOT / "reports" / "test_predictions.csv": ARTIFACTS / "test_predictions.csv",
+    ROOT / "reports" / "model_comparison_predictions.csv": ARTIFACTS
+    / "model_comparison_predictions.csv",
     ROOT / "data" / "raw" / "player_stats_2025_26_pergame.csv": ARTIFACTS
     / "player_stats_2025_26_pergame.csv",
     ROOT / "data" / "raw" / "player_stats_2025_26_totals.csv": ARTIFACTS

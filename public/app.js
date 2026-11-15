@@ -14,7 +14,8 @@ const state = {
   meta: null,
   line: 225.5,
   active: "upcoming",
-  loaded: { upcoming: false, analysis: false, external: false, results: false, players: false, props: false },
+  loaded: { upcoming: false, analysis: false, external: false, results: false, players: false, props: false, comparison: false },
+  comparisonModel: "ridge",
   upcoming: { days: 7, team: "" },
   analysis: { days: 7, team: "" },
   results: { season: "2025-26", team: "", limit: 25, window: 200 },
@@ -754,6 +755,127 @@ async function loadResults(silent = false) {
   } finally {
     setBusy(button, false);
   }
+}
+
+
+function modelDisplayName(name) {
+  return ({
+    ridge: "Ridge",
+    random_forest: "Random Forest",
+    hist_gradient_boosting: "HistGradientBoosting",
+    baseline_media_liga: "Media de liga",
+    baseline_forma_reciente: "Forma reciente",
+  })[name] || name || "Modelo";
+}
+
+function comparisonMetricRows(rows) {
+  return (rows || []).map((row) => `
+    <tr class="${["ridge", "random_forest", "hist_gradient_boosting"].includes(row.model) ? "comparison-model-row" : ""}">
+      <td><strong>${esc(modelDisplayName(row.model))}</strong></td>
+      <td class="num">${num(row.n, 0)}</td>
+      <td class="num">${num(row.mae, 3)}</td>
+      <td class="num">${num(row.rmse, 3)}</td>
+      <td class="num">${num(row.r2, 3)}</td>
+      <td class="num">${signed(row.bias, 3)}</td>
+      <td class="num">${pct(row.within_10)}</td>
+    </tr>`).join("") || '<tr><td colspan="7">No hay métricas guardadas.</td></tr>';
+}
+
+async function loadModelComparison(silent = false) {
+  const button = $("#modelComparisonRefresh");
+  if (!silent) {
+    setBusy(button, true);
+    notice($("#modelComparisonNotice"), "");
+    $("#modelValidationBody").innerHTML = '<tr><td colspan="7"><span class="spinner"></span> Cargando…</td></tr>';
+    $("#modelTestBody").innerHTML = '<tr><td colspan="7"><span class="spinner"></span> Cargando…</td></tr>';
+    $("#modelPredictionsBody").innerHTML = '<tr><td colspan="5"><span class="spinner"></span> Cargando…</td></tr>';
+  }
+  try {
+    const data = await api("/api/model-comparison", {
+      model: state.comparisonModel,
+      limit: 30,
+    });
+    state.loaded.comparison = true;
+    if (!data.available) {
+      $("#modelComparisonSummary").innerHTML = "";
+      $("#modelValidationBody").innerHTML = '<tr><td colspan="7">Comparación todavía no disponible.</td></tr>';
+      $("#modelTestBody").innerHTML = '<tr><td colspan="7">Comparación todavía no disponible.</td></tr>';
+      $("#modelPredictionsBody").innerHTML = '<tr><td colspan="5">Sin predicciones guardadas.</td></tr>';
+      notice($("#modelComparisonNotice"), data.message || "Ejecuta un nuevo entrenamiento para generar la comparación de modelos.");
+      $("#modelPredictionsNote").textContent = "";
+      return;
+    }
+
+    $("#modelComparisonSummary").innerHTML = [
+      summaryCard("Modelo seleccionado", modelDisplayName(data.best_model), "menor MAE en validación"),
+      summaryCard("Validación", data.validation_season || "—", "selección del modelo"),
+      summaryCard("Test", data.test_season || "—", "evaluación fuera de muestra"),
+      summaryCard("Comparación", data.generated_at ? new Date(data.generated_at).toLocaleString("es-CL") : "—", "última ejecución"),
+    ].join("");
+    $("#modelValidationCaption").textContent = `Temporada ${data.validation_season || "—"} · se utiliza para elegir el modelo.`;
+    $("#modelTestCaption").textContent = `Temporada ${data.test_season || "—"} · evaluación final, sin intervenir en la selección.`;
+    $("#modelValidationBody").innerHTML = comparisonMetricRows(data.validation);
+    $("#modelTestBody").innerHTML = comparisonMetricRows(data.test);
+
+    const predictions = data.games || [];
+    if (data.predictions_available && predictions.length) {
+      $("#modelPredictionsBody").innerHTML = predictions.map((game) => `
+        <tr>
+          <td>${esc(shortDate(game.game_date))}</td>
+          <td><span class="team">${esc(game.away_team)}</span> <span class="vs">@</span> <span class="team">${esc(game.home_team)}</span></td>
+          <td class="num">${num(game.actual_total, 0)}</td>
+          <td class="num">${num(game.predicted_total, 1)}</td>
+          <td class="num ${Number(game.error) > 0 ? "miss" : Number(game.error) < 0 ? "hit" : ""}">${signed(game.error, 1)}</td>
+        </tr>`).join("");
+      $("#modelPredictionsNote").textContent = `Mostrando ${predictions.length} de ${data.count} partidos de test. Error = real − predicho; positivo indica subestimación.`;
+    } else {
+      $("#modelPredictionsBody").innerHTML = '<tr><td colspan="5">El artefacto actual no contiene el detalle por partido.</td></tr>';
+      $("#modelPredictionsNote").textContent = "Ejecuta un nuevo entrenamiento y exporta los artefactos para guardar las predicciones individuales de los tres modelos.";
+    }
+    notice($("#modelComparisonNotice"), "");
+  } catch (error) {
+    notice($("#modelComparisonNotice"), error.message, true);
+    $("#modelComparisonSummary").innerHTML = "";
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+const MODEL_LABELS = { ridge: "Ridge", random_forest: "Random Forest", hist_gradient_boosting: "HistGradientBoosting" };
+
+function comparisonMetricRow(row) {
+  const label = MODEL_LABELS[row.model] || row.model || "—";
+  const winner = state.comparisonModel === row.model;
+  return `<tr class="${winner ? "is-best-model" : ""}"><td><strong>${esc(label)}</strong>${winner ? ' <span class="pill pill-success">Mejor validación</span>' : ""}</td><td class="num">${num(row.mae, 2)}</td><td class="num">${num(row.rmse, 2)}</td><td class="num">${signed(row.bias, 2)}</td><td class="num">${pct(row.within_10)}</td><td class="num">${num(row.n, 0)}</td></tr>`;
+}
+
+async function loadModelComparison(silent = false) {
+  const button = $("#modelComparisonRefresh");
+  if (!silent) { setBusy(button, true); notice($("#modelComparisonNotice"), ""); }
+  try {
+    const data = await api("/api/model-comparison");
+    state.loaded.comparison = true;
+    state.comparisonModel = data.best_model || "ridge";
+    const testRows = data.test || [];
+    const bestTest = [...testRows].sort((a, b) => Number(a.mae) - Number(b.mae))[0];
+    $("#modelComparisonSummary").innerHTML = [
+      summaryCard("Modelo seleccionado", MODEL_LABELS[data.best_model] || data.best_model || "—", "Menor MAE en validación"),
+      summaryCard("Mejor MAE de test", bestTest ? num(bestTest.mae, 2) : "—", bestTest ? (MODEL_LABELS[bestTest.model] || bestTest.model) : "Sin datos"),
+      summaryCard("Partidos comparados", String(data.prediction_count || 0), data.test_season || "Test temporal"),
+      summaryCard("Entrenamiento", data.generated_at ? shortDate(data.generated_at) : "—", "Última ejecución registrada"),
+    ].join("");
+    $("#modelComparisonValidationBody").innerHTML = (data.validation || []).length ? data.validation.map(comparisonMetricRow).join("") : '<tr><td colspan="6">Sin métricas. Ejecuta un entrenamiento.</td></tr>';
+    $("#modelComparisonTestBody").innerHTML = testRows.length ? testRows.map(comparisonMetricRow).join("") : '<tr><td colspan="6">Sin métricas de test disponibles.</td></tr>';
+    const keys = ["ridge", "random_forest", "hist_gradient_boosting"];
+    const rows = data.predictions || [];
+    $("#modelComparisonPredictionsBody").innerHTML = rows.length ? rows.map(game => {
+      const cells = keys.map(key => { const item = game.models?.[key]; return item ? `<td class="num">${num(item.predicted, 1)} <small class="muted">(${signed(item.error, 1)})</small></td>` : '<td class="num">—</td>'; }).join("");
+      return `<tr><td>${esc(shortDate(game.date))}</td><td>${esc(game.matchup)}</td><td class="num">${num(game.actual, 1)}</td>${cells}</tr>`;
+    }).join("") : '<tr><td colspan="6">No hay predicciones individuales exportadas. Ejecuta entrenamiento y exportación de artefactos.</td></tr>';
+    $("#modelComparisonNote").textContent = data.selection_note || "MAE y RMSE más bajos son mejores; sesgo cercano a cero es preferible.";
+    if (!data.predictions_available) notice($("#modelComparisonNotice"), "Faltan las predicciones individuales exportadas. Vuelve a entrenar y ejecuta scripts/export_vercel_artifacts.py.", true);
+  } catch (error) { notice($("#modelComparisonNotice"), error.message, true); if (!silent) showToast(error.message); }
+  finally { setBusy(button, false); }
 }
 
 async function loadPlayers() {
@@ -2078,6 +2200,8 @@ function activateTab(name) {
   if (name === "analysis") loadAnalysis(state.loaded.analysis);
   if (name === "external") loadExternalAnalysis(state.loaded.external);
   if (name === "results") loadResults(state.loaded.results);
+  if (name === "model-comparison") loadModelComparison(state.loaded.comparison);
+  if (name === "comparison") loadModelComparison(state.loaded.comparison);
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
   if (name === "teams") loadTeamImpactPlayers();
@@ -2107,6 +2231,7 @@ function bindEvents() {
     loadUpcoming();
   });
 
+  $("#modelComparisonRefresh").addEventListener("click", () => loadModelComparison());
   $("#analysisRefresh").addEventListener("click", () => loadAnalysis());
   $("#externalRefresh").addEventListener("click", () => loadExternalAnalysis());
   $("#externalDays").addEventListener("change", loadExternalAnalysis);
@@ -2129,6 +2254,11 @@ function bindEvents() {
   $("#teamImpactWindow").addEventListener("change", loadTeammateAbsenceImpact);
 
   $("#resultsRefresh").addEventListener("click", loadResults);
+  $("#modelComparisonRefresh").addEventListener("click", () => loadModelComparison());
+  $("#comparisonModel").addEventListener("change", (event) => {
+    state.comparisonModel = event.target.value;
+    loadModelComparison();
+  });
   $$(".results-nav-btn").forEach((button) => {
     button.addEventListener("click", () => activateResultsView(button.dataset.resultsView));
   });
