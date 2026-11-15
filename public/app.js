@@ -984,7 +984,7 @@ async function loadPlayers() {
         // La ficha /api/player-card trabaja con el estado de la temporada actual.
         // No depender de /api/meta evita que una discrepancia de temporada
         // desactive todos los enlaces de jugadores.
-        const canOpenDetail = data.season === "2026-27" && Number.isFinite(Number(player.player_id)) && Number(player.player_id) > 0;
+        const canOpenDetail = Number.isFinite(Number(player.player_id)) && Number(player.player_id) > 0;
         const rowAttrs = canOpenDetail
           ? ` data-player-id="${esc(player.player_id)}" class="is-clickable" title="Abrir ficha del jugador"`
           : "";
