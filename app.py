@@ -3507,15 +3507,23 @@ def _external_team_travel(
     completed = completed.sort_values(["game_date", "game_time_et", "game_id"])
     previous = completed.iloc[-1]
     previous_venue = team if str(previous["home"]) == team else str(previous["home"])
-    origin = NBA_ARENA_COORDINATES.get(previous_venue)
+    # Para Lakers se usa El Segundo como base operativa estimada, en vez de
+    # asumir que el equipo viajó directamente desde la ciudad del partido previo.
+    # La distancia sigue siendo geodésica aproximada, no una ruta de vuelo.
+    if team == "LAL":
+        origin = (33.9193, -118.3908)  # UCLA Health Training Center, El Segundo
+        origin_label = "El Segundo (base Lakers, estimado)"
+    else:
+        origin = NBA_ARENA_COORDINATES.get(previous_venue)
+        origin_label = previous_venue
     destination = NBA_ARENA_COORDINATES.get(destination_team)
     if origin is None or destination is None:
-        return {"distance_km": None, "from_arena": previous_venue, "to_arena": destination_team,
+        return {"distance_km": None, "from_arena": origin_label, "to_arena": destination_team,
                 "previous_game_date": pd.Timestamp(previous["game_date"]).strftime("%Y-%m-%d"),
                 "reason": "Coordenadas del recinto no disponibles"}
     return {
         "distance_km": round(_great_circle_km(origin, destination)),
-        "from_arena": previous_venue,
+        "from_arena": origin_label,
         "to_arena": destination_team,
         "previous_game_date": pd.Timestamp(previous["game_date"]).strftime("%Y-%m-%d"),
         "reason": None,
