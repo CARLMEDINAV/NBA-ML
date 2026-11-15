@@ -1951,7 +1951,7 @@ async function submitPrediction(event) {
 }
 
 
-async async function loadTeamImpactPlayers() {
+async function loadTeamImpactPlayers() {
   const team = $("#teamImpactTeam").value;
   const select = $("#teamImpactPlayer");
   select.innerHTML = '<option value="">Cargando jugadores…</option>';
