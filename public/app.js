@@ -862,7 +862,7 @@ async function loadModelComparison(silent = false) {
       summaryCard("Modelo seleccionado", MODEL_LABELS[data.best_model] || data.best_model || "—", "Menor MAE en validación"),
       summaryCard("Mejor MAE de test", bestTest ? num(bestTest.mae, 2) : "—", bestTest ? (MODEL_LABELS[bestTest.model] || bestTest.model) : "Sin datos"),
       summaryCard("Partidos comparados", String(data.prediction_count || 0), data.test_season || "Test temporal"),
-      summaryCard("Entrenamiento", data.generated_at ? shortDate(data.generated_at) : "—", "Última ejecución registrada"),
+      summaryCard("Entrenamiento", data.generated_at && Number.isFinite(Date.parse(data.generated_at)) ? new Date(data.generated_at).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" }) : "—", "Última ejecución registrada"),
     ].join("");
     $("#modelComparisonValidationBody").innerHTML = (data.validation || []).length ? data.validation.map(comparisonMetricRow).join("") : '<tr><td colspan="6">Sin métricas. Ejecuta un entrenamiento.</td></tr>';
     $("#modelComparisonTestBody").innerHTML = testRows.length ? testRows.map(comparisonMetricRow).join("") : '<tr><td colspan="6">Sin métricas de test disponibles.</td></tr>';
