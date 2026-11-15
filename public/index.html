@@ -662,7 +662,14 @@
         <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Sesgo</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelComparisonTestBody"></tbody></table></div>
         <div class="section-head compact-head"><div><h3>Predicciones individuales</h3><p class="muted">Mismos partidos para los tres modelos. Error = puntos reales − predicción.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Partido</th><th class="num">Real</th><th class="num">Ridge</th><th class="num">Random Forest</th><th class="num">HistGradient</th></tr></thead><tbody id="modelComparisonPredictionsBody"></tbody></table></div>
-        <p id="modelComparisonNote" class="table-note"></p>
+        <div class="section-head compact-head"><div><h3>Diagnóstico de errores</h3><p class="muted">Desglose de los errores en toda la muestra de test, no solo los partidos visibles arriba.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">Sesgo</th><th class="num">Subestimó</th><th class="num">Sobreestimó</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelErrorSummaryBody"></tbody></table></div>
+        <div class="section-head compact-head"><div><h3>Error según total real</h3><p class="muted">Permite detectar si los modelos fallan más en partidos de anotación baja o alta. Sesgo = real − predicción.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Total real</th><th class="num">Muestras</th><th class="num">Ridge MAE</th><th class="num">Random Forest MAE</th><th class="num">HistGradient MAE</th></tr></thead><tbody id="modelErrorBucketsBody"></tbody></table></div>
+        <div class="section-head compact-head"><div><h3>10 mayores errores</h3><p class="muted">Partidos con mayor error absoluto del modelo seleccionado mediante validación.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Partido</th><th class="num">Real</th><th class="num">Predicho</th><th class="num">Error</th><th class="num">Error abs.</th></tr></thead><tbody id="modelWorstErrorsBody"></tbody></table></div>
+        <p id="modelErrorNote" class="table-note"></p>
+                <p id="modelComparisonNote" class="table-note"></p>
       </section>
     </main>
 
