@@ -841,6 +841,43 @@ async function loadModelComparison(silent = false) {
   }
 }
 
+const MODEL_LABELS = { ridge: "Ridge", random_forest: "Random Forest", hist_gradient_boosting: "HistGradientBoosting" };
+
+function comparisonMetricRow(row) {
+  const label = MODEL_LABELS[row.model] || row.model || "—";
+  const winner = state.comparisonModel === row.model;
+  return `<tr class="${winner ? "is-best-model" : ""}"><td><strong>${esc(label)}</strong>${winner ? ' <span class="pill pill-success">Mejor validación</span>' : ""}</td><td class="num">${num(row.mae, 2)}</td><td class="num">${num(row.rmse, 2)}</td><td class="num">${signed(row.bias, 2)}</td><td class="num">${pct(row.within_10)}</td><td class="num">${num(row.n, 0)}</td></tr>`;
+}
+
+async function loadModelComparison(silent = false) {
+  const button = $("#modelComparisonRefresh");
+  if (!silent) { setBusy(button, true); notice($("#modelComparisonNotice"), ""); }
+  try {
+    const data = await api("/api/model-comparison");
+    state.loaded.comparison = true;
+    state.comparisonModel = data.best_model || "ridge";
+    const testRows = data.test || [];
+    const bestTest = [...testRows].sort((a, b) => Number(a.mae) - Number(b.mae))[0];
+    $("#modelComparisonSummary").innerHTML = [
+      summaryCard("Modelo seleccionado", MODEL_LABELS[data.best_model] || data.best_model || "—", "Menor MAE en validación"),
+      summaryCard("Mejor MAE de test", bestTest ? num(bestTest.mae, 2) : "—", bestTest ? (MODEL_LABELS[bestTest.model] || bestTest.model) : "Sin datos"),
+      summaryCard("Partidos comparados", String(data.prediction_count || 0), data.test_season || "Test temporal"),
+      summaryCard("Entrenamiento", data.generated_at ? shortDate(data.generated_at) : "—", "Última ejecución registrada"),
+    ].join("");
+    $("#modelComparisonValidationBody").innerHTML = (data.validation || []).length ? data.validation.map(comparisonMetricRow).join("") : '<tr><td colspan="6">Sin métricas. Ejecuta un entrenamiento.</td></tr>';
+    $("#modelComparisonTestBody").innerHTML = testRows.length ? testRows.map(comparisonMetricRow).join("") : '<tr><td colspan="6">Sin métricas de test disponibles.</td></tr>';
+    const keys = ["ridge", "random_forest", "hist_gradient_boosting"];
+    const rows = data.predictions || [];
+    $("#modelComparisonPredictionsBody").innerHTML = rows.length ? rows.map(game => {
+      const cells = keys.map(key => { const item = game.models?.[key]; return item ? `<td class="num">${num(item.predicted, 1)} <small class="muted">(${signed(item.error, 1)})</small></td>` : '<td class="num">—</td>'; }).join("");
+      return `<tr><td>${esc(shortDate(game.date))}</td><td>${esc(game.matchup)}</td><td class="num">${num(game.actual, 1)}</td>${cells}</tr>`;
+    }).join("") : '<tr><td colspan="6">No hay predicciones individuales exportadas. Ejecuta entrenamiento y exportación de artefactos.</td></tr>';
+    $("#modelComparisonNote").textContent = data.selection_note || "MAE y RMSE más bajos son mejores; sesgo cercano a cero es preferible.";
+    if (!data.predictions_available) notice($("#modelComparisonNotice"), "Faltan las predicciones individuales exportadas. Vuelve a entrenar y ejecuta scripts/export_vercel_artifacts.py.", true);
+  } catch (error) { notice($("#modelComparisonNotice"), error.message, true); if (!silent) showToast(error.message); }
+  finally { setBusy(button, false); }
+}
+
 async function loadPlayers() {
   const tbody = $("#playersBody");
   const button = $("#playersRefresh");
@@ -2163,6 +2200,7 @@ function activateTab(name) {
   if (name === "analysis") loadAnalysis(state.loaded.analysis);
   if (name === "external") loadExternalAnalysis(state.loaded.external);
   if (name === "results") loadResults(state.loaded.results);
+  if (name === "model-comparison") loadModelComparison(state.loaded.comparison);
   if (name === "comparison") loadModelComparison(state.loaded.comparison);
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
@@ -2193,6 +2231,7 @@ function bindEvents() {
     loadUpcoming();
   });
 
+  $("#modelComparisonRefresh").addEventListener("click", () => loadModelComparison());
   $("#analysisRefresh").addEventListener("click", () => loadAnalysis());
   $("#externalRefresh").addEventListener("click", () => loadExternalAnalysis());
   $("#externalDays").addEventListener("change", loadExternalAnalysis);
