@@ -4486,3 +4486,32 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
   .sidebar-nav .tab::before { font-size:.98rem; }
   .workspace { width:100%; }
 }
+
+
+/* Team selector: keep the native control tappable on mobile browsers */
+#tab-teams .controls-row {
+  position: relative;
+  z-index: 40;
+  overflow: visible;
+}
+#tab-teams .controls-row label {
+  position: relative;
+  z-index: 41;
+}
+#tab-teams #teamImpactTeam {
+  position: relative;
+  z-index: 42;
+  display: block;
+  width: 100%;
+  min-width: 190px;
+  min-height: 48px;
+  padding: 10px 38px 10px 12px;
+  color: #f5f7fa;
+  background-color: #101a2e;
+  border: 1px solid rgba(148,163,184,.35);
+  border-radius: 10px;
+  appearance: auto;
+  -webkit-appearance: menulist;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
