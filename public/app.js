@@ -5,6 +5,7 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const PLAYER_SORT_LABELS = { pra: "PRA", pts: "PTS", reb: "REB", ast: "AST" };
 const PROP_GRADE_LABELS = { A: "Muy probable", B: "Probable", C: "Media", D: "Baja" };
+const NBA_TEAMS_FALLBACK = [{"abbreviation":"ATL","name":"Atlanta Hawks"},{"abbreviation":"BOS","name":"Boston Celtics"},{"abbreviation":"BKN","name":"Brooklyn Nets"},{"abbreviation":"CHA","name":"Charlotte Hornets"},{"abbreviation":"CHI","name":"Chicago Bulls"},{"abbreviation":"CLE","name":"Cleveland Cavaliers"},{"abbreviation":"DAL","name":"Dallas Mavericks"},{"abbreviation":"DEN","name":"Denver Nuggets"},{"abbreviation":"DET","name":"Detroit Pistons"},{"abbreviation":"GSW","name":"Golden State Warriors"},{"abbreviation":"HOU","name":"Houston Rockets"},{"abbreviation":"IND","name":"Indiana Pacers"},{"abbreviation":"LAC","name":"LA Clippers"},{"abbreviation":"LAL","name":"Los Angeles Lakers"},{"abbreviation":"MEM","name":"Memphis Grizzlies"},{"abbreviation":"MIA","name":"Miami Heat"},{"abbreviation":"MIL","name":"Milwaukee Bucks"},{"abbreviation":"MIN","name":"Minnesota Timberwolves"},{"abbreviation":"NOP","name":"New Orleans Pelicans"},{"abbreviation":"NYK","name":"New York Knicks"},{"abbreviation":"OKC","name":"Oklahoma City Thunder"},{"abbreviation":"ORL","name":"Orlando Magic"},{"abbreviation":"PHI","name":"Philadelphia 76ers"},{"abbreviation":"PHX","name":"Phoenix Suns"},{"abbreviation":"POR","name":"Portland Trail Blazers"},{"abbreviation":"SAC","name":"Sacramento Kings"},{"abbreviation":"SAS","name":"San Antonio Spurs"},{"abbreviation":"TOR","name":"Toronto Raptors"},{"abbreviation":"UTA","name":"Utah Jazz"},{"abbreviation":"WAS","name":"Washington Wizards"}];
 
 const nf1 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 1 });
 const nf0 = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
@@ -416,7 +417,10 @@ function fillTeams(select, teams, includeAll = false) {
 }
 
 function populateTeams(meta) {
-  const teams = meta.teams || [];
+  // Evita selectores vacíos si /api/meta no entrega el catálogo completo.
+  const teams = Array.isArray(meta.teams) && meta.teams.length === 30
+    ? meta.teams
+    : NBA_TEAMS_FALLBACK;
   fillTeams($("#upcomingTeam"), teams, true);
   fillTeams($("#analysisTeam"), teams, true);
   fillTeams($("#externalTeam"), teams, true);
