@@ -3495,6 +3495,12 @@ def _external_team_travel(
         & pd.to_datetime(schedule["game_date"]).lt(game_date)
         & (schedule["home"].eq(team) | schedule["away"].eq(team))
     ].copy()
+    if "is_neutral" in completed.columns and not completed.empty:
+        previous_row = completed.sort_values(["game_date", "game_time_et", "game_id"]).iloc[-1]
+        if bool(previous_row.get("is_neutral", False)):
+            return {"distance_km": None, "from_arena": None, "to_arena": destination_team,
+                    "previous_game_date": pd.Timestamp(previous_row["game_date"]).strftime("%Y-%m-%d"),
+                    "reason": "El partido anterior fue en sede neutral; recinto exacto no disponible"}
     if completed.empty:
         return {"distance_km": None, "from_arena": None, "to_arena": destination_team,
                 "previous_game_date": None, "reason": "No hay partido previo en el calendario disponible"}
@@ -3546,6 +3552,26 @@ def _external_team_split(
         "margin": round(float((valid["scored"] - valid["conceded"]).mean()), 1),
     }
 
+
+
+
+def _external_league_home_advantage(
+    schedule: pd.DataFrame, game_date: pd.Timestamp
+) -> dict[str, Any]:
+    completed = schedule[
+        schedule["status"].eq(3)
+        & pd.to_datetime(schedule["game_date"]).lt(game_date)
+        & ~schedule.get("is_neutral", pd.Series(False, index=schedule.index)).fillna(False).astype(bool)
+    ]
+    valid = completed[["home_score", "away_score"]].apply(
+        pd.to_numeric, errors="coerce"
+    ).dropna()
+    if valid.empty:
+        return {"games": 0, "home_margin": None}
+    return {
+        "games": int(len(valid)),
+        "home_margin": round(float((valid["home_score"] - valid["away_score"]).mean()), 1),
+    }
 
 def _external_absence_scenarios(
     schedule: pd.DataFrame, team: str, game_date: pd.Timestamp,
@@ -3657,6 +3683,7 @@ def external_context(
                 "away": _external_team_split(schedule, str(game.away), "away", game_date),
                 "home": _external_team_split(schedule, str(game.home), "home", game_date),
             },
+            "home_advantage": _external_league_home_advantage(schedule, game_date),
             "absence_scenarios": {
                 "away": _external_absence_scenarios(schedule, str(game.away), game_date, away_injury, player_history),
                 "home": _external_absence_scenarios(schedule, str(game.home), game_date, home_injury, player_history),
