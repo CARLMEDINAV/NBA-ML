@@ -54,6 +54,7 @@
       <button class="tab is-active" role="tab" id="tab-btn-upcoming" aria-selected="true" aria-controls="tab-upcoming" data-tab="upcoming">Próximos</button>
       <button class="tab" role="tab" id="tab-btn-betbuilder" aria-selected="false" aria-controls="tab-betbuilder" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-analysis" aria-selected="false" aria-controls="tab-analysis" data-tab="analysis">Análisis</button>
+      <button class="tab" role="tab" id="tab-btn-external" aria-selected="false" aria-controls="tab-external" data-tab="external">Análisis externo</button>
       <button class="tab" role="tab" id="tab-btn-results" aria-selected="false" aria-controls="tab-results" data-tab="results">Resultados</button>
       <button class="tab" role="tab" id="tab-btn-players" aria-selected="false" aria-controls="tab-players" data-tab="players">Jugadores</button>
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
@@ -118,6 +119,33 @@
           </table>
         </div>
         <p class="table-note" id="upcomingNote"></p>
+      </section>
+
+
+      <section id="tab-external" class="tab-panel external-analysis-section" role="tabpanel" aria-labelledby="tab-btn-external" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Contexto previo al partido</p>
+            <h2>Análisis externo</h2>
+            <p class="muted">Evalúa descanso, back-to-back, localía, desplazamientos y bajas. Esta sección es independiente de la predicción estadística.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="externalRefresh">Actualizar</button>
+        </div>
+        <div class="controls-row external-controls">
+          <label>Días
+            <select id="externalDays"><option value="1">Hoy</option><option value="3" selected>3 días</option><option value="5">5 días</option><option value="7">7 días</option></select>
+          </label>
+          <label>Equipo
+            <select id="externalTeam"><option value="">Todos</option></select>
+          </label>
+          <span class="control-note" id="externalRange"></span>
+        </div>
+        <div id="externalNotice" class="notice" role="status" hidden></div>
+        <div class="summary-grid" id="externalSummary" aria-live="polite"></div>
+        <div id="externalGames" class="external-games" aria-live="polite">
+          <div class="empty">Selecciona esta sección para cargar el contexto de los próximos partidos.</div>
+        </div>
+        <p class="table-note" id="externalNote">Las distancias de viaje y la ventaja histórica local/visitante se mostrarán solo cuando exista una fuente verificable para el último recinto y el split estadístico. No se estiman con datos incompletos.</p>
       </section>
 
       <section id="tab-analysis" class="tab-panel analysis-section" role="tabpanel" aria-labelledby="tab-btn-analysis" hidden>

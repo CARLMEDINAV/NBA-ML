@@ -14,7 +14,7 @@ const state = {
   meta: null,
   line: 225.5,
   active: "upcoming",
-  loaded: { upcoming: false, analysis: false, results: false, players: false, props: false },
+  loaded: { upcoming: false, analysis: false, external: false, results: false, players: false, props: false },
   upcoming: { days: 7, team: "" },
   analysis: { days: 7, team: "" },
   results: { season: "2025-26", team: "", limit: 25, window: 200 },
@@ -418,6 +418,7 @@ function populateTeams(meta) {
   const teams = meta.teams || [];
   fillTeams($("#upcomingTeam"), teams, true);
   fillTeams($("#analysisTeam"), teams, true);
+  fillTeams($("#externalTeam"), teams, true);
   fillTeams($("#resultsTeam"), teams, true);
   fillTeams($("#playersTeam"), teams, true);
   fillTeams($("#injuriesTeam"), teams, true);
@@ -1945,6 +1946,92 @@ function activateResultsView(name) {
   });
 }
 
+
+async function loadExternalAnalysis(silent = false) {
+  const container = $("#externalGames");
+  const button = $("#externalRefresh");
+  if (!silent) {
+    container.innerHTML = '<div class="empty"><span class="spinner"></span> Cargando contexto externo…</div>';
+    setBusy(button, true);
+    notice($("#externalNotice"), "");
+  }
+  try {
+    const [schedule, injuryData] = await Promise.all([
+      api("/api/upcoming", { days: Number($("#externalDays").value || 3), team: $("#externalTeam").value, line: state.line, live: 1, injuries: 1 }),
+      api("/api/injuries"),
+    ]);
+    state.loaded.external = true;
+    $("#externalRange").textContent = schedule.start + " → " + schedule.end;
+    const injuryByTeam = new Map((injuryData.teams || []).map((team) => [String(team.team).toUpperCase(), team]));
+    const games = schedule.games || [];
+    const b2bCount = games.filter((game) => Number(game.home_rest) <= 0 || Number(game.away_rest) <= 0).length;
+    const injuryTeams = new Set(games.flatMap((game) => [game.home, game.away]).filter((team) => {
+      const item = injuryByTeam.get(String(team).toUpperCase());
+      return item && Number(item.injury_count) > 0;
+    }));
+    $("#externalSummary").innerHTML = [
+      summaryCard("Partidos", String(games.length), "en el período"),
+      summaryCard("Partidos con B2B", String(b2bCount), "al menos un equipo sin día de descanso"),
+      summaryCard("Equipos con bajas", String(injuryTeams.size), "según ESPN"),
+      summaryCard("Fuente de lesiones", injuryData.source || "ESPN", injuryData.source_updated_at ? "actualizada " + injuryData.source_updated_at : "estado de la fuente"),
+    ].join("");
+    if (!games.length) {
+      container.innerHTML = '<div class="empty">No hay partidos para el período o filtro seleccionado.</div>';
+      return;
+    }
+    const restText = (value) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return "Sin dato";
+      if (n <= 0) return "Sin días de descanso (B2B)";
+      return n + " días de descanso";
+    };
+    const injuryHtml = (teamCode) => {
+      const item = injuryByTeam.get(String(teamCode).toUpperCase());
+      if (!item) return '<span class="external-muted">Parte no disponible</span>';
+      const players = (item.injuries || []).slice(0, 4).map((p) =>
+        '<li><strong>' + esc(p.player_name) + '</strong><span>' + esc(p.status_label || p.status || "Estado sin confirmar") + '</span></li>'
+      ).join("");
+      return '<div class="external-injuries"><strong>' + Number(item.injury_count || 0) + ' reporte(s) · ' + Number(item.out_count || 0) + ' OUT</strong>' +
+        (players ? '<ul>' + players + '</ul>' : '<span class="external-muted">Sin bajas reportadas</span>') + '</div>';
+    };
+    container.innerHTML = games.map((game) => {
+      const homeRest = Number(game.home_rest);
+      const awayRest = Number(game.away_rest);
+      const homeB2B = Number.isFinite(homeRest) && homeRest <= 0;
+      const awayB2B = Number.isFinite(awayRest) && awayRest <= 0;
+      const homeInj = injuryByTeam.get(String(game.home).toUpperCase());
+      const awayInj = injuryByTeam.get(String(game.away).toUpperCase());
+      const homeOut = Number(homeInj?.out_count || 0);
+      const awayOut = Number(awayInj?.out_count || 0);
+      const homeImpact = game.availability?.home?.impact_points;
+      const awayImpact = game.availability?.away?.impact_points;
+      const context = [];
+      if (homeB2B && !awayB2B) context.push("Visitante con ventaja de descanso");
+      if (awayB2B && !homeB2B) context.push("Local con ventaja de descanso");
+      if (homeOut > awayOut) context.push("Local con más bajas OUT reportadas");
+      if (awayOut > homeOut) context.push("Visitante con más bajas OUT reportadas");
+      if (!context.length) context.push("Sin ventaja contextual clara con los datos disponibles");
+      return '<article class="external-game-card">' +
+        '<header class="external-game-head"><div><span class="external-date">' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + ' ET</span><h3>' + esc(game.away_name || game.away) + ' <span class="vs">@</span> ' + esc(game.home_name || game.home) + '</h3></div><span class="external-game-total">Modelo ' + num(game.predicted_total) + ' pts</span></header>' +
+        '<div class="external-matchup-grid">' +
+          '<section><h4>Visitante · ' + esc(game.away) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.away_rest)) + (awayB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p><b>Bajas</b>' + injuryHtml(game.away) + (awayImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(awayImpact,1) + ' pts</small>' : '') + '</section>' +
+          '<section><h4>Local · ' + esc(game.home) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.home_rest)) + (homeB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p><b>Bajas</b>' + injuryHtml(game.home) + (homeImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(homeImpact,1) + ' pts</small>' : '') + '</section>' +
+        '</div>' +
+        '<div class="external-context"><b>Lectura contextual</b><p>' + esc(context.join(" · ")) + '</p><small>Localía: ' + esc(game.home_name || game.home) + ' juega en casa. La ventaja histórica de localía no se cuantifica en esta vista.</small><small>Viaje: distancia no disponible; no se infiere a partir de la ciudad del equipo ni del descanso.</small></div>' +
+        '</article>';
+    }).join("");
+    const warnings = [schedule.warning, schedule.injuries_warning, injuryData.warning].filter(Boolean);
+    $("#externalNote").textContent = "Descanso obtenido del calendario del modelo. Lesiones: ESPN" + (injuryData.source_updated_at ? " · actualización " + injuryData.source_updated_at : "") + ". Los recuentos de bajas no equivalen a impacto de minutos; OUT, cuestionables y dudas se muestran por separado." + (warnings.length ? " Avisos: " + warnings.join(" ") : "");
+  } catch (error) {
+    if (!silent) {
+      container.innerHTML = '<div class="empty">No se pudo cargar el análisis externo.</div>';
+      notice($("#externalNotice"), error.message, true);
+    }
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 function activateTab(name) {
   state.active = name;
   $$(".tab").forEach((button) => {
@@ -1962,6 +2049,7 @@ function activateTab(name) {
   });
   if (name === "upcoming") loadUpcoming(state.loaded.upcoming);
   if (name === "analysis") loadAnalysis(state.loaded.analysis);
+  if (name === "external") loadExternalAnalysis(state.loaded.external);
   if (name === "results") loadResults(state.loaded.results);
   if (name === "players" && !state.loaded.players) loadPlayers();
   if (name === "props" && !state.loaded.props) loadProps();
@@ -1993,6 +2081,9 @@ function bindEvents() {
   });
 
   $("#analysisRefresh").addEventListener("click", () => loadAnalysis());
+  $("#externalRefresh").addEventListener("click", () => loadExternalAnalysis());
+  $("#externalDays").addEventListener("change", loadExternalAnalysis);
+  $("#externalTeam").addEventListener("change", loadExternalAnalysis);
   $("#analysisDays").addEventListener("change", (event) => {
     state.analysis.days = Number(event.target.value);
     loadAnalysis();
@@ -2199,6 +2290,7 @@ function bindEvents() {
     if (document.visibilityState !== "visible") return;
     if (state.active === "upcoming") loadUpcoming(true);
     if (state.active === "analysis") loadAnalysis(true);
+    if (state.active === "external") loadExternalAnalysis(true);
     if (state.active === "results") loadResults(true);
     if (state.active === "props") loadProps(true);
   }, 60000);
