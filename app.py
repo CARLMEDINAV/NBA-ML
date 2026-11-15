@@ -3448,6 +3448,228 @@ def injuries(
     return _ok(_injuries_response(team=team, status=status, q=q))
 
 
+
+
+# ---------------------------------------------------------------------------
+# Contexto externo: viaje real entre recintos, splits local/visita y escenarios
+# descriptivos de disponibilidad. Estos datos no modifican el pronóstico base.
+# ---------------------------------------------------------------------------
+
+NBA_ARENA_COORDINATES = {
+    "ATL": (33.7573, -84.3963), "BOS": (42.3662, -71.0621),
+    "BKN": (40.6826, -73.9754), "CHA": (35.2251, -80.8392),
+    "CHI": (41.8807, -87.6742), "CLE": (41.4964, -81.6881),
+    "DAL": (32.7906, -96.8103), "DEN": (39.7486, -105.0075),
+    "DET": (42.3411, -83.0550), "GSW": (37.7681, -122.3877),
+    "HOU": (29.7508, -95.3622), "IND": (39.7639, -86.1556),
+    "LAC": (33.9451, -118.3431), "LAL": (34.0431, -118.2672),
+    "MEM": (35.1383, -90.0506), "MIA": (25.7814, -80.1870),
+    "MIL": (43.0436, -87.9169), "MIN": (44.9794, -93.2761),
+    "NOP": (29.9489, -90.0819), "NYK": (40.7506, -73.9936),
+    "OKC": (35.4633, -97.5150), "ORL": (28.5392, -81.3839),
+    "PHI": (39.9011, -75.1719), "PHX": (33.4458, -112.0714),
+    "POR": (45.5317, -122.6667), "SAC": (38.6492, -121.5181),
+    "SAS": (29.4269, -98.4375), "TOR": (43.6433, -79.3792),
+    "UTA": (40.7683, -111.9011), "WAS": (38.8981, -77.0208),
+}
+
+
+def _great_circle_km(origin: tuple[float, float], destination: tuple[float, float]) -> float:
+    """Distancia geodésica aproximada entre dos recintos, no ruta aérea real."""
+    lat1, lon1 = map(math.radians, origin)
+    lat2, lon2 = map(math.radians, destination)
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    value = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 6371.0088 * 2 * math.asin(math.sqrt(min(1.0, value)))
+
+
+def _external_team_travel(
+    schedule: pd.DataFrame, team: str, destination_team: str, game_date: pd.Timestamp,
+    neutral: bool,
+) -> dict[str, Any]:
+    if neutral:
+        return {"distance_km": None, "from_arena": None, "to_arena": None,
+                "previous_game_date": None, "reason": "Sede neutral sin coordenadas verificadas"}
+    completed = schedule[
+        schedule["status"].eq(3)
+        & pd.to_datetime(schedule["game_date"]).lt(game_date)
+        & (schedule["home"].eq(team) | schedule["away"].eq(team))
+    ].copy()
+    if completed.empty:
+        return {"distance_km": None, "from_arena": None, "to_arena": destination_team,
+                "previous_game_date": None, "reason": "No hay partido previo en el calendario disponible"}
+    completed = completed.sort_values(["game_date", "game_time_et", "game_id"])
+    previous = completed.iloc[-1]
+    previous_venue = team if str(previous["home"]) == team else str(previous["home"])
+    origin = NBA_ARENA_COORDINATES.get(previous_venue)
+    destination = NBA_ARENA_COORDINATES.get(destination_team)
+    if origin is None or destination is None:
+        return {"distance_km": None, "from_arena": previous_venue, "to_arena": destination_team,
+                "previous_game_date": pd.Timestamp(previous["game_date"]).strftime("%Y-%m-%d"),
+                "reason": "Coordenadas del recinto no disponibles"}
+    return {
+        "distance_km": round(_great_circle_km(origin, destination)),
+        "from_arena": previous_venue,
+        "to_arena": destination_team,
+        "previous_game_date": pd.Timestamp(previous["game_date"]).strftime("%Y-%m-%d"),
+        "reason": None,
+    }
+
+
+def _external_team_split(
+    schedule: pd.DataFrame, team: str, venue: str, game_date: pd.Timestamp
+) -> dict[str, Any]:
+    completed = schedule[
+        schedule["status"].eq(3)
+        & pd.to_datetime(schedule["game_date"]).lt(game_date)
+        & (schedule["home"].eq(team) if venue == "home" else schedule["away"].eq(team))
+        & ~schedule.get("is_neutral", pd.Series(False, index=schedule.index)).fillna(False).astype(bool)
+    ].copy()
+    if completed.empty:
+        return {"games": 0, "points_for": None, "points_against": None,
+                "game_total": None, "margin": None}
+    if venue == "home":
+        scored = pd.to_numeric(completed["home_score"], errors="coerce")
+        conceded = pd.to_numeric(completed["away_score"], errors="coerce")
+    else:
+        scored = pd.to_numeric(completed["away_score"], errors="coerce")
+        conceded = pd.to_numeric(completed["home_score"], errors="coerce")
+    valid = pd.DataFrame({"scored": scored, "conceded": conceded}).dropna()
+    if valid.empty:
+        return {"games": 0, "points_for": None, "points_against": None,
+                "game_total": None, "margin": None}
+    return {
+        "games": int(len(valid)),
+        "points_for": round(float(valid["scored"].mean()), 1),
+        "points_against": round(float(valid["conceded"].mean()), 1),
+        "game_total": round(float((valid["scored"] + valid["conceded"]).mean()), 1),
+        "margin": round(float((valid["scored"] - valid["conceded"]).mean()), 1),
+    }
+
+
+def _external_absence_scenarios(
+    schedule: pd.DataFrame, team: str, game_date: pd.Timestamp,
+    injury_team: dict[str, Any] | None, player_history: pd.DataFrame | None,
+) -> list[dict[str, Any]]:
+    if not injury_team or player_history is None or player_history.empty:
+        return []
+    required = {"team", "player_name", "game_id", "game_date"}
+    if not required.issubset(player_history.columns):
+        return []
+    team_games = schedule[
+        schedule["status"].eq(3)
+        & pd.to_datetime(schedule["game_date"]).lt(game_date)
+        & (schedule["home"].eq(team) | schedule["away"].eq(team))
+    ].copy().sort_values(["game_date", "game_time_et", "game_id"]).tail(40)
+    if team_games.empty:
+        return []
+    team_games["game_id"] = team_games["game_id"].astype(str)
+    team_games["team_points"] = team_games.apply(
+        lambda row: row["home_score"] if row["home"] == team else row["away_score"], axis=1
+    )
+    team_games["opponent_points"] = team_games.apply(
+        lambda row: row["away_score"] if row["home"] == team else row["home_score"], axis=1
+    )
+    team_games["game_total"] = team_games["team_points"] + team_games["opponent_points"]
+    team_games = team_games.dropna(subset=["team_points", "opponent_points"])
+    history = player_history.copy()
+    history["team"] = history["team"].astype(str).str.upper()
+    history["game_id"] = history["game_id"].astype(str)
+    scenarios: list[dict[str, Any]] = []
+    for injury in (injury_team.get("injuries") or [])[:8]:
+        player_name = str(injury.get("player_name") or "").strip()
+        if not player_name:
+            continue
+        normalize = lambda value: "".join(ch.lower() for ch in str(value) if ch.isalnum())
+        player_rows = history[
+            history["team"].eq(team)
+            & history["player_name"].map(normalize).eq(normalize(player_name))
+        ]
+        if player_rows.empty:
+            continue
+        first_date = pd.to_datetime(player_rows["game_date"], errors="coerce").min()
+        eligible = team_games[pd.to_datetime(team_games["game_date"]).ge(first_date)]
+        if eligible.empty:
+            continue
+        played_ids = set(player_rows["game_id"].astype(str))
+        with_player = eligible[eligible["game_id"].isin(played_ids)]
+        without_player = eligible[~eligible["game_id"].isin(played_ids)]
+        if len(with_player) < 3 or len(without_player) < 3:
+            continue
+        overall_total = float(eligible["game_total"].mean())
+        with_total = float(with_player["game_total"].mean())
+        without_total = float(without_player["game_total"].mean())
+        scenarios.append({
+            "player_name": player_name,
+            "status": injury.get("status_label") or injury.get("status") or "Sin confirmar",
+            "games_with": int(len(with_player)),
+            "games_without": int(len(without_player)),
+            "team_points_with": round(float(with_player["team_points"].mean()), 1),
+            "team_points_without": round(float(without_player["team_points"].mean()), 1),
+            "delta_team_points": round(float(without_player["team_points"].mean() - with_player["team_points"].mean()), 1),
+            "total_with": round(with_total, 1),
+            "total_without": round(without_total, 1),
+            "delta_game_total": round(without_total - with_total, 1),
+            "total_shift_if_plays": round(with_total - overall_total, 1),
+            "total_shift_if_out": round(without_total - overall_total, 1),
+            "note": "Comparación histórica descriptiva; no implica causalidad ni se suma a otros jugadores.",
+        })
+    return scenarios
+
+
+@app.get("/api/external-context")
+def external_context(
+    days: int = Query(7, ge=1, le=30),
+    team: str | None = None,
+    today: str | None = None,
+) -> JSONResponse:
+    schedule = _schedule()
+    state = _state()
+    start = _today(today)
+    end = start + pd.Timedelta(days=days - 1)
+    dates = pd.to_datetime(schedule["game_date"]).dt.normalize()
+    mask = dates.between(start, end) & schedule["status"].eq(1)
+    selected = [item.strip().upper() for item in (team or "").split(",") if item.strip()]
+    if selected:
+        mask &= schedule["home"].isin(selected) | schedule["away"].isin(selected)
+    games = schedule.loc[mask].sort_values(["game_date", "game_time_et", "game_id"])
+    injury_teams, injury_meta = _injury_report(state)
+    injury_index = {item["team"]: item for item in injury_teams}
+    try:
+        player_history = _player_history()
+    except Exception:
+        player_history = None
+    rows = []
+    for game in games.itertuples(index=False):
+        game_date = pd.Timestamp(game.game_date).normalize()
+        neutral = bool(getattr(game, "is_neutral", False))
+        destination = str(game.home)
+        away_injury = injury_index.get(str(game.away).upper())
+        home_injury = injury_index.get(str(game.home).upper())
+        rows.append({
+            "game_id": str(game.game_id),
+            "neutral_site": neutral,
+            "travel": {
+                "away": _external_team_travel(schedule, str(game.away), destination, game_date, neutral),
+                "home": _external_team_travel(schedule, str(game.home), destination, game_date, neutral),
+            },
+            "splits": {
+                "away": _external_team_split(schedule, str(game.away), "away", game_date),
+                "home": _external_team_split(schedule, str(game.home), "home", game_date),
+            },
+            "absence_scenarios": {
+                "away": _external_absence_scenarios(schedule, str(game.away), game_date, away_injury, player_history),
+                "home": _external_absence_scenarios(schedule, str(game.home), game_date, home_injury, player_history),
+            },
+        })
+    return _ok({
+        "games": rows,
+        "source": "Calendario NBA, coordenadas públicas de recintos y registros históricos del jugador",
+        "travel_method": "Distancia de gran círculo entre el recinto del partido anterior y el recinto del partido actual; no representa ruta aérea real.",
+        "injuries_warning": injury_meta.get("warning"),
+    })
+
+
 @app.get("/api/upcoming")
 def upcoming(
     days: int = Query(7, ge=1, le=30),
