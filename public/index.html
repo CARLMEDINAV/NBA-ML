@@ -62,6 +62,7 @@
       <button class="tab" role="tab" id="tab-btn-quarters" aria-selected="false" aria-controls="tab-quarters" data-tab="quarters">Cuartos</button>
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
+      <button class="tab" role="tab" id="tab-btn-model-comparison" aria-selected="false" aria-controls="tab-model-comparison" data-tab="model-comparison">Comparación ML</button>
       <button class="tab" role="tab" id="tab-btn-comparison" aria-selected="false" aria-controls="tab-comparison" data-tab="comparison">Comparación ML</button>
       </nav>
       <section id="tab-upcoming" class="tab-panel is-active upcoming-section" role="tabpanel" aria-labelledby="tab-btn-upcoming">
@@ -706,6 +707,21 @@
           </div>
           <p class="table-note" id="modelPredictionsNote"></p>
         </section>
+      </section>
+
+      <section id="tab-model-comparison" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-model-comparison" hidden>
+        <div class="section-head"><div><p class="eyebrow">Evaluación de machine learning</p><h2>Comparación de modelos</h2>
+          <p class="muted">Ridge, Random Forest e HistGradientBoosting evaluados sobre las mismas particiones temporales. El test queda separado de la selección.</p></div>
+          <button class="btn btn-ghost" type="button" id="modelComparisonRefresh">Actualizar</button></div>
+        <div id="modelComparisonNotice" class="notice" role="status" hidden></div>
+        <div id="modelComparisonSummary" class="summary-grid"></div>
+        <div class="section-head compact-head"><div><h3>Métricas de validación</h3><p class="muted">Usadas para seleccionar el modelo.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Sesgo</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelComparisonValidationBody"></tbody></table></div>
+        <div class="section-head compact-head"><div><h3>Evaluación fuera de muestra</h3><p class="muted">Test temporal, no utilizado para ajustar ni seleccionar hiperparámetros.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Sesgo</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelComparisonTestBody"></tbody></table></div>
+        <div class="section-head compact-head"><div><h3>Predicciones individuales</h3><p class="muted">Mismos partidos para los tres modelos. Error = puntos reales − predicción.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Partido</th><th class="num">Real</th><th class="num">Ridge</th><th class="num">Random Forest</th><th class="num">HistGradient</th></tr></thead><tbody id="modelComparisonPredictionsBody"></tbody></table></div>
+        <p id="modelComparisonNote" class="table-note"></p>
       </section>
     </main>
 
