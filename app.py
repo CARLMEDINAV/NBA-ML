@@ -4587,9 +4587,16 @@ def position_vs_opponent(
         })
     rows["pts"] = pd.to_numeric(rows["pts"], errors="coerce")
     rows["min"] = pd.to_numeric(rows["min"], errors="coerce")
-    rows = rows[rows["min"].fillna(0).gt(0) & rows["pts"].notna()].sort_values(
+    # Excluir actuaciones con menos de 10 minutos para evitar muestras marginales.
+    rows = rows[rows["min"].ge(10) & rows["pts"].notna()].sort_values(
         ["game_date", "player_name"], ascending=[False, True]
     )
+    if rows.empty:
+        return _ok({
+            "available": False, "opponent": opponent_key, "position": position,
+            "games_checked": int(len(recent_games)), "minimum_minutes": 10,
+            "reason": "No hay actuaciones de esa posición con al menos 10 minutos jugados en la ventana seleccionada.",
+        })
     values = rows["pts"].astype(float)
     games = [{
         "player_id": int(row["player_id_num"]), "player_name": str(row["player_name"]),
@@ -4599,12 +4606,12 @@ def position_vs_opponent(
     } for row in rows.to_dict(orient="records")]
     return _ok({
         "available": bool(games), "opponent": opponent_key, "position": position,
-        "window": window, "season": current_season, "games_checked": int(len(recent_games)), "sample": len(games),
+        "window": window, "season": current_season, "games_checked": int(len(recent_games)), "minimum_minutes": 10, "sample": len(games),
         "average": round(float(values.mean()), 1) if len(values) else None,
         "median": round(float(values.median()), 1) if len(values) else None,
         "max": int(values.max()) if len(values) else None, "players": games,
         "position_source": "ESPN roster",
-        "note": "Puntos reales de cada jugador en los últimos partidos del rival. ESPN publica actualmente las posiciones agrupadas como G (guards), F (forwards) y C (centers); no se infieren posiciones específicas como PG/SG/SF/PF.",
+        "note": "Solo se incluyen actuaciones con al menos 10 minutos jugados. Puntos reales de cada jugador en los últimos partidos del rival. ESPN publica actualmente las posiciones agrupadas como G (guards), F (forwards) y C (centers); no se infieren posiciones específicas como PG/SG/SF/PF.",
     })
 
 
