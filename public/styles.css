@@ -4331,3 +4331,17 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 .external-context p{margin:5px 0;color:var(--text);font-size:.75rem}
 .external-context small{display:block;color:var(--muted);font-size:.64rem;line-height:1.5}
 @media(max-width:640px){.external-matchup-grid{grid-template-columns:1fr}.external-game-head{flex-direction:column}.external-game-total{white-space:normal}.external-controls{display:grid;grid-template-columns:1fr 1fr}.external-controls .control-note{grid-column:1/-1}}
+
+
+/* Indicadores cuantitativos del análisis externo */
+.external-split-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.external-split{display:grid;gap:5px;padding:12px;border:1px solid var(--border);border-radius:10px;background:rgba(148,163,184,.035);min-width:0}
+.external-split b,.external-sensitivity>b{font-size:.78rem;color:var(--text)}
+.external-split small,.external-sensitivity small{font-size:.72rem;color:var(--muted);line-height:1.5}
+.external-sensitivity{display:grid;gap:9px;margin-top:13px;padding:13px;border:1px solid var(--border);border-radius:11px;background:rgba(148,163,184,.025)}
+.external-scenarios{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.external-scenario{display:grid;gap:5px;padding:10px;border-radius:9px;background:rgba(59,130,246,.055);border:1px solid rgba(59,130,246,.15);min-width:0}
+.external-scenario b{font-size:.76rem;color:var(--text)}
+.external-scenario small{overflow-wrap:anywhere}
+.external-muted{display:block;color:var(--muted);font-size:.72rem;line-height:1.5;margin:3px 0}
+@media(max-width:680px){.external-split-grid,.external-scenarios{grid-template-columns:1fr}.external-game-head{flex-wrap:wrap}}
