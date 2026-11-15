@@ -3232,6 +3232,35 @@ def model_comparison(
     )
 
 
+@app.get("/api/model-comparison")
+def model_comparison() -> JSONResponse:
+    """Métricas y predicciones comparables de modelos sobre el test temporal."""
+    artifact = _artifact()
+    comparison = artifact.get("model_comparison") or {}
+    prediction_path = ARTIFACTS / "model_comparison_predictions.csv"
+    predictions: list[dict[str, Any]] = []
+    if prediction_path.exists():
+        frame = pd.read_csv(prediction_path).sort_values("game_date", ascending=False).head(100)
+        model_keys = [key for key in ("ridge", "random_forest", "hist_gradient_boosting") if f"predicted_{key}" in frame.columns]
+        for _, row in frame.iterrows():
+            item: dict[str, Any] = {
+                "date": str(row.get("game_date", "")),
+                "matchup": f"{row.get('away_team', '')} @ {row.get('home_team', '')}",
+                "actual": _clean(row.get("total_points")),
+                "models": {},
+            }
+            for key in model_keys:
+                item["models"][key] = {"predicted": _clean(row.get(f"predicted_{key}")), "error": _clean(row.get(f"error_{key}"))}
+            predictions.append(item)
+    return _ok({
+        "generated_at": comparison.get("generated_at"), "best_model": comparison.get("best_model"),
+        "validation_season": comparison.get("validation_season"), "test_season": comparison.get("test_season"),
+        "selection_note": comparison.get("selection_note"), "validation": comparison.get("validation", []),
+        "test": comparison.get("test", []), "predictions": predictions,
+        "prediction_count": len(predictions), "predictions_available": prediction_path.exists(),
+    })
+
+
 @app.get("/api/meta")
 def meta(today: str | None = None) -> JSONResponse:
     artifact = _artifact()
