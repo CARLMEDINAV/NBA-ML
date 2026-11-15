@@ -4305,3 +4305,29 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
   .position-matchup-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .position-matchup-controls button { grid-column: 1 / -1; width: 100%; }
 }
+
+/* Análisis externo: descanso, localía y bajas */
+.external-analysis-section{display:grid;gap:16px}
+.external-controls{align-items:end}
+.external-games{display:grid;gap:14px}
+.external-game-card{padding:16px;border:1px solid var(--border);border-radius:15px;background:var(--panel);box-shadow:0 8px 22px rgba(0,0,0,.08);min-width:0}
+.external-game-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.external-date{display:block;color:var(--muted);font-size:.68rem;margin-bottom:5px}
+.external-game-head h3{margin:0;color:var(--text);font-size:1rem}
+.external-game-total{white-space:nowrap;color:#93c5fd;font:750 .76rem var(--mono);padding:7px 9px;border-radius:8px;background:rgba(59,130,246,.1)}
+.external-matchup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.external-matchup-grid>section{min-width:0;padding:12px;border:1px solid var(--border);border-radius:11px;background:rgba(148,163,184,.035)}
+.external-matchup-grid h4{margin:0 0 9px;color:var(--text);font-size:.78rem}
+.external-matchup-grid p{margin:6px 0 10px;color:var(--muted);font-size:.72rem}
+.external-matchup-grid>section>b{display:block;color:var(--muted);font-size:.68rem;margin-bottom:5px}
+.external-matchup-grid small{display:block;color:var(--muted);font-size:.64rem;margin-top:8px}
+.external-flag{display:inline-block;margin-left:5px;padding:3px 6px;border-radius:5px;background:rgba(245,158,11,.13);color:#fbbf24;font-size:.6rem;font-weight:800}
+.external-injuries>strong{display:block;color:var(--text);font-size:.7rem}
+.external-injuries ul{list-style:none;margin:7px 0 0;padding:0;display:grid;gap:5px}
+.external-injuries li{display:flex;justify-content:space-between;gap:8px;color:var(--text);font-size:.66rem}
+.external-injuries li span,.external-muted{color:var(--muted);font-size:.64rem}
+.external-context{margin-top:12px;padding:11px 12px;border-radius:10px;background:rgba(148,163,184,.06)}
+.external-context>b{font-size:.7rem;color:var(--text)}
+.external-context p{margin:5px 0;color:var(--text);font-size:.75rem}
+.external-context small{display:block;color:var(--muted);font-size:.64rem;line-height:1.5}
+@media(max-width:640px){.external-matchup-grid{grid-template-columns:1fr}.external-game-head{flex-direction:column}.external-game-total{white-space:normal}.external-controls{display:grid;grid-template-columns:1fr 1fr}.external-controls .control-note{grid-column:1/-1}}
