@@ -872,7 +872,26 @@ async function loadModelComparison(silent = false) {
       const cells = keys.map(key => { const item = game.models?.[key]; return item ? `<td class="num">${num(item.predicted, 1)} <small class="muted">(${signed(item.error, 1)})</small></td>` : '<td class="num">—</td>'; }).join("");
       return `<tr><td>${esc(shortDate(game.date))}</td><td>${esc(game.matchup)}</td><td class="num">${num(game.actual, 1)}</td>${cells}</tr>`;
     }).join("") : '<tr><td colspan="6">No hay predicciones individuales exportadas. Ejecuta entrenamiento y exportación de artefactos.</td></tr>';
-    $("#modelComparisonNote").textContent = data.selection_note || "MAE y RMSE más bajos son mejores; sesgo cercano a cero es preferible.";
+    const diagnostics = data.diagnostics || {};
+    const diagnosticModels = diagnostics.models || [];
+    $("#modelErrorSummaryBody").innerHTML = diagnosticModels.length ? diagnosticModels.map(row => {
+      const label = MODEL_LABELS[row.model] || row.model;
+      return `<tr><td><strong>${esc(label)}</strong></td><td class="num">${num(row.mae, 2)}</td><td class="num">${signed(row.bias, 2)}</td><td class="num">${num(row.underestimated, 0)}</td><td class="num">${num(row.overestimated, 0)}</td><td class="num">${pct(row.within_10)}</td><td class="num">${num(row.n, 0)}</td></tr>`;
+    }).join("") : '<tr><td colspan="7">Sin datos suficientes para el diagnóstico.</td></tr>';
+    const buckets = diagnostics.actual_buckets || [];
+    $("#modelErrorBucketsBody").innerHTML = buckets.length ? buckets.map(bucket => {
+      const values = ["ridge", "random_forest", "hist_gradient_boosting"].map(key => {
+        const row = (bucket.models || []).find(item => item.model === key);
+        return row ? `<td class="num">${num(row.mae, 2)} <small class="muted">sesgo ${signed(row.bias, 1)}</small></td>` : '<td class="num">—</td>';
+      }).join("");
+      return `<tr><td>${esc(bucket.range)}</td><td class="num">${num(bucket.n, 0)}</td>${values}</tr>`;
+    }).join("") : '<tr><td colspan="5">No hay partidos en los rangos disponibles.</td></tr>';
+    const worst = diagnostics.worst_games || [];
+    $("#modelWorstErrorsBody").innerHTML = worst.length ? worst.map(row => `
+      <tr><td>${esc(shortDate(row.date))}</td><td>${esc(row.matchup)}</td><td class="num">${num(row.actual, 1)}</td><td class="num">${num(row.predicted, 1)}</td><td class="num">${signed(row.error, 1)}</td><td class="num">${num(row.absolute_error, 1)}</td></tr>`
+    ).join("") : '<tr><td colspan="6">Sin errores extremos disponibles.</td></tr>';
+    $("#modelErrorNote").textContent = `Diagnóstico sobre ${diagnosticModels[0]?.n || 0} partidos alineados. Error = real − predicción: positivo significa que el modelo subestimó el total. Los rangos se basan en el total real y los peores partidos corresponden al modelo elegido por validación (${MODEL_LABELS[data.best_model] || data.best_model || "—"}).`;
+        $("#modelComparisonNote").textContent = data.selection_note || "MAE y RMSE más bajos son mejores; sesgo cercano a cero es preferible.";
     if (!data.predictions_available) notice($("#modelComparisonNotice"), "Faltan las predicciones individuales exportadas. Vuelve a entrenar y ejecuta scripts/export_vercel_artifacts.py.", true);
   } catch (error) { notice($("#modelComparisonNotice"), error.message, true); if (!silent) showToast(error.message); }
   finally { setBusy(button, false); }
