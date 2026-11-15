@@ -1971,7 +1971,7 @@ async function loadExternalAnalysis(silent = false) {
     }));
     $("#externalSummary").innerHTML = [
       summaryCard("Partidos", String(games.length), "en el período"),
-      summaryCard("Con descanso ≤ 1 día", String(b2bCount), "al menos un equipo"),
+      summaryCard("Partidos con B2B", String(b2bCount), "al menos un equipo sin día de descanso"),
       summaryCard("Equipos con bajas", String(injuryTeams.size), "según ESPN"),
       summaryCard("Fuente de lesiones", injuryData.source || "ESPN", injuryData.source_updated_at ? "actualizada " + injuryData.source_updated_at : "estado de la fuente"),
     ].join("");
