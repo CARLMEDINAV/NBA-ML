@@ -974,7 +974,6 @@ async function loadPlayers() {
       })
       .join("");
 
-    const canOpenDetail = data.season === (state.meta?.current_season || "2026-27");
     tbody.innerHTML = players
       .map((player, index) => {
         const headshotUrl =
@@ -982,6 +981,10 @@ async function loadPlayers() {
           (player.player_id
             ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png`
             : "");
+        // La ficha /api/player-card trabaja con el estado de la temporada actual.
+        // No depender de /api/meta evita que una discrepancia de temporada
+        // desactive todos los enlaces de jugadores.
+        const canOpenDetail = data.season === "2026-27" && Number.isFinite(Number(player.player_id)) && Number(player.player_id) > 0;
         const rowAttrs = canOpenDetail
           ? ` data-player-id="${esc(player.player_id)}" class="is-clickable" title="Abrir ficha del jugador"`
           : "";
