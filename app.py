@@ -3187,6 +3187,51 @@ def health() -> JSONResponse:
 
 
 
+@app.get("/api/model-comparison")
+def model_comparison(
+    model: str = "ridge",
+    limit: int = Query(30, ge=1, le=100),
+) -> JSONResponse:
+    """Métricas fuera de muestra y predicciones por partido de cada candidato."""
+    comparison = _artifact().get("model_comparison") or {}
+    if not comparison:
+        return _ok(
+            {
+                "available": False,
+                "message": "La comparación todavía no está guardada. Ejecuta un nuevo entrenamiento para generarla.",
+            }
+        )
+
+    allowed_models = {"ridge", "random_forest", "hist_gradient_boosting"}
+    if model not in allowed_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Modelo no válido. Opciones: {', '.join(sorted(allowed_models))}",
+        )
+
+    prediction_map = comparison.get("predictions") or {}
+    rows = prediction_map.get(model) or []
+    rows = sorted(rows, key=lambda row: str(row.get("game_date") or ""), reverse=True)
+    validation = comparison.get("validation") or []
+    test = comparison.get("test") or []
+    return _ok(
+        {
+            "available": bool(validation and test),
+            "generated_at": comparison.get("generated_at"),
+            "best_model": comparison.get("best_model"),
+            "validation_season": comparison.get("validation_season"),
+            "test_season": comparison.get("test_season"),
+            "selection_note": comparison.get("selection_note"),
+            "validation": validation,
+            "test": test,
+            "selected_model": model,
+            "predictions_available": model in prediction_map,
+            "count": len(rows),
+            "games": rows[:limit],
+        }
+    )
+
+
 @app.get("/api/meta")
 def meta(today: str | None = None) -> JSONResponse:
     artifact = _artifact()
