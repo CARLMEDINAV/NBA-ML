@@ -63,7 +63,6 @@
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
       <button class="tab" role="tab" id="tab-btn-model-comparison" aria-selected="false" aria-controls="tab-model-comparison" data-tab="model-comparison">Comparación ML</button>
-      <button class="tab" role="tab" id="tab-btn-comparison" aria-selected="false" aria-controls="tab-comparison" data-tab="comparison">Comparación ML</button>
       </nav>
       <section id="tab-upcoming" class="tab-panel is-active upcoming-section" role="tabpanel" aria-labelledby="tab-btn-upcoming">
         <div class="section-head">
@@ -649,64 +648,6 @@
         </form>
         <div id="predictNotice" class="notice" role="status" hidden></div>
         <div id="predictResult" class="predict-result" aria-live="polite"></div>
-      </section>
-
-      <section id="tab-comparison" class="tab-panel model-comparison-section" role="tabpanel" aria-labelledby="tab-btn-comparison" hidden>
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Evaluación de machine learning</p>
-            <h2>Comparación de modelos</h2>
-            <p class="muted">Ridge, Random Forest e HistGradientBoosting evaluados sobre las mismas particiones temporales. El test permanece separado de la selección del modelo.</p>
-          </div>
-          <button class="btn btn-ghost" type="button" id="modelComparisonRefresh">Actualizar</button>
-        </div>
-        <div id="modelComparisonNotice" class="notice" role="status" hidden></div>
-        <div class="summary-grid" id="modelComparisonSummary" aria-live="polite"></div>
-
-        <section class="comparison-block">
-          <div class="section-head compact">
-            <div><h3>Validación</h3><p class="muted" id="modelValidationCaption">Métricas usadas para seleccionar el modelo.</p></div>
-          </div>
-          <div class="table-wrap">
-            <table aria-label="Comparación de modelos en validación">
-              <thead><tr><th>Modelo</th><th class="num">Partidos</th><th class="num">MAE ↓</th><th class="num">RMSE ↓</th><th class="num">R² ↑</th><th class="num">Sesgo</th><th class="num">Dentro de ±10</th></tr></thead>
-              <tbody id="modelValidationBody"><tr><td colspan="7">Cargando comparación…</td></tr></tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="comparison-block">
-          <div class="section-head compact">
-            <div><h3>Test fuera de muestra</h3><p class="muted" id="modelTestCaption">Evaluación final en una temporada que no intervino en la selección.</p></div>
-          </div>
-          <div class="table-wrap">
-            <table aria-label="Comparación de modelos en test">
-              <thead><tr><th>Modelo</th><th class="num">Partidos</th><th class="num">MAE ↓</th><th class="num">RMSE ↓</th><th class="num">R² ↑</th><th class="num">Sesgo</th><th class="num">Dentro de ±10</th></tr></thead>
-              <tbody id="modelTestBody"><tr><td colspan="7">Cargando comparación…</td></tr></tbody>
-            </table>
-          </div>
-          <p class="table-note">MAE y RMSE más bajos son mejores. Sesgo positivo significa que el total real superó al predicho; negativo, que el modelo sobreestimó.</p>
-        </section>
-
-        <section class="comparison-block">
-          <div class="section-head compact">
-            <div><h3>Predicciones partido a partido</h3><p class="muted">Compara el total real con la predicción del modelo seleccionado.</p></div>
-            <label>Modelo
-              <select id="comparisonModel">
-                <option value="ridge">Ridge</option>
-                <option value="random_forest">Random Forest</option>
-                <option value="hist_gradient_boosting">HistGradientBoosting</option>
-              </select>
-            </label>
-          </div>
-          <div class="table-wrap">
-            <table aria-label="Predicciones individuales del modelo seleccionado">
-              <thead><tr><th>Fecha</th><th>Partido</th><th class="num">Real</th><th class="num">Predicho</th><th class="num">Error</th></tr></thead>
-              <tbody id="modelPredictionsBody"><tr><td colspan="5">Selecciona un modelo.</td></tr></tbody>
-            </table>
-          </div>
-          <p class="table-note" id="modelPredictionsNote"></p>
-        </section>
       </section>
 
       <section id="tab-model-comparison" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-model-comparison" hidden>
