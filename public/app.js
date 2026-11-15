@@ -1956,9 +1956,10 @@ async function loadExternalAnalysis(silent = false) {
     notice($("#externalNotice"), "");
   }
   try {
-    const [schedule, injuryData] = await Promise.all([
+    const [schedule, injuryData, externalContext] = await Promise.all([
       api("/api/upcoming", { days: Number($("#externalDays").value || 3), team: $("#externalTeam").value, line: state.line, live: 1, injuries: 1 }),
       api("/api/injuries"),
+      api("/api/external-context", { days: Number($("#externalDays").value || 3), team: $("#externalTeam").value }),
     ]);
     state.loaded.external = true;
     $("#externalRange").textContent = schedule.start + " → " + schedule.end;
@@ -1994,7 +1995,9 @@ async function loadExternalAnalysis(silent = false) {
       return '<div class="external-injuries"><strong>' + Number(item.injury_count || 0) + ' reporte(s) · ' + Number(item.out_count || 0) + ' OUT</strong>' +
         (players ? '<ul>' + players + '</ul>' : '<span class="external-muted">Sin bajas reportadas</span>') + '</div>';
     };
+    const externalByGame = new Map((externalContext.games || []).map((item) => [String(item.game_id), item]));
     container.innerHTML = games.map((game) => {
+      const external = externalByGame.get(String(game.game_id)) || {};
       const homeRest = Number(game.home_rest);
       const awayRest = Number(game.away_rest);
       const homeB2B = Number.isFinite(homeRest) && homeRest <= 0;
@@ -2011,16 +2014,40 @@ async function loadExternalAnalysis(silent = false) {
       if (homeOut > awayOut) context.push("Local con más bajas OUT reportadas");
       if (awayOut > homeOut) context.push("Visitante con más bajas OUT reportadas");
       if (!context.length) context.push("Sin ventaja contextual clara con los datos disponibles");
+      const travelLine = (side) => {
+        const item = external.travel?.[side];
+        if (!item || item.distance_km == null) return '<small>Viaje: ' + esc(item?.reason || "Sin dato verificable") + '</small>';
+        return '<small>Viaje desde ' + esc(item.from_arena || "recinto anterior") + ': <b>' + num(item.distance_km, 0) + ' km</b> hasta ' + esc(item.to_arena || game.home) + ' · partido previo ' + esc(item.previous_game_date || "—") + '</small>';
+      };
+      const splitLine = (side, label) => {
+        const item = external.splits?.[side];
+        if (!item || !item.games) return '<div class="external-split"><b>' + label + '</b><small>Muestra local/visita insuficiente</small></div>';
+        return '<div class="external-split"><b>' + label + ' · ' + item.games + ' PJ</b><small>PF ' + num(item.points_for) + ' · PC ' + num(item.points_against) + ' · Margen ' + signed(item.margin) + ' · Total ' + num(item.game_total) + '</small></div>';
+      };
+      const scenarioLine = (side, label) => {
+        const scenarios = external.absence_scenarios?.[side] || [];
+        if (!scenarios.length) return '<p class="external-muted">' + label + ': sin muestra suficiente para estimar escenarios individuales (mínimo 3 partidos con y 3 sin el jugador).</p>';
+        return '<div class="external-scenarios">' + scenarios.map((item) => {
+          const base = Number(game.predicted_total);
+          const plays = Number.isFinite(base) ? base + Number(item.total_shift_if_plays || 0) : null;
+          const out = Number.isFinite(base) ? base + Number(item.total_shift_if_out || 0) : null;
+          return '<div class="external-scenario"><b>' + esc(item.player_name) + ' · ' + esc(item.status) + '</b>' +
+            '<small>Con jugador: ' + num(plays) + ' pts · Sin jugador: ' + num(out) + ' pts</small>' +
+            '<small>Histórico: ' + item.games_with + ' con / ' + item.games_without + ' sin · Δ total ' + signed(item.delta_game_total) + ' pts · Δ PF equipo ' + signed(item.delta_team_points) + '</small></div>';
+        }).join("") + '</div>';
+      };
       return '<article class="external-game-card">' +
         '<header class="external-game-head"><div><span class="external-date">' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + ' ET</span><h3>' + esc(game.away_name || game.away) + ' <span class="vs">@</span> ' + esc(game.home_name || game.home) + '</h3></div><span class="external-game-total">Modelo ' + num(game.predicted_total) + ' pts</span></header>' +
         '<div class="external-matchup-grid">' +
-          '<section><h4>Visitante · ' + esc(game.away) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.away_rest)) + (awayB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p><b>Bajas</b>' + injuryHtml(game.away) + (awayImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(awayImpact,1) + ' pts</small>' : '') + '</section>' +
-          '<section><h4>Local · ' + esc(game.home) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.home_rest)) + (homeB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p><b>Bajas</b>' + injuryHtml(game.home) + (homeImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(homeImpact,1) + ' pts</small>' : '') + '</section>' +
+          '<section><h4>Visitante · ' + esc(game.away) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.away_rest)) + (awayB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p>' + travelLine("away") + '<b>Bajas</b>' + injuryHtml(game.away) + (awayImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(awayImpact,1) + ' pts</small>' : '') + '</section>' +
+          '<section><h4>Local · ' + esc(game.home) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.home_rest)) + (homeB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p>' + travelLine("home") + '<b>Bajas</b>' + injuryHtml(game.home) + (homeImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(homeImpact,1) + ' pts</small>' : '') + '</section>' +
         '</div>' +
-        '<div class="external-context"><b>Lectura contextual</b><p>' + esc(context.join(" · ")) + '</p><small>Localía: ' + esc(game.home_name || game.home) + ' juega en casa. La ventaja histórica de localía no se cuantifica en esta vista.</small><small>Viaje: distancia no disponible; no se infiere a partir de la ciudad del equipo ni del descanso.</small></div>' +
+        '<div class="external-context"><b>Lectura contextual</b><p>' + esc(context.join(" · ")) + '</p><small>Localía: ' + esc(game.home_name || game.home) + ' juega en casa. Ventaja media de localía en la muestra: ' + (external.home_advantage?.home_margin == null ? "sin datos" : signed(external.home_advantage.home_margin) + ' pts para el local en ' + external.home_advantage.games + ' partidos') + '. No se aplica al pronóstico.</small></div>' +
+        '<div class="external-split-grid">' + splitLine("away", (game.away_name || game.away) + " · visitante") + splitLine("home", (game.home_name || game.home) + " · local") + '</div>' +
+        '<section class="external-sensitivity"><b>Sensibilidad por disponibilidad</b><p class="external-muted">Proyección hipotética individual basada en promedios históricos con/sin cada jugador. No es causal, no se suma entre jugadores y no modifica la predicción oficial.</p>' + scenarioLine("away", "Visitante") + scenarioLine("home", "Local") + '</section>' +
         '</article>';
     }).join("");
-    const warnings = [schedule.warning, schedule.injuries_warning, injuryData.warning].filter(Boolean);
+    const warnings = [schedule.warning, schedule.injuries_warning, injuryData.warning, externalContext.injuries_warning].filter(Boolean);
     $("#externalNote").textContent = "Descanso obtenido del calendario del modelo. Lesiones: ESPN" + (injuryData.source_updated_at ? " · actualización " + injuryData.source_updated_at : "") + ". Los recuentos de bajas no equivalen a impacto de minutos; OUT, cuestionables y dudas se muestran por separado." + (warnings.length ? " Avisos: " + warnings.join(" ") : "");
   } catch (error) {
     if (!silent) {
