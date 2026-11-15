@@ -4368,3 +4368,9 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 .is-best-model { background: rgba(69,214,160,.07); }
 .compact-head { margin: 24px 0 10px; }
 .table-wrap td small { display: block; color: var(--faint); font-size: .72rem; }
+
+
+/* Diagnóstico de errores de modelos */
+#tab-model-comparison .table-wrap table { min-width: 760px; }
+#tab-model-comparison .compact-head { margin-top: 26px; }
+#modelErrorNote { line-height: 1.6; }
