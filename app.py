@@ -3189,29 +3189,54 @@ def health() -> JSONResponse:
 
 @app.get("/api/model-comparison")
 def model_comparison(
-    model: str = "ridge",
-    limit: int = Query(30, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=500),
 ) -> JSONResponse:
-    """Métricas fuera de muestra y predicciones por partido de cada candidato."""
-    comparison = _artifact().get("model_comparison") or {}
-    if not comparison:
-        return _ok(
+    """Métricas y predicciones alineadas de los tres modelos sobre el mismo test."""
+    artifact = _artifact()
+    comparison = artifact.get("model_comparison") or {}
+    prediction_map = comparison.get("predictions") or {}
+    model_keys = ("ridge", "random_forest", "hist_gradient_boosting")
+
+    # Cada candidato contiene una lista con los mismos game_id. Se alinean por
+    # identificador, nunca por posición, para evitar comparar partidos distintos.
+    indexed: dict[str, dict[str, dict[str, Any]]] = {}
+    for model_key in model_keys:
+        indexed[model_key] = {
+            str(row.get("game_id")): row
+            for row in (prediction_map.get(model_key) or [])
+            if row.get("game_id") is not None
+        }
+
+    common_ids = set(indexed[model_keys[0]])
+    for model_key in model_keys[1:]:
+        common_ids.intersection_update(indexed[model_key])
+
+    predictions: list[dict[str, Any]] = []
+    for game_id in common_ids:
+        ridge_row = indexed["ridge"][game_id]
+        actual = ridge_row.get("actual_total")
+        if actual is None:
+            continue
+        models: dict[str, dict[str, Any]] = {}
+        for model_key in model_keys:
+            row = indexed[model_key][game_id]
+            predicted = row.get("predicted_total")
+            error = row.get("error")
+            models[model_key] = {
+                "predicted": _clean(predicted),
+                "error": _clean(error if error is not None else float(actual) - float(predicted)),
+            }
+        predictions.append(
             {
-                "available": False,
-                "message": "La comparación todavía no está guardada. Ejecuta un nuevo entrenamiento para generarla.",
+                "game_id": game_id,
+                "date": str(ridge_row.get("game_date") or ""),
+                "matchup": f"{ridge_row.get('away_team', '')} @ {ridge_row.get('home_team', '')}",
+                "actual": _clean(actual),
+                "models": models,
             }
         )
 
-    allowed_models = {"ridge", "random_forest", "hist_gradient_boosting"}
-    if model not in allowed_models:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Modelo no válido. Opciones: {', '.join(sorted(allowed_models))}",
-        )
-
-    prediction_map = comparison.get("predictions") or {}
-    rows = prediction_map.get(model) or []
-    rows = sorted(rows, key=lambda row: str(row.get("game_date") or ""), reverse=True)
+    predictions.sort(key=lambda row: row["date"], reverse=True)
     validation = comparison.get("validation") or []
     test = comparison.get("test") or []
     return _ok(
@@ -3224,41 +3249,11 @@ def model_comparison(
             "selection_note": comparison.get("selection_note"),
             "validation": validation,
             "test": test,
-            "selected_model": model,
-            "predictions_available": model in prediction_map,
-            "count": len(rows),
-            "games": rows[:limit],
+            "predictions_available": bool(predictions),
+            "prediction_count": len(predictions),
+            "predictions": predictions[:limit],
         }
     )
-
-
-@app.get("/api/model-comparison")
-def model_comparison() -> JSONResponse:
-    """Métricas y predicciones comparables de modelos sobre el test temporal."""
-    artifact = _artifact()
-    comparison = artifact.get("model_comparison") or {}
-    prediction_path = ARTIFACTS / "model_comparison_predictions.csv"
-    predictions: list[dict[str, Any]] = []
-    if prediction_path.exists():
-        frame = pd.read_csv(prediction_path).sort_values("game_date", ascending=False).head(100)
-        model_keys = [key for key in ("ridge", "random_forest", "hist_gradient_boosting") if f"predicted_{key}" in frame.columns]
-        for _, row in frame.iterrows():
-            item: dict[str, Any] = {
-                "date": str(row.get("game_date", "")),
-                "matchup": f"{row.get('away_team', '')} @ {row.get('home_team', '')}",
-                "actual": _clean(row.get("total_points")),
-                "models": {},
-            }
-            for key in model_keys:
-                item["models"][key] = {"predicted": _clean(row.get(f"predicted_{key}")), "error": _clean(row.get(f"error_{key}"))}
-            predictions.append(item)
-    return _ok({
-        "generated_at": comparison.get("generated_at"), "best_model": comparison.get("best_model"),
-        "validation_season": comparison.get("validation_season"), "test_season": comparison.get("test_season"),
-        "selection_note": comparison.get("selection_note"), "validation": comparison.get("validation", []),
-        "test": comparison.get("test", []), "predictions": predictions,
-        "prediction_count": len(predictions), "predictions_available": prediction_path.exists(),
-    })
 
 
 @app.get("/api/meta")
