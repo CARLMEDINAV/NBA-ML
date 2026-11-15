@@ -431,6 +431,13 @@ function populateTeams(meta) {
   $("#positionVsTeam").prepend(positionVsPlaceholder);
   $("#positionVsTeam").value = "";
   fillTeams($("#teamImpactTeam"), teams);
+  const teamImpactSelect = $("#teamImpactTeam");
+  if (!teamImpactSelect.value && teamImpactSelect.options.length) {
+    teamImpactSelect.selectedIndex = 0;
+  }
+  if (state.active === "teams" && teamImpactSelect.value) {
+    loadTeamImpactPlayers();
+  }
   fillTeams($("#predictHome"), teams);
   fillTeams($("#predictAway"), teams);
 
@@ -1954,6 +1961,14 @@ async function submitPrediction(event) {
 async function loadTeamImpactPlayers() {
   const team = $("#teamImpactTeam").value;
   const select = $("#teamImpactPlayer");
+  if (!team) {
+    select.innerHTML = '<option value="">Selecciona primero un equipo</option>';
+    $("#teamImpactSummary").innerHTML = "";
+    $("#teamImpactCards").innerHTML = "";
+    $("#teamImpactGames").innerHTML = "";
+    notice($("#teamImpactNotice"), "Selecciona un equipo para cargar sus jugadores.");
+    return;
+  }
   select.innerHTML = '<option value="">Cargando jugadores…</option>';
   $("#teamImpactSummary").innerHTML = "";
   $("#teamImpactCards").innerHTML = "";
