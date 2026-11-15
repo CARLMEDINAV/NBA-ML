@@ -4345,3 +4345,22 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 .external-scenario small{overflow-wrap:anywhere}
 .external-muted{display:block;color:var(--muted);font-size:.72rem;line-height:1.5;margin:3px 0}
 @media(max-width:680px){.external-split-grid,.external-scenarios{grid-template-columns:1fr}.external-game-head{flex-wrap:wrap}}
+
+
+/* Comparación de modelos ML */
+.model-comparison-section .comparison-block { margin: 22px 0; }
+.model-comparison-section .comparison-block .section-head { margin-bottom: 12px; }
+.model-comparison-section .comparison-block h3 { margin: 0; font-size: 1.05rem; }
+.model-comparison-section .comparison-block .section-head label {
+  display: grid; gap: 6px; min-width: 190px; color: var(--muted); font-size: .78rem;
+}
+.model-comparison-section .comparison-block select {
+  min-height: 40px; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: #111827; color: var(--text);
+}
+.comparison-model-row td:first-child { color: var(--orange); }
+.model-comparison-section .table-wrap table { min-width: 700px; }
+@media (max-width: 620px) {
+  .model-comparison-section .comparison-block .section-head { align-items: stretch; flex-direction: column; }
+  .model-comparison-section .comparison-block .section-head label { width: 100%; }
+}
