@@ -587,6 +587,23 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         candidate_metrics = regression_metrics(test_frame[TARGET].to_numpy(), candidate_pred)
         test_model_rows.append({"model": candidate_name, **candidate_metrics})
 
+    # Guardar predicciones por partido para inspeccionar cada candidato en la UI.
+    comparison_base = test_frame[
+        ["game_id", "game_date", "home_team", "away_team", TARGET]
+    ].copy()
+    comparison_base["game_date"] = pd.to_datetime(
+        comparison_base["game_date"]
+    ).dt.strftime("%Y-%m-%d")
+    comparison_predictions: dict[str, list[dict[str, object]]] = {}
+    for candidate_name, candidate_pred in test_model_predictions.items():
+        candidate_frame = comparison_base.copy()
+        candidate_frame["predicted_total"] = candidate_pred
+        candidate_frame["error"] = (
+            candidate_frame[TARGET] - candidate_frame["predicted_total"]
+        )
+        candidate_frame = candidate_frame.rename(columns={TARGET: "actual_total"})
+        comparison_predictions[candidate_name] = candidate_frame.to_dict("records")
+
     test_rows: list[dict[str, object]] = [
         {"model": "baseline_media_liga", **baseline_metrics["league_mean"]},
         {"model": "baseline_forma_reciente", **baseline_metrics["naive_form"]},
@@ -664,6 +681,7 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
             "best_model": best_name,
             "validation": validation_rows,
             "test": test_model_rows,
+            "predictions": comparison_predictions,
             "test_season": TEST_SEASON,
             "validation_season": VAL_SEASON,
             "selection_note": "Modelo elegido por MAE en validacion; test reservado para evaluacion final.",
