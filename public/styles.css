@@ -4364,3 +4364,7 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
   .model-comparison-section .comparison-block .section-head { align-items: stretch; flex-direction: column; }
   .model-comparison-section .comparison-block .section-head label { width: 100%; }
 }
+
+.is-best-model { background: rgba(69,214,160,.07); }
+.compact-head { margin: 24px 0 10px; }
+.table-wrap td small { display: block; color: var(--faint); font-size: .72rem; }
