@@ -2047,7 +2047,7 @@ async function loadExternalAnalysis(silent = false) {
         '<section class="external-sensitivity"><b>Sensibilidad por disponibilidad</b><p class="external-muted">Proyección hipotética individual basada en promedios históricos con/sin cada jugador. No es causal, no se suma entre jugadores y no modifica la predicción oficial.</p>' + scenarioLine("away", "Visitante") + scenarioLine("home", "Local") + '</section>' +
         '</article>';
     }).join("");
-    const warnings = [schedule.warning, schedule.injuries_warning, injuryData.warning].filter(Boolean);
+    const warnings = [schedule.warning, schedule.injuries_warning, injuryData.warning, externalContext.injuries_warning].filter(Boolean);
     $("#externalNote").textContent = "Descanso obtenido del calendario del modelo. Lesiones: ESPN" + (injuryData.source_updated_at ? " · actualización " + injuryData.source_updated_at : "") + ". Los recuentos de bajas no equivalen a impacto de minutos; OUT, cuestionables y dudas se muestran por separado." + (warnings.length ? " Avisos: " + warnings.join(" ") : "");
   } catch (error) {
     if (!silent) {
