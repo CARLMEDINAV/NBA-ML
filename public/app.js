@@ -418,6 +418,7 @@ function populateTeams(meta) {
   const teams = meta.teams || [];
   fillTeams($("#upcomingTeam"), teams, true);
   fillTeams($("#analysisTeam"), teams, true);
+  fillTeams($("#externalTeam"), teams, true);
   fillTeams($("#resultsTeam"), teams, true);
   fillTeams($("#playersTeam"), teams, true);
   fillTeams($("#injuriesTeam"), teams, true);
@@ -1963,7 +1964,7 @@ async function loadExternalAnalysis(silent = false) {
     $("#externalRange").textContent = schedule.start + " → " + schedule.end;
     const injuryByTeam = new Map((injuryData.teams || []).map((team) => [String(team.team).toUpperCase(), team]));
     const games = schedule.games || [];
-    const b2bCount = games.filter((game) => Number(game.home_rest) <= 1 || Number(game.away_rest) <= 1).length;
+    const b2bCount = games.filter((game) => Number(game.home_rest) <= 0 || Number(game.away_rest) <= 0).length;
     const injuryTeams = new Set(games.flatMap((game) => [game.home, game.away]).filter((team) => {
       const item = injuryByTeam.get(String(team).toUpperCase());
       return item && Number(item.injury_count) > 0;
@@ -1981,7 +1982,7 @@ async function loadExternalAnalysis(silent = false) {
     const restText = (value) => {
       const n = Number(value);
       if (!Number.isFinite(n)) return "Sin dato";
-      if (n <= 1) return "B2B / descanso mínimo";
+      if (n <= 0) return "Sin días de descanso (B2B)";
       return n + " días de descanso";
     };
     const injuryHtml = (teamCode) => {
@@ -1996,8 +1997,8 @@ async function loadExternalAnalysis(silent = false) {
     container.innerHTML = games.map((game) => {
       const homeRest = Number(game.home_rest);
       const awayRest = Number(game.away_rest);
-      const homeB2B = Number.isFinite(homeRest) && homeRest <= 1;
-      const awayB2B = Number.isFinite(awayRest) && awayRest <= 1;
+      const homeB2B = Number.isFinite(homeRest) && homeRest <= 0;
+      const awayB2B = Number.isFinite(awayRest) && awayRest <= 0;
       const homeInj = injuryByTeam.get(String(game.home).toUpperCase());
       const awayInj = injuryByTeam.get(String(game.away).toUpperCase());
       const homeOut = Number(homeInj?.out_count || 0);
