@@ -49,8 +49,14 @@
       </div>
     </section>
 
-    <main id="main">
-      <nav class="tabs" role="tablist" aria-label="Secciones">
+    <div class="app-shell">
+      <button class="mobile-nav-toggle" type="button" id="mobileNavToggle" aria-label="Abrir menú" aria-expanded="false">☰ <span>Menú</span></button>
+      <aside class="sidebar" id="appSidebar" aria-label="Navegación principal">
+        <div class="sidebar-heading">
+          <div class="sidebar-heading-copy"><span class="sidebar-kicker">NBA TOTALS</span><strong>Workspace</strong></div>
+          <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="Contraer menú" title="Contraer menú">‹</button>
+        </div>
+        <nav class="tabs sidebar-nav" role="tablist" aria-label="Secciones">
       <button class="tab is-active" role="tab" id="tab-btn-upcoming" aria-selected="true" aria-controls="tab-upcoming" data-tab="upcoming">Próximos</button>
       <button class="tab" role="tab" id="tab-btn-betbuilder" aria-selected="false" aria-controls="tab-betbuilder" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-analysis" aria-selected="false" aria-controls="tab-analysis" data-tab="analysis">Análisis</button>
@@ -64,6 +70,8 @@
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
       <button class="tab" role="tab" id="tab-btn-model-comparison" aria-selected="false" aria-controls="tab-model-comparison" data-tab="model-comparison">Comparación ML</button>
       </nav>
+      </aside>
+      <main id="main" class="workspace">
       <section id="tab-upcoming" class="tab-panel is-active upcoming-section" role="tabpanel" aria-labelledby="tab-btn-upcoming">
         <div class="section-head">
           <div>
@@ -672,6 +680,7 @@
                 <p id="modelComparisonNote" class="table-note"></p>
       </section>
     </main>
+    </div>
 
     <footer class="footer">
       <p>
