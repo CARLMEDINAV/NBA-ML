@@ -2233,7 +2233,7 @@ function activateTab(name) {
 }
 
 function bindEvents() {
-  $(".tab").forEach((button) => {
+  $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
   const sidebar = $("#appSidebar");
