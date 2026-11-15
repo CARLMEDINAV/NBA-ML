@@ -650,6 +650,19 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
     predictions_output["predicted_total"] = test_predictions
     predictions_output["error"] = predictions_output[TARGET] - predictions_output["predicted_total"]
 
+    # Predicciones individuales de cada candidato sobre exactamente el mismo test.
+    comparison_output = test_frame[
+        ["game_id", "game_date", "season", "home_team", "away_team", TARGET]
+    ].copy()
+    for candidate_name, candidate_pred in test_model_predictions.items():
+        comparison_output[f"predicted_{candidate_name}"] = candidate_pred
+        comparison_output[f"error_{candidate_name}"] = (
+            comparison_output[TARGET] - comparison_output[f"predicted_{candidate_name}"]
+        )
+    comparison_output.to_csv(
+        REPORTS_DIR / "model_comparison_predictions.csv", index=False, encoding="utf-8"
+    )
+
     # Modelo auxiliar de margen para el hándicap sugerido.
     margin = train_margin_model(dataset)
     margin_table = margin["test_predictions"][
