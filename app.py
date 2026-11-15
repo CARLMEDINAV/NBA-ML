@@ -3237,6 +3237,79 @@ def model_comparison(
         )
 
     predictions.sort(key=lambda row: row["date"], reverse=True)
+
+    # Diagnóstico calculado sobre toda la muestra alineada, no solo las filas
+    # que se muestran en la tabla. Error = real - predicción.
+    error_diagnostics: dict[str, Any] = {"models": [], "actual_buckets": []}
+    for model_key in model_keys:
+        errors = [
+            float(row["actual"]) - float(row["models"][model_key]["predicted"])
+            for row in predictions
+            if row["models"][model_key]["predicted"] is not None
+        ]
+        if errors:
+            absolute = [abs(value) for value in errors]
+            error_diagnostics["models"].append({
+                "model": model_key,
+                "n": len(errors),
+                "mae": float(np.mean(absolute)),
+                "bias": float(np.mean(errors)),
+                "underestimated": sum(value > 0 for value in errors),
+                "overestimated": sum(value < 0 for value in errors),
+                "within_10": float(np.mean(np.asarray(absolute) <= 10)),
+            })
+
+    actual_ranges = [
+        ("<200", None, 200),
+        ("200–219", 200, 220),
+        ("220–239", 220, 240),
+        ("240–259", 240, 260),
+        ("260+", 260, None),
+    ]
+    for label, lower, upper in actual_ranges:
+        bucket = [
+            row for row in predictions
+            if (lower is None or float(row["actual"]) >= lower)
+            and (upper is None or float(row["actual"]) < upper)
+        ]
+        if not bucket:
+            continue
+        bucket_models = []
+        for model_key in model_keys:
+            errors = [
+                float(row["actual"]) - float(row["models"][model_key]["predicted"])
+                for row in bucket
+                if row["models"][model_key]["predicted"] is not None
+            ]
+            if errors:
+                bucket_models.append({
+                    "model": model_key,
+                    "mae": float(np.mean(np.abs(errors))),
+                    "bias": float(np.mean(errors)),
+                })
+        error_diagnostics["actual_buckets"].append({
+            "range": label, "n": len(bucket), "models": bucket_models,
+        })
+
+    best_key = str(comparison.get("best_model") or "ridge")
+    worst_errors = sorted(
+        [
+            {
+                "date": row["date"],
+                "matchup": row["matchup"],
+                "actual": row["actual"],
+                "predicted": row["models"][best_key]["predicted"],
+                "error": row["models"][best_key]["error"],
+                "absolute_error": abs(float(row["models"][best_key]["error"])),
+            }
+            for row in predictions
+            if row["models"].get(best_key, {}).get("error") is not None
+        ],
+        key=lambda row: row["absolute_error"],
+        reverse=True,
+    )[:10]
+    error_diagnostics["worst_games"] = worst_errors
+
     validation = comparison.get("validation") or []
     test = comparison.get("test") or []
     return _ok(
@@ -3252,6 +3325,7 @@ def model_comparison(
             "predictions_available": bool(predictions),
             "prediction_count": len(predictions),
             "predictions": predictions[:limit],
+            "diagnostics": error_diagnostics,
         }
     )
 
