@@ -1,6 +1,6 @@
 # Resultados del modelo de totales NBA
 
-Generado: 2026-10-21T05:11:25.396131+00:00
+Generado: 2026-11-15T04:37:59.363490+00:00
 
 ## Datos y particiones
 
@@ -24,21 +24,25 @@ Generado: 2026-10-21T05:11:25.396131+00:00
 |---|---|---|---|---|---|---|
 | baseline_media_liga | 1225 | 18.087 | 22.982 | -0.334 | 11.503 | 0.345 |
 | baseline_forma_reciente | 1225 | 15.351 | 19.298 | 0.059 | 0.401 | 0.407 |
-| ridge_train+val | 1225 | 15.388 | 19.276 | 0.061 | -0.978 | 0.393 |
+| ridge | 1225 | 15.388 | 19.276 | 0.061 | -0.978 | 0.393 |
+| random_forest | 1225 | 15.429 | 19.398 | 0.049 | -0.864 | 0.386 |
+| hist_gradient_boosting | 1225 | 15.375 | 19.311 | 0.058 | -0.767 | 0.389 |
 
 Mejor modelo: **ridge**. Mejora de MAE frente a la media de la liga: **14.9%**. Frente al baseline de forma reciente: **-0.2%** (un rival dificil de batir: los totales NBA tienen mucho ruido irreducible).
 
 ## Validacion walk-forward
 
-| season | n | mae | baseline_mae | delta_vs_form | rmse | r2 | bias |
-|---|---|---|---|---|---|---|---|
-| 2021-22 | 1230 | 14.864 | 14.820 | -0.043 | 18.770 | 0.118 | 2.259 |
-| 2022-23 | 1230 | 14.700 | 14.829 | 0.129 | 18.919 | 0.057 | 0.854 |
-| 2023-24 | 1230 | 14.631 | 14.707 | 0.076 | 18.238 | 0.190 | -0.943 |
-| 2024-25 | 1225 | 14.594 | 14.858 | 0.264 | 18.247 | 0.150 | 0.025 |
-| 2025-26 | 1225 | 15.388 | 15.351 | -0.037 | 19.276 | 0.061 | -0.978 |
+| season | n | mae | baseline_mae | delta_vs_form | rmse | r2 | bias | interval_80_coverage | interval_80_width |
+|---|---|---|---|---|---|---|---|---|---|
+| 2021-22 | 1230 | 14.864 | 14.820 | -0.043 | 18.770 | 0.118 | 2.259 | nan | nan |
+| 2022-23 | 1230 | 14.700 | 14.829 | 0.129 | 18.919 | 0.057 | 0.854 | 0.781 | 46.742 |
+| 2023-24 | 1230 | 14.631 | 14.707 | 0.076 | 18.238 | 0.190 | -0.943 | 0.821 | 47.931 |
+| 2024-25 | 1225 | 14.594 | 14.858 | 0.264 | 18.247 | 0.150 | 0.025 | 0.800 | 47.363 |
+| 2025-26 | 1225 | 15.388 | 15.351 | -0.037 | 19.276 | 0.061 | -0.978 | 0.774 | 47.297 |
 
 MAE medio walk-forward: **14.84** vs **14.91** de la forma reciente (5 temporadas).
+
+La cobertura del intervalo 80% se evalua secuencialmente: para cada temporada se usan exclusivamente residuos de temporadas anteriores. Las primeras temporadas sin historial suficiente se muestran como NaN.
 
 El set completo de 76 features obtuvo un MAE walk-forward medio de 14.90; el conjunto parsimonioso de 20 features usado aqui, 14.84. Se prioriza el modelo simple por estabilidad e interpretabilidad.
 
