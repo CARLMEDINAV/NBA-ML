@@ -80,3 +80,29 @@ def test_external_home_split_uses_only_completed_home_games_before_match():
     assert result["points_for"] == 117.5
     assert result["points_against"] == 107.5
     assert result["margin"] == 10
+
+def test_lakers_travel_uses_estimated_el_segundo_base():
+    schedule = pd.DataFrame([
+        {
+            "game_id": "0022600001",
+            "game_date": pd.Timestamp("2026-11-11"),
+            "game_time_et": "19:00",
+            "status": 3,
+            "home": "MIL",
+            "away": "LAL",
+        },
+        {
+            "game_id": "0022600002",
+            "game_date": pd.Timestamp("2026-11-15"),
+            "game_time_et": "16:00",
+            "status": 1,
+            "home": "PHX",
+            "away": "LAL",
+        },
+    ])
+    result = app_module._external_team_travel(
+        schedule, "LAL", "PHX", pd.Timestamp("2026-11-15"), False
+    )
+    assert result["from_arena"] == "El Segundo (base Lakers, estimado)"
+    assert result["to_arena"] == "PHX"
+    assert result["distance_km"] == pytest.approx(570, abs=30)
