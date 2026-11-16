@@ -397,6 +397,9 @@ async function api(path, params = {}) {
 
 
 function fillTeams(select, teams, includeAll = false) {
+  // Algunas secciones opcionales pueden no estar montadas en esta versión
+  // de la interfaz. Su ausencia nunca debe interrumpir la carga global.
+  if (!select) return;
   const current = select.value;
   select.innerHTML = "";
   if (includeAll) {
