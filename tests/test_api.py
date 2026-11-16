@@ -541,7 +541,7 @@ def test_static_frontend_is_served():
     assert 'id="pdH2H"' in response.text
     assert 'id="pdLikelyDefender"' in response.text
     assert 'id="pdDefenders"' in response.text
-    assert 'id="upcomingSummary" aria-busy="true"' in response.text
+    assert 'id="upcomingSummary"' not in response.text
     assert 'class="loading skeleton-row"' in response.text
     assert "ajuste histórico por bajas confirmadas" in response.text
     assert "VER ANÁLISIS DEL PARTIDO" in response.text
