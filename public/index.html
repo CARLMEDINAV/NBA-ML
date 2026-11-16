@@ -16,7 +16,7 @@
   <meta name="twitter:description" content="Predicción del total de puntos NBA, hándicap y props de jugadores.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230b1020'/%3E%3Ctext x='16' y='21' font-family='system-ui,sans-serif' font-size='14' font-weight='700' text-anchor='middle' fill='%23f97316'%3ENT%3C/text%3E%3C/svg%3E">
   <link rel="dns-prefetch" href="https://stats.nba.com">
-  <link rel="stylesheet" href="/styles.css?v=20261116-1">
+  <link rel="stylesheet" href="/styles.css?v=20261116-2">
 </head>
 <body>
   <div class="page">
@@ -400,10 +400,32 @@
         <div id="propsNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="propsSummary" aria-live="polite" hidden></div>
 
+        <section class="props-candidates-section" aria-labelledby="propsCandidatesTitle">
+          <div class="props-section-heading props-candidates-heading">
+            <div><p class="eyebrow">RADAR DE JUGADORES</p><h3 id="propsCandidatesTitle">Mejores candidatos</h3><p class="muted">Jugadores destacados por la señal general del modelo. Filtra por mercado para comparar sus proyecciones.</p></div>
+            <span id="propsCandidateCount" class="props-candidate-count">— candidatos</span>
+          </div>
+          <div class="props-candidate-toolbar">
+            <label>Mercado
+              <select id="propsMarket">
+                <option value="pra" selected>PRA · PTS + REB + AST</option>
+                <option value="pts">Puntos · PTS</option>
+                <option value="reb">Rebotes · REB</option>
+                <option value="ast">Asistencias · AST</option>
+              </select>
+            </label>
+            <span class="props-candidate-method">Orden: confianza general del modelo (PRA)</span>
+          </div>
+          <div id="propsCandidates" class="props-candidates-grid" aria-live="polite">
+            <div class="props-candidates-empty">Cargando candidatos…</div>
+          </div>
+          <p class="props-candidates-disclaimer">La proyección no es una línea de apuesta ni una probabilidad de OVER. Compara con la línea real de tu casa antes de evaluar un mercado.</p>
+        </section>
+
         <section class="props-content-section" aria-labelledby="propsAnalyzerTitle">
           <div class="props-section-heading"><div><p class="eyebrow">01 · ANÁLISIS INDIVIDUAL</p><h3>Rendimiento del jugador</h3><p class="muted">Compara sus últimos partidos con una línea seleccionada y revisa su contexto reciente.</p></div></div>
                   <section class="props-analyzer" aria-labelledby="propsAnalyzerTitle">
-          <div class="props-analyzer-head"><div><p class="eyebrow">HISTORIAL RECIENTE</p><h3 id="propsAnalyzerTitle">Analizador de Props</h3><p>Selecciona un jugador, una estadística y una línea. Comparamos sus últimos 5 y 10 partidos reales.</p></div><span class="props-live-tag"><i></i> DATOS NBA</span></div>
+          <div class="props-analyzer-head"><div><p class="eyebrow">HISTORIAL RECIENTE</p><h3 id="propsAnalyzerTitle">Detalle del jugador</h3><p>Abre un candidato para revisar sus últimos 5 y 10 partidos, su línea de referencia y el contexto del enfrentamiento.</p></div><span class="props-live-tag"><i></i> DATOS NBA</span></div>
           <div class="props-analyzer-controls">
             <label>Jugador<select id="propsPlayer"><option value="">Cargando jugadores…</option></select></label>
             <label>Estadística<select id="propsStat"><option value="pts">Puntos (PTS)</option><option value="reb">Rebotes (REB)</option><option value="ast">Asistencias (AST)</option><option value="pra">Puntos + rebotes + asistencias (PRA)</option><option value="pts_ast">Puntos + asistencias</option><option value="pts_reb">Puntos + rebotes</option><option value="reb_ast">Rebotes + asistencias</option><option value="fg3m">Triples anotados (3PM)</option><option value="stl">Robos (STL)</option><option value="blk">Tapones (BLK)</option><option value="stl_blk">Robos + tapones</option><option value="min">Minutos (MIN)</option><option value="dd">Doble-doble (DD)</option><option value="td">Triple-doble (TD)</option></select></label>
@@ -749,7 +771,7 @@
     <p style="padding:1rem;margin:1rem;border:1px solid #f97316;border-radius:8px;color:#f97316;background:#0b1020;font-family:system-ui,sans-serif">
     </p>
   </noscript>
-  <script src="/app.js?v=20261116-3" defer></script>
+  <script src="/app.js?v=20261116-4" defer></script>
   <script src="/bet-builder.js?v=20261111-1" defer></script>
   <script src="/injuries.js?v=20261111-1" defer></script>
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
