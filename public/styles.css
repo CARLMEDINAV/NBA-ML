@@ -4479,7 +4479,10 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 .props-candidate-toolbar select{min-height:38px;min-width:190px;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2,var(--panel));color:var(--text)}
 .props-candidate-method{color:var(--muted);font-size:.66rem;text-align:right}
 .props-candidates-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.props-candidate-card{min-width:0;padding:15px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(145deg,var(--panel),color-mix(in srgb,var(--panel) 88%,var(--accent) 12%));box-shadow:0 8px 22px rgba(0,0,0,.08)}
+.props-candidate-card{min-width:0;padding:15px;border:1px solid rgba(99,145,255,.28);border-radius:16px;background:linear-gradient(145deg,#172b4d 0%,#14233d 58%,#182b49 100%);box-shadow:0 8px 22px rgba(0,0,0,.18)}
+.props-candidate-card .props-candidate-projection{background:rgba(7,16,32,.42)}
+.props-candidate-card .props-candidate-metrics>span{background:rgba(7,16,32,.24);border-color:rgba(148,180,230,.18)}
+.props-candidate-card .props-candidate-footer{border-top-color:rgba(148,180,230,.2)}
 .props-candidate-top,.props-candidate-player,.props-candidate-footer{display:flex;align-items:center;justify-content:space-between;gap:9px}
 .props-candidate-player{justify-content:flex-start;min-width:0}
 .props-candidate-player img,.props-candidate-avatar{flex:none;width:42px;height:42px;border-radius:11px;object-fit:cover;background:var(--panel-2,var(--panel));color:var(--text);display:grid;place-items:center;font-weight:850}
