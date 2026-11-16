@@ -4437,3 +4437,34 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
 @media(prefers-reduced-motion:reduce){.upcoming-game-card{animation:none}.upcoming-probability-track i{transition:none}}
 
 .upcoming-card-skeleton{height:255px;padding:18px;border:1px solid var(--border);border-radius:16px;background:rgba(18,29,51,.7);overflow:hidden}.upcoming-card-skeleton i{display:block;height:13px;margin:12px 0;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.12) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:upcoming-shimmer 1.35s ease-in-out infinite}.upcoming-card-skeleton i:nth-child(2){height:58px;margin:22px 0}.upcoming-card-skeleton i:nth-child(3){width:75%}.upcoming-card-skeleton i:nth-child(4){width:90%}@keyframes upcoming-shimmer{to{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){.upcoming-card-skeleton i{animation:none}}
+
+
+/* Compact two-column upcoming cards, including narrow screens */
+.upcoming-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.upcoming-game-card{padding:12px;border-radius:13px}
+.upcoming-card-top{font-size:.68rem;gap:5px;flex-wrap:wrap}
+.upcoming-card-top .pill{font-size:.65rem;padding:4px 7px}
+.upcoming-matchup{gap:5px;margin:12px 0}
+.upcoming-team{gap:4px}
+.upcoming-team-logo{width:32px;height:32px}
+.upcoming-team strong{font-size:.78rem;line-height:1.15}
+.upcoming-team small,.upcoming-card-stats small{font-size:.58rem}
+.upcoming-at{font-size:.8rem}
+.upcoming-total{padding:8px 0;font-size:.72rem}
+.upcoming-total strong{font-size:1.12rem}
+.upcoming-card-stats{gap:5px;padding:9px 0}
+.upcoming-card-stats strong{font-size:.7rem}
+.upcoming-probability>div:first-child{font-size:.66rem}
+.upcoming-probability-track{height:6px;margin-top:6px}
+.upcoming-card-skeleton{height:205px;padding:12px}
+@media(max-width:720px){
+  .upcoming-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .upcoming-viewbar{align-items:center;flex-wrap:wrap}
+  .upcoming-game-card{padding:10px}
+  .upcoming-team-logo{width:27px;height:27px}
+  .upcoming-team strong{font-size:.7rem}
+  .upcoming-total strong{font-size:1rem}
+  .upcoming-card-stats{gap:3px}
+  .upcoming-card-stats strong{font-size:.64rem}
+}
+@media(prefers-reduced-motion:reduce){.upcoming-card-skeleton i{animation:none}}
