@@ -16,7 +16,7 @@
   <meta name="twitter:description" content="Predicción del total de puntos NBA, hándicap y props de jugadores.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230b1020'/%3E%3Ctext x='16' y='21' font-family='system-ui,sans-serif' font-size='14' font-weight='700' text-anchor='middle' fill='%23f97316'%3ENT%3C/text%3E%3C/svg%3E">
   <link rel="dns-prefetch" href="https://stats.nba.com">
-  <link rel="stylesheet" href="/styles.css?v=20261115-2">
+  <link rel="stylesheet" href="/styles.css?v=20261116-1">
 </head>
 <body>
   <div class="page">
@@ -49,14 +49,7 @@
       </div>
     </section>
 
-    <div class="app-shell">
-      <button class="mobile-nav-toggle" type="button" id="mobileNavToggle" aria-label="Abrir menú" aria-expanded="false">☰ <span>Menú</span></button>
-      <aside class="sidebar" id="appSidebar" aria-label="Navegación principal">
-        <div class="sidebar-heading">
-          <div class="sidebar-heading-copy"><span class="sidebar-kicker">NBA TOTALS</span><strong>Workspace</strong></div>
-          <button class="sidebar-collapse" type="button" id="sidebarCollapse" aria-label="Contraer menú" title="Contraer menú">‹</button>
-        </div>
-        <nav class="tabs sidebar-nav" role="tablist" aria-label="Secciones">
+    <nav class="tabs" role="tablist" aria-label="Secciones">
       <button class="tab is-active" role="tab" id="tab-btn-upcoming" aria-selected="true" aria-controls="tab-upcoming" data-tab="upcoming">Próximos</button>
       <button class="tab" role="tab" id="tab-btn-betbuilder" aria-selected="false" aria-controls="tab-betbuilder" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-analysis" aria-selected="false" aria-controls="tab-analysis" data-tab="analysis">Análisis</button>
@@ -69,8 +62,8 @@
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
       <button class="tab" role="tab" id="tab-btn-model-comparison" aria-selected="false" aria-controls="tab-model-comparison" data-tab="model-comparison">Comparación ML</button>
-      </nav>
-      </aside>
+    </nav>
+    <div class="app-shell">
       <main id="main" class="workspace">
       <section id="tab-upcoming" class="tab-panel is-active upcoming-section" role="tabpanel" aria-labelledby="tab-btn-upcoming">
         <div class="section-head">
