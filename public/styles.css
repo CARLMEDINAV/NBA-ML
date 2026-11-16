@@ -4406,3 +4406,32 @@ table tbody td { padding-top: 12px; padding-bottom: 12px; }
   pointer-events: auto;
   touch-action: manipulation;
 }
+
+/* Upcoming cards and view switcher */
+.upcoming-viewbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 12px}
+.view-toggle{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--border);border-radius:12px;background:rgba(8,12,24,.72)}
+.view-toggle-btn{border:0;border-radius:8px;padding:8px 13px;background:transparent;color:var(--muted);font:inherit;font-size:.82rem;cursor:pointer}
+.view-toggle-btn.is-active{background:rgba(116,168,255,.18);color:var(--text);box-shadow:inset 0 0 0 1px rgba(116,168,255,.3)}
+.upcoming-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 16px}
+.upcoming-game-card{min-width:0;padding:17px;border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:16px;background:linear-gradient(145deg,rgba(18,29,51,.96),rgba(10,16,30,.96));box-shadow:0 12px 30px rgba(0,0,0,.16);animation:upcoming-card-in .35s ease both}
+.upcoming-game-card.signal-over{border-left-color:var(--green)}.upcoming-game-card.signal-under{border-left-color:var(--red)}
+.upcoming-card-top,.upcoming-total,.upcoming-probability>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.upcoming-card-top{color:var(--muted);font-size:.76rem}
+.upcoming-matchup{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;margin:20px 0}
+.upcoming-team{display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.upcoming-team-logo{width:42px;height:42px;object-fit:contain;filter:drop-shadow(0 3px 8px rgba(0,0,0,.25))}
+.upcoming-team strong{font-size:.92rem;overflow-wrap:anywhere}.upcoming-team small,.upcoming-card-stats small{color:var(--faint);font-size:.65rem;letter-spacing:.06em}
+.upcoming-at{color:var(--faint);font-weight:800}
+.upcoming-total{padding:11px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);color:var(--muted);font-size:.82rem}
+.upcoming-total strong{font:700 1.45rem var(--mono);color:var(--text)}
+.upcoming-card-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:13px 0}
+.upcoming-card-stats>div{display:grid;gap:5px;min-width:0}.upcoming-card-stats strong{font:600 .85rem var(--mono);overflow-wrap:anywhere}
+.upcoming-probability{margin-top:4px}.upcoming-probability>div:first-child{font-size:.75rem;color:var(--muted)}.upcoming-probability b{color:var(--text);font-family:var(--mono)}
+.upcoming-probability-track{height:7px;margin-top:8px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.09)}
+.upcoming-probability-track i{display:block;height:100%;border-radius:99px;background:var(--blue);transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.signal-over .upcoming-probability-track i{background:var(--green)}.signal-under .upcoming-probability-track i{background:var(--red)}
+.upcoming-error{padding:24px;border:1px solid rgba(255,107,129,.35);border-radius:14px;background:rgba(255,107,129,.06);color:var(--text)}
+.upcoming-error p{color:var(--muted)}.upcoming-error .btn{margin-top:8px}
+@keyframes upcoming-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:720px){.upcoming-cards{grid-template-columns:1fr}.upcoming-viewbar{align-items:flex-start;flex-wrap:wrap}.upcoming-team-logo{width:36px;height:36px}}
+@media(prefers-reduced-motion:reduce){.upcoming-game-card{animation:none}.upcoming-probability-track i{transition:none}}
