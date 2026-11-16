@@ -2278,26 +2278,6 @@ function bindEvents() {
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
-  const sidebar = $("#appSidebar");
-  $("#sidebarCollapse").addEventListener("click", () => {
-    const collapsed = sidebar.classList.toggle("is-collapsed");
-    $("#sidebarCollapse").textContent = collapsed ? "›" : "‹";
-    $("#sidebarCollapse").setAttribute("aria-label", collapsed ? "Expandir menú" : "Contraer menú");
-  });
-  $("#mobileNavToggle").addEventListener("click", () => {
-    const open = sidebar.classList.toggle("is-open");
-    $("#mobileNavToggle").setAttribute("aria-expanded", String(open));
-    $("#mobileNavToggle").setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
-    $("#mobileNavToggle").querySelector("span").textContent = open ? "Cerrar" : "Menú";
-  });
-  sidebar.addEventListener("click", (event) => {
-    if (event.target.closest(".tab") && window.matchMedia("(max-width: 760px)").matches) {
-      sidebar.classList.remove("is-open");
-      $("#mobileNavToggle").setAttribute("aria-expanded", "false");
-      $("#mobileNavToggle").setAttribute("aria-label", "Abrir menú");
-      $("#mobileNavToggle").querySelector("span").textContent = "Menú";
-    }
-  });
   $("#lineInput").addEventListener("change", (event) => setLine(event.target.value));
   $("#lineDown").addEventListener("click", () => setLine(state.line - 0.5));
   $("#lineUp").addEventListener("click", () => setLine(state.line + 0.5));
