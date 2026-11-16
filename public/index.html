@@ -66,7 +66,7 @@
         <div class="section-head">
           <div>
             <p class="eyebrow">Calendario</p>
-            <h2>Próximos partidos</h2>
+            
             <p class="muted">Proyecciones de puntos, probabilidades e intervalo de confianza para los próximos encuentros. Las señales son estimaciones del modelo, no garantías de resultado.</p>
           </div>
           <button class="btn btn-ghost" type="button" id="upcomingRefresh">Actualizar</button>
@@ -85,21 +85,7 @@
           <span class="control-note" id="upcomingRange"></span>
         </div>
         <div id="upcomingNotice" class="notice" role="status" hidden></div>
-        <div class="summary-grid" id="upcomingSummary" aria-busy="true" aria-live="polite">
-          <div class="summary-card summary-skeleton" aria-hidden="true">
-            <span class="k">Partidos</span><span class="v">—</span><span class="s">Cargando</span>
-          </div>
-          <div class="summary-card summary-skeleton" aria-hidden="true">
-            <span class="k">Línea</span><span class="v">—</span><span class="s">Cargando</span>
-          </div>
-          <div class="summary-card summary-skeleton" aria-hidden="true">
-            <span class="k">P(over) media</span><span class="v">—</span><span class="s">Cargando</span>
-          </div>
-          <div class="summary-card summary-skeleton" aria-hidden="true">
-            <span class="k">Modelo</span><span class="v">—</span><span class="s">Cargando</span>
-          </div>
-        </div>
-        <div class="upcoming-viewbar"><span class="control-note">Vista de partidos</span><div class="view-toggle" role="group" aria-label="Vista de próximos partidos"><button type="button" class="view-toggle-btn is-active" data-upcoming-view="cards" aria-pressed="true">Tarjetas</button><button type="button" class="view-toggle-btn" data-upcoming-view="table" aria-pressed="false">Tabla</button></div></div><div id="upcomingCards" class="upcoming-cards" aria-live="polite"></div><div class="table-wrap upcoming-table-wrap" tabindex="0" role="region" aria-label="Tabla de próximos partidos. Usa las flechas del teclado para desplazarte horizontalmente.">
+        <div class="upcoming-viewbar"><div class="view-toggle" role="group" aria-label="Vista de próximos partidos"><button type="button" class="view-toggle-btn is-active" data-upcoming-view="cards" aria-pressed="true">Tarjetas</button><button type="button" class="view-toggle-btn" data-upcoming-view="table" aria-pressed="false">Tabla</button></div></div><div id="upcomingCards" class="upcoming-cards" aria-live="polite"></div><div class="table-wrap upcoming-table-wrap" tabindex="0" role="region" aria-label="Tabla de próximos partidos. Usa las flechas del teclado para desplazarte horizontalmente.">
           <table class="upcoming-table" aria-label="Próximos partidos con proyección de total y hándicap">
             <thead>
               <tr>
