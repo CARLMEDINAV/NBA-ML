@@ -53,15 +53,12 @@
       <button class="tab is-active" role="tab" id="tab-btn-upcoming" aria-selected="true" aria-controls="tab-upcoming" data-tab="upcoming">Próximos</button>
       <button class="tab" role="tab" id="tab-btn-betbuilder" aria-selected="false" aria-controls="tab-betbuilder" data-tab="betbuilder">Bet Builder <span class="tab-count" id="bbTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-analysis" aria-selected="false" aria-controls="tab-analysis" data-tab="analysis">Análisis</button>
-      <button class="tab" role="tab" id="tab-btn-external" aria-selected="false" aria-controls="tab-external" data-tab="external">Análisis externo</button>
       <button class="tab" role="tab" id="tab-btn-results" aria-selected="false" aria-controls="tab-results" data-tab="results">Resultados</button>
       <button class="tab" role="tab" id="tab-btn-players" aria-selected="false" aria-controls="tab-players" data-tab="players">Jugadores</button>
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
-      <button class="tab" role="tab" id="tab-btn-quarters" aria-selected="false" aria-controls="tab-quarters" data-tab="quarters">Cuartos</button>
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
-      <button class="tab" role="tab" id="tab-btn-model-comparison" aria-selected="false" aria-controls="tab-model-comparison" data-tab="model-comparison">Comparación ML</button>
     </nav>
     <div class="app-shell">
       <main id="main" class="workspace">
@@ -124,31 +121,7 @@
       </section>
 
 
-      <section id="tab-external" class="tab-panel external-analysis-section" role="tabpanel" aria-labelledby="tab-btn-external" hidden>
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Contexto previo al partido</p>
-            <h2>Análisis externo</h2>
-            <p class="muted">Evalúa descanso, back-to-back, localía, desplazamientos y bajas. Esta sección es independiente de la predicción estadística.</p>
-          </div>
-          <button class="btn btn-ghost" type="button" id="externalRefresh">Actualizar</button>
-        </div>
-        <div class="controls-row external-controls">
-          <label>Días
-            <select id="externalDays"><option value="1">Hoy</option><option value="3" selected>3 días</option><option value="5">5 días</option><option value="7">7 días</option></select>
-          </label>
-          <label>Equipo
-            <select id="externalTeam"><option value="">Todos</option></select>
-          </label>
-          <span class="control-note" id="externalRange"></span>
-        </div>
-        <div id="externalNotice" class="notice" role="status" hidden></div>
-        <div class="summary-grid" id="externalSummary" aria-live="polite"></div>
-        <div id="externalGames" class="external-games" aria-live="polite">
-          <div class="empty">Selecciona esta sección para cargar el contexto de los próximos partidos.</div>
-        </div>
-        <p class="table-note" id="externalNote">Viaje calculado entre recintos consecutivos mediante distancia geodésica; splits y escenarios de disponibilidad son históricos descriptivos y no modifican la predicción base.</p>
-      </section>
+      
 
       <section id="tab-analysis" class="tab-panel analysis-section" role="tabpanel" aria-labelledby="tab-btn-analysis" hidden>
         <div class="section-head">
@@ -486,17 +459,7 @@
         <p class="table-note" id="propsNote"></p>
       </section>
 
-      <section id="tab-quarters" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-quarters" hidden>
-        <div class="section-head">
-          <div><p class="eyebrow">PROYECCIÓN POR PERIODOS</p><h2>Predicción por cuartos</h2>
-          <p class="muted">Estimación experimental de puntos para Q1, Q2, Q3 y Q4 según parciales recientes.</p></div>
-          <button class="btn btn-ghost" id="quarterRefresh" type="button">Actualizar</button>
-        </div>
-        <div class="advanced-panel">
-          <label class="advanced-game-select">Partido<select id="quarterGame"><option value="">Cargando partidos…</option></select></label>
-          <div id="quarterResult" class="advanced-result" aria-live="polite">Selecciona un partido para proyectar sus cuatro cuartos.</div>
-        </div>
-      </section>
+      
 
       <section id="tab-betbuilder" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-betbuilder" hidden>
         <div class="section-head bb-section-head">
@@ -651,27 +614,7 @@
         <div id="predictResult" class="predict-result" aria-live="polite"></div>
       </section>
 
-      <section id="tab-model-comparison" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-model-comparison" hidden>
-        <div class="section-head"><div><p class="eyebrow">Evaluación de machine learning</p><h2>Comparación de modelos</h2>
-          <p class="muted">Ridge, Random Forest e HistGradientBoosting evaluados sobre las mismas particiones temporales. El test queda separado de la selección.</p></div>
-          <button class="btn btn-ghost" type="button" id="modelComparisonRefresh">Actualizar</button></div>
-        <div id="modelComparisonNotice" class="notice" role="status" hidden></div>
-        <div id="modelComparisonSummary" class="summary-grid"></div>
-        <div class="section-head compact-head"><div><h3>Métricas de validación</h3><p class="muted">Usadas para seleccionar el modelo.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Sesgo</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelComparisonValidationBody"></tbody></table></div>
-        <div class="section-head compact-head"><div><h3>Evaluación fuera de muestra</h3><p class="muted">Test temporal, no utilizado para ajustar ni seleccionar hiperparámetros.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">RMSE</th><th class="num">Sesgo</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelComparisonTestBody"></tbody></table></div>
-        <div class="section-head compact-head"><div><h3>Predicciones individuales</h3><p class="muted">Mismos partidos para los tres modelos. Error = puntos reales − predicción.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Partido</th><th class="num">Real</th><th class="num">Ridge</th><th class="num">Random Forest</th><th class="num">HistGradient</th></tr></thead><tbody id="modelComparisonPredictionsBody"></tbody></table></div>
-        <div class="section-head compact-head"><div><h3>Diagnóstico de errores</h3><p class="muted">Desglose de los errores en toda la muestra de test, no solo los partidos visibles arriba.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Modelo</th><th class="num">MAE</th><th class="num">Sesgo</th><th class="num">Subestimó</th><th class="num">Sobreestimó</th><th class="num">Dentro ±10</th><th class="num">Muestras</th></tr></thead><tbody id="modelErrorSummaryBody"></tbody></table></div>
-        <div class="section-head compact-head"><div><h3>Error según total real</h3><p class="muted">Permite detectar si los modelos fallan más en partidos de anotación baja o alta. Sesgo = real − predicción.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Total real</th><th class="num">Muestras</th><th class="num">Ridge MAE</th><th class="num">Random Forest MAE</th><th class="num">HistGradient MAE</th></tr></thead><tbody id="modelErrorBucketsBody"></tbody></table></div>
-        <div class="section-head compact-head"><div><h3>10 mayores errores</h3><p class="muted">Partidos con mayor error absoluto del modelo seleccionado mediante validación.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Partido</th><th class="num">Real</th><th class="num">Predicho</th><th class="num">Error</th><th class="num">Error abs.</th></tr></thead><tbody id="modelWorstErrorsBody"></tbody></table></div>
-        <p id="modelErrorNote" class="table-note"></p>
-                <p id="modelComparisonNote" class="table-note"></p>
-      </section>
+      
     </main>
     </div>
 
