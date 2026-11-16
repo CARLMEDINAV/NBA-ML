@@ -998,7 +998,6 @@ async function loadPlayers() {
           </div>`;
       })
       .join("");
-
     tbody.innerHTML = players
       .map((player, index) => {
         const headshotUrl =
@@ -1997,8 +1996,7 @@ async function submitPrediction(event) {
       date,
       line: state.line,
       injuries: 1,
-    });
-    const probability = Number(result.probability_over);
+    });    const probability = Number(result.probability_over);
     const low = Number(result.interval_80[0]);
     const high = Number(result.interval_80[1]);
     box.dataset.ready = "1";
