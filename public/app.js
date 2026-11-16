@@ -29,7 +29,7 @@ const state = {
     limit: 25,
     q: "",
   },
-  props: { days: 5, team: "", limit: 8, players: [], selectedPlayerId: "", selectedStat: "pts", line: null, card: null, cardCache: {}, requestId: 0 },
+  props: { days: 5, team: "", limit: 8, date: "", gameId: "", players: [], selectedPlayerId: "", selectedStat: "pts", line: null, card: null, cardCache: {}, requestId: 0 },
   detail: {
     playerId: null,
     data: null,
@@ -1154,6 +1154,7 @@ async function loadProps(silent = false) {
     notice($("#propsNotice"), [data.warning, missingTeamsText].filter(Boolean).join(" "));
 
     state.props.players = players;
+    populatePropsGameFilters();
     renderPropsCandidates();
     window.dispatchEvent(new CustomEvent("nba:props-ready"));
     if (state.props.selectedPlayerId && !players.some((player) => String(player.player_id) === String(state.props.selectedPlayerId))) {
@@ -1206,6 +1207,32 @@ async function loadProps(silent = false) {
 }
 
 
+function populatePropsGameFilters() {
+  const dateSelect = $("#propsDate");
+  const gameSelect = $("#propsGame");
+  if (!dateSelect || !gameSelect) return;
+  const allPlayers = state.props.players || [];
+  const dates = [...new Set(allPlayers.map((player) => player.game?.date).filter(Boolean))].sort();
+  const previousDate = state.props.date || dateSelect.value || "";
+  dateSelect.innerHTML = '<option value="">Todas las fechas</option>' + dates.map((date) =>
+    '<option value="' + esc(date) + '">' + esc(shortDate(date)) + '</option>'
+  ).join("");
+  state.props.date = dates.includes(previousDate) ? previousDate : "";
+  dateSelect.value = state.props.date;
+  const filteredGames = allPlayers
+    .filter((player) => !state.props.date || player.game?.date === state.props.date)
+    .map((player) => player.game || {})
+    .filter((game) => game.game_id !== undefined && game.game_id !== null);
+  const uniqueGames = [...new Map(filteredGames.map((game) => [String(game.game_id), game])).values()]
+    .sort((a, b) => String(a.time_et || "").localeCompare(String(b.time_et || "")));
+  const previousGame = state.props.gameId || gameSelect.value || "";
+  gameSelect.innerHTML = '<option value="">Todos los partidos</option>' + uniqueGames.map((game) =>
+    '<option value="' + esc(game.game_id) + '">' + esc((game.away || "—") + " @ " + (game.home || "—")) + ' · ' + esc(game.time_et || "Hora por confirmar") + '</option>'
+  ).join("");
+  state.props.gameId = uniqueGames.some((game) => String(game.game_id) === String(previousGame)) ? String(previousGame) : "";
+  gameSelect.value = state.props.gameId;
+}
+
 function renderPropsCandidates() {
   const container = $("#propsCandidates");
   const count = $("#propsCandidateCount");
@@ -1215,6 +1242,8 @@ function renderPropsCandidates() {
   const labels = { pts: "PTS", reb: "REB", ast: "AST", pra: "PRA" };
   const players = [...(state.props.players || [])]
     .filter((player) => Number.isFinite(Number(player[fields[market]])))
+    .filter((player) => !state.props.date || player.game?.date === state.props.date)
+    .filter((player) => !state.props.gameId || String(player.game?.game_id) === String(state.props.gameId))
     .sort((a, b) => {
       const ga = propGradeInfo(a).confidence;
       const gb = propGradeInfo(b).confidence;
@@ -1222,7 +1251,7 @@ function renderPropsCandidates() {
     });
   if (count) count.textContent = players.length + (players.length === 1 ? " candidato" : " candidatos");
   if (!players.length) {
-    container.innerHTML = '<div class="props-candidates-empty">No hay candidatos para los filtros seleccionados. Amplía los días o cambia el equipo.</div>';
+    container.innerHTML = '<div class="props-candidates-empty">No hay candidatos para este partido o fecha. Selecciona otro encuentro o amplía los días.</div>';
     return;
   }
   container.innerHTML = players.map((player) => {
@@ -1236,16 +1265,16 @@ function renderPropsCandidates() {
     const metrics = [
       ["PTS", player.projected_pts], ["REB", player.projected_reb],
       ["AST", player.projected_ast], ["PRA", player.projected_pra]
-    ].map(([label, value]) => '<span><small>' + label + '</small><b>' + (Number.isFinite(Number(value)) ? num(value) : "—") + '</b></span>').join("");
-    const min = Number.isFinite(Number(player.projected_min)) ? num(player.projected_min) + " MIN L5" : "";
-    return '<article class="props-candidate-card">' +
-      '<div class="props-candidate-top"><div class="props-candidate-player">' +
-      (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '<span class="props-candidate-avatar">' + esc((player.player_name || "NBA").split(" ").map((part) => part[0]).slice(0,2).join("").toUpperCase()) + '</span>') +
-      '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + (isHome ? "LOCAL" : "VISITA") + ' vs ' + esc(opponent) + '</small></div></div>' +
-      '<span class="props-candidate-grade grade-' + grade.toLowerCase() + '"><b>' + grade + '</b><small>' + Math.round(confidence * 100) + '%</small></span></div>' +
-      '<div class="props-candidate-projection"><div><small>PROYECCIÓN ' + labels[market] + '</small><strong>' + num(statValue) + '</strong></div><span>' + esc(gradeLabel) + '<small>Confianza general PRA</small></span></div>' +
-      '<div class="props-candidate-metrics">' + metrics + '</div>' +
-      '<div class="props-candidate-footer"><span>' + esc(min || (Number.isFinite(Number(player.gp)) ? player.gp + " PJ temporada" : "Proyección del modelo")) + '</span><button type="button" class="props-candidate-open" data-props-player="' + esc(player.player_id) + '" data-props-stat="' + market + '">Ver análisis <span aria-hidden="true">→</span></button></div>' +
+    ].map(([label, value]) => '<div><small>' + label + '</small><strong>' + (Number.isFinite(Number(value)) ? num(value) : "—") + '</strong></div>').join("");
+    const confidencePct = Math.max(0, Math.min(100, Math.round(confidence * 100)));
+    return '<article class="props-candidate-card upcoming-game-card signal-neutral">' +
+      '<div class="upcoming-card-top"><span>' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + '</span><span class="props-candidate-grade grade-' + grade.toLowerCase() + '"><b>' + grade + '</b><small>' + confidencePct + '%</small></span></div>' +
+      '<div class="upcoming-matchup"><div class="upcoming-team">' + upcomingTeamLogo(game.away) + '<strong>' + esc(game.away || "Visitante") + '</strong><small>VISITANTE</small></div><span class="upcoming-at">@</span><div class="upcoming-team">' + upcomingTeamLogo(game.home) + '<strong>' + esc(game.home || "Local") + '</strong><small>LOCAL</small></div></div>' +
+      '<div class="props-player-card-identity">' + (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '<span class="props-candidate-avatar">' + esc((player.player_name || "NBA").split(" ").map((part) => part[0]).slice(0,2).join("").toUpperCase()) + '</span>') + '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + (isHome ? "LOCAL" : "VISITA") + ' vs ' + esc(opponent) + '</small></div></div>' +
+      '<div class="upcoming-total"><span>Proyección ' + labels[market] + '</span><strong>' + num(statValue) + '</strong></div>' +
+      '<div class="upcoming-card-stats props-candidate-metrics">' + metrics + '</div>' +
+      '<div class="upcoming-probability"><div><span>Confianza general del modelo · ' + esc(gradeLabel) + '</span><b>' + confidencePct + '%</b></div><div class="upcoming-probability-track"><i style="width:' + confidencePct + '%"></i></div></div>' +
+      '<div class="props-candidate-footer"><span>' + esc(Number.isFinite(Number(player.projected_min)) ? num(player.projected_min) + " MIN proyectados" : "Proyección del modelo") + '</span><button type="button" class="props-candidate-open" data-props-player="' + esc(player.player_id) + '" data-props-stat="' + market + '">Ver análisis <span aria-hidden="true">→</span></button></div>' +
       '</article>';
   }).join("");
 }
@@ -2498,6 +2527,16 @@ function bindEvents() {
   });
   bind("#propsLineDown", "click", () => { state.props.line = Math.max(0, propsLineValue() - 0.5); renderPropsAnalyzer(); });
   bind("#propsLineUp", "click", () => { state.props.line = propsLineValue() + 0.5; renderPropsAnalyzer(); });
+  bind("#propsDate", "change", (event) => {
+    state.props.date = event.target.value;
+    state.props.gameId = "";
+    populatePropsGameFilters();
+    renderPropsCandidates();
+  });
+  bind("#propsGame", "change", (event) => {
+    state.props.gameId = event.target.value;
+    renderPropsCandidates();
+  });
   bind("#propsDays", "change", (event) => {
     const days = Number(event.currentTarget.value);
     if (!Number.isInteger(days) || days < 1 || days > 14) return;
