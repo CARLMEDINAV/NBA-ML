@@ -4059,3 +4059,19 @@ touch-action: manipulation;
 .props-candidates-empty{grid-column:1/-1;padding:24px;border:1px dashed var(--border);border-radius:13px;color:var(--muted);font-size:.78rem;text-align:center}
 .props-candidates-disclaimer{margin:0;color:var(--muted);font-size:.64rem;line-height:1.5}
 @media(max-width:560px){.props-candidates-grid{gap:8px}.props-candidate-card{padding:10px;border-radius:13px}.props-candidate-player img,.props-candidate-avatar{width:34px;height:34px}.props-candidate-player strong{font-size:.7rem}.props-candidate-player small{font-size:.51rem}.props-candidate-grade{width:36px;height:36px}.props-candidate-grade b{font-size:.85rem}.props-candidate-projection{padding:8px;margin:9px 0}.props-candidate-projection>div strong{font-size:1.45rem}.props-candidate-projection>span{font-size:.6rem}.props-candidate-metrics{gap:3px}.props-candidate-metrics>span{padding:6px 2px}.props-candidate-metrics b{font-size:.68rem}.props-candidate-footer>span{font-size:.52rem}.props-candidate-open{padding:6px 7px;font-size:.59rem}.props-candidate-toolbar{align-items:flex-start;flex-direction:column}.props-candidate-method{text-align:left}.props-candidates-heading{align-items:flex-start}}
+
+
+/* Predicciones de jugadores: misma jerarquía visual que las tarjetas de Próximos. */
+.props-candidates-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.props-candidate-card.upcoming-game-card{padding:16px;border-left:3px solid var(--blue);background:linear-gradient(145deg,rgba(18,29,51,.96),rgba(10,16,30,.96))}
+.props-player-card-identity{display:flex;align-items:center;gap:11px;min-width:0;margin:0 0 12px;padding:10px 11px;border:1px solid var(--border);border-radius:12px;background:rgba(7,16,32,.35)}
+.props-player-card-identity img,.props-player-card-identity .props-candidate-avatar{flex:none;width:48px;height:48px;border-radius:11px;object-fit:cover;background:var(--panel-2,var(--panel))}
+.props-player-card-identity>div{display:grid;gap:4px;min-width:0}
+.props-player-card-identity strong{overflow:hidden;color:var(--text);font-size:.86rem;text-overflow:ellipsis;white-space:nowrap}
+.props-player-card-identity small{color:var(--muted);font:700 .62rem var(--mono)}
+.props-candidate-card .props-candidate-grade{width:42px;height:42px}
+.props-candidate-card .props-candidate-metrics>div{display:grid;gap:5px;min-width:0}
+.props-candidate-card .props-candidate-metrics small{color:var(--faint);font-size:.65rem;letter-spacing:.06em}
+.props-candidate-card .props-candidate-metrics strong{font:600 .85rem var(--mono);overflow-wrap:anywhere}
+.props-candidate-card .props-candidate-footer{margin-top:9px;padding-top:11px;border-top:1px solid var(--border)}
+@media(max-width:640px){.props-candidates-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.props-candidate-card.upcoming-game-card{padding:10px}.props-player-card-identity{gap:7px;padding:7px}.props-player-card-identity img,.props-player-card-identity .props-candidate-avatar{width:36px;height:36px}.props-player-card-identity strong{font-size:.72rem}.props-player-card-identity small{font-size:.52rem}.props-candidate-card .upcoming-team-logo{width:27px;height:27px}.props-candidate-card .upcoming-team strong{font-size:.7rem}.props-candidate-card .upcoming-total strong{font-size:1rem}.props-candidate-card .upcoming-card-stats{gap:4px}.props-candidate-card .upcoming-card-stats strong{font-size:.68rem}.props-candidate-card .props-candidate-footer{align-items:flex-start;flex-direction:column}}
