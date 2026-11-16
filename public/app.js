@@ -2326,11 +2326,10 @@ function bindEvents() {
     loadUpcoming();
   });
 
-  $("#modelComparisonRefresh").addEventListener("click", () => loadModelComparison());
+
   $("#analysisRefresh").addEventListener("click", () => loadAnalysis());
-  $("#externalRefresh").addEventListener("click", () => loadExternalAnalysis());
-  $("#externalDays").addEventListener("change", loadExternalAnalysis);
-  $("#externalTeam").addEventListener("change", loadExternalAnalysis);
+
+
   $("#analysisDays").addEventListener("change", (event) => {
     state.analysis.days = Number(event.target.value);
     loadAnalysis();
@@ -2349,11 +2348,8 @@ function bindEvents() {
   $("#teamImpactWindow").addEventListener("change", loadTeammateAbsenceImpact);
 
   $("#resultsRefresh").addEventListener("click", loadResults);
-  $("#modelComparisonRefresh").addEventListener("click", () => loadModelComparison());
-  $("#comparisonModel").addEventListener("change", (event) => {
-    state.comparisonModel = event.target.value;
-    loadModelComparison();
-  });
+
+
   $$(".results-nav-btn").forEach((button) => {
     button.addEventListener("click", () => activateResultsView(button.dataset.resultsView));
   });
