@@ -490,6 +490,7 @@ async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
+    $("#upcomingCards").innerHTML = Array.from({length: 4}, () => '<div class="upcoming-card-skeleton"><i></i><i></i><i></i><i></i></div>').join("");
     loadingRows(tbody, 9, 6);
     setBusy(button, true);
     notice($("#upcomingNotice"), "");
