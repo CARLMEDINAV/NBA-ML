@@ -19,7 +19,7 @@ const state = {
   comparisonModel: "ridge",
   upcoming: { days: 7, team: "" },
   analysis: { days: 7, team: "" },
-  results: { season: "2025-26", team: "", limit: 25, window: 200 },
+  results: { season: "2026-27", team: "", limit: 25, window: 200 },
   players: {
     season: "2026-27",
     mode: "pergame",
@@ -674,6 +674,10 @@ async function loadAnalysis(silent = false) {
 
 
 async function loadResults(silent = false) {
+  // La selección visible es la fuente de verdad: evita consultar 2025-26
+  // cuando la interfaz ya muestra 2026-27 (estado antiguo o caché previa).
+  const selectedSeason = $("#resultsSeason")?.value;
+  if (selectedSeason) state.results.season = selectedSeason;
   const tbody = $("#resultsBody");
   const button = $("#resultsRefresh");
   if (!silent) {
