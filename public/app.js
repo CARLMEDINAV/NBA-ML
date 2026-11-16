@@ -507,17 +507,6 @@ async function loadUpcoming(silent = false) {
     });
     state.loaded.upcoming = true;
     $("#upcomingRange").textContent = `${data.start} → ${data.end}`;
-    const probabilities = data.games.map((game) => game.probability_over).filter((value) => value != null);
-    const average = probabilities.length
-      ? probabilities.reduce((sum, value) => sum + value, 0) / probabilities.length
-      : null;
-    $("#upcomingSummary").innerHTML = [
-      summaryCard("Partidos", String(data.count), `${data.skipped} omitidos`),
-      summaryCard("Línea", num(data.line, 1), "referencia"),
-      summaryCard("P(over) media", pct(average), "si hay señal"),
-    ].join("");
-    $("#upcomingSummary").setAttribute("aria-busy", "false");
-
     if (!data.games.length) {
       $("#upcomingCards").innerHTML = '<div class="empty upcoming-empty">No hay partidos programados en ese rango para el filtro elegido.</div>';
       emptyRow(tbody, 9, "No hay partidos programados en ese rango para el filtro elegido.");
