@@ -379,7 +379,7 @@ async function api(path, params = {}) {
     if (value === null || value === undefined || value === "") return;
     url.searchParams.set(key, value);
   });
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await fetch(url, { headers: { Accept: "application/json" }, cache: path === "/api/player-props" ? "no-store" : "default" });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = data.detail;
@@ -1126,6 +1126,8 @@ async function loadPositionVsOpponent() {
 }
 
 async function loadProps(silent = false) {
+  const daysControl = $("#propsDays");
+  if (daysControl) state.props.days = Math.max(1, Math.min(14, Number(daysControl.value) || 5));
   const button = $("#propsRefresh");
   if (!silent) {
     setBusy(button, true);
@@ -2495,7 +2497,9 @@ function bindEvents() {
   $("#propsLineDown").addEventListener("click", () => { state.props.line = Math.max(0, propsLineValue() - 0.5); renderPropsAnalyzer(); });
   $("#propsLineUp").addEventListener("click", () => { state.props.line = propsLineValue() + 0.5; renderPropsAnalyzer(); });
   $("#propsDays").addEventListener("change", (event) => {
-    state.props.days = Number(event.target.value);
+    const days = Number(event.currentTarget.value);
+    if (!Number.isInteger(days) || days < 1 || days > 14) return;
+    state.props.days = days;
     loadProps();
   });
   $("#propsTeam").addEventListener("change", (event) => {
