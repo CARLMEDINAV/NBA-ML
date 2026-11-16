@@ -435,14 +435,14 @@ function populateTeams(meta) {
   const positionVsPlaceholder = document.createElement("option");
   positionVsPlaceholder.value = "";
   positionVsPlaceholder.textContent = "Selecciona rival";
-  $("#positionVsTeam").prepend(positionVsPlaceholder);
-  $("#positionVsTeam").value = "";
+  $("#positionVsTeam")?.prepend(positionVsPlaceholder);
+  if ($("#positionVsTeam")) $("#positionVsTeam").value = "";
   fillTeams($("#teamImpactTeam"), teams);
   const teamImpactSelect = $("#teamImpactTeam");
-  if (!teamImpactSelect.value && teamImpactSelect.options.length) {
+  if (teamImpactSelect && !teamImpactSelect.value && teamImpactSelect.options.length) {
     teamImpactSelect.selectedIndex = 0;
   }
-  if (state.active === "teams" && teamImpactSelect.value) {
+  if (state.active === "teams" && teamImpactSelect?.value) {
     loadTeamImpactPlayers();
   }
   fillTeams($("#predictHome"), teams);
@@ -2325,6 +2325,15 @@ function activateTab(name) {
 }
 
 function bindEvents() {
+  // Un control opcional ausente no debe impedir que se conecten los demás filtros.
+  const bind = (selector, eventName, handler) => {
+    const element = $(selector);
+    if (!element) {
+      console.warn("[NBA Totals] Control no encontrado:", selector);
+      return;
+    }
+    element.addEventListener(eventName, handler);
+  };
   let savedUpcomingView = "cards";
   try { savedUpcomingView = localStorage.getItem("nba-upcoming-view") || "cards"; } catch (_) {}
   setUpcomingView(savedUpcomingView, false);
@@ -2351,96 +2360,96 @@ function bindEvents() {
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
-  $("#lineInput").addEventListener("change", (event) => setLine(event.target.value));
-  $("#lineDown").addEventListener("click", () => setLine(state.line - 0.5));
-  $("#lineUp").addEventListener("click", () => setLine(state.line + 0.5));
+  bind("#lineInput", "change", (event) => setLine(event.target.value));
+  bind("#lineDown", "click", () => setLine(state.line - 0.5));
+  bind("#lineUp", "click", () => setLine(state.line + 0.5));
 
-  $("#upcomingRefresh").addEventListener("click", loadUpcoming);
+  bind("#upcomingRefresh", "click", loadUpcoming);
   $("[data-upcoming-view]").forEach((button) => button.addEventListener("click", () => setUpcomingView(button.dataset.upcomingView)));
-  $("#upcomingDays").addEventListener("change", (event) => {
+  bind("#upcomingDays", "change", (event) => {
     state.upcoming.days = Number(event.target.value);
     loadUpcoming();
   });
-  $("#upcomingTeam").addEventListener("change", (event) => {
+  bind("#upcomingTeam", "change", (event) => {
     state.upcoming.team = event.target.value;
     loadUpcoming();
   });
 
 
-  $("#analysisRefresh").addEventListener("click", () => loadAnalysis());
+  bind("#analysisRefresh", "click", () => loadAnalysis());
 
 
-  $("#analysisDays").addEventListener("change", (event) => {
+  bind("#analysisDays", "change", (event) => {
     state.analysis.days = Number(event.target.value);
     loadAnalysis();
   });
-  $("#analysisTeam").addEventListener("change", (event) => {
+  bind("#analysisTeam", "change", (event) => {
     state.analysis.team = event.target.value;
     loadAnalysis();
   });
 
-  $("#teamImpactTeam").addEventListener("change", loadTeamImpactPlayers);
-  $("#teamImpactPlayer").addEventListener("change", loadTeamImpact);
-  $("#teamImpactWindow").addEventListener("change", loadTeamImpact);
-  $("#teamImpactRefresh").addEventListener("click", loadTeamImpact);
-  $("#teammateImpactRefresh").addEventListener("click", loadTeammateAbsenceImpact);
-  $("#teamImpactPlayer").addEventListener("change", loadTeammateAbsenceImpact);
-  $("#teamImpactWindow").addEventListener("change", loadTeammateAbsenceImpact);
+  bind("#teamImpactTeam", "change", loadTeamImpactPlayers);
+  bind("#teamImpactPlayer", "change", loadTeamImpact);
+  bind("#teamImpactWindow", "change", loadTeamImpact);
+  bind("#teamImpactRefresh", "click", loadTeamImpact);
+  bind("#teammateImpactRefresh", "click", loadTeammateAbsenceImpact);
+  bind("#teamImpactPlayer", "change", loadTeammateAbsenceImpact);
+  bind("#teamImpactWindow", "change", loadTeammateAbsenceImpact);
 
-  $("#resultsRefresh").addEventListener("click", loadResults);
+  bind("#resultsRefresh", "click", loadResults);
 
 
   $$(".results-nav-btn").forEach((button) => {
     button.addEventListener("click", () => activateResultsView(button.dataset.resultsView));
   });
-  $("#resultsSeason").addEventListener("change", (event) => {
+  bind("#resultsSeason", "change", (event) => {
     state.results.season = event.target.value;
     loadResults();
   });
-  $("#resultsTeam").addEventListener("change", (event) => {
+  bind("#resultsTeam", "change", (event) => {
     state.results.team = event.target.value;
     loadResults();
   });
-  $("#resultsLimit").addEventListener("change", (event) => {
+  bind("#resultsLimit", "change", (event) => {
     state.results.limit = Number(event.target.value);
     loadResults();
   });
-  $("#resultsWindow").addEventListener("change", (event) => {
+  bind("#resultsWindow", "change", (event) => {
     state.results.window = Number(event.target.value);
     loadResults();
   });
 
-  $("#playersRefresh").addEventListener("click", loadPlayers);
-  $("#playersSeason").addEventListener("change", (event) => {
+  bind("#playersRefresh", "click", loadPlayers);
+  bind("#playersSeason", "change", (event) => {
     state.players.season = event.target.value;
     state.players.minGp = event.target.value === "2025-26" ? 10 : 1;
     $("#playersMinGp").value = String(state.players.minGp);
     loadPlayers();
   });
-  $("#playersMode").addEventListener("change", (event) => {
+  bind("#playersMode", "change", (event) => {
     state.players.mode = event.target.value;
     loadPlayers();
   });
-  $("#playersSort").addEventListener("change", (event) => {
+  bind("#playersSort", "change", (event) => {
     state.players.sort = event.target.value;
     loadPlayers();
   });
-  $("#playersTeam").addEventListener("change", (event) => {
+  bind("#playersTeam", "change", (event) => {
     state.players.team = event.target.value;
     loadPlayers();
   });
-  $("#playersMinGp").addEventListener("change", (event) => {
+  bind("#playersMinGp", "change", (event) => {
     const value = Number(event.target.value);
     state.players.minGp = Math.min(82, Math.max(1, value || 1));
     event.target.value = String(state.players.minGp);
     loadPlayers();
   });
-  $("#playersLimit").addEventListener("change", (event) => {
+  bind("#playersLimit", "change", (event) => {
     state.players.limit = Number(event.target.value);
     loadPlayers();
   });
   let searchTimer;
-  $("#playersSearch").addEventListener("input", (event) => {
+  bind("#playersSearch", "input", (event) => {
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => {
       state.players.q = event.target.value.trim();
@@ -2448,9 +2457,9 @@ function bindEvents() {
     }, 350);
   });
 
-  $("#propsRefresh").addEventListener("click", () => loadProps());
-  $("#propsMarket").addEventListener("change", renderPropsCandidates);
-  $("#propsCandidates").addEventListener("click", (event) => {
+  bind("#propsRefresh", "click", () => loadProps());
+  bind("#propsMarket", "change", renderPropsCandidates);
+  bind("#propsCandidates", "click", (event) => {
     const button = event.target.closest("[data-props-player]");
     if (!button) return;
     const playerId = String(button.dataset.propsPlayer || "");
@@ -2464,53 +2473,53 @@ function bindEvents() {
     loadPropsPlayerCard(playerId);
     $("#propsAnalyzerTitle").scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  $("#positionVsRefresh").addEventListener("click", loadPositionVsOpponent);
-  $("#positionVsSort").addEventListener("change", renderPositionVsPlayers);
-  $("#positionVsTeam").addEventListener("change", loadPositionVsOpponent);
-  $("#positionVsRole").addEventListener("change", loadPositionVsOpponent);
-  $("#positionVsWindow").addEventListener("change", loadPositionVsOpponent);
-  $("#propsPlayer").addEventListener("change", (event) => {
+  bind("#positionVsRefresh", "click", loadPositionVsOpponent);
+  bind("#positionVsSort", "change", renderPositionVsPlayers);
+  bind("#positionVsTeam", "change", loadPositionVsOpponent);
+  bind("#positionVsRole", "change", loadPositionVsOpponent);
+  bind("#positionVsWindow", "change", loadPositionVsOpponent);
+  bind("#propsPlayer", "change", (event) => {
     state.props.selectedPlayerId = event.target.value;
     state.props.card = null;
     state.props.line = null;
     loadPropsPlayerCard(state.props.selectedPlayerId);
   });
-  $("#propsStat").addEventListener("change", (event) => {
+  bind("#propsStat", "change", (event) => {
     state.props.selectedStat = event.target.value;
     state.props.line = state.props.card ? pdDefaultLine(state.props.card, state.props.selectedStat) : 0.5;
     renderPropsAnalyzer();
   });
-  $("#propsLine").addEventListener("change", (event) => {
+  bind("#propsLine", "change", (event) => {
     const value = Number(event.target.value);
     if (!Number.isFinite(value) || value < 0) return;
     state.props.line = Math.round(value * 2) / 2;
     renderPropsAnalyzer();
   });
-  $("#propsLineDown").addEventListener("click", () => { state.props.line = Math.max(0, propsLineValue() - 0.5); renderPropsAnalyzer(); });
-  $("#propsLineUp").addEventListener("click", () => { state.props.line = propsLineValue() + 0.5; renderPropsAnalyzer(); });
-  $("#propsDays").addEventListener("change", (event) => {
+  bind("#propsLineDown", "click", () => { state.props.line = Math.max(0, propsLineValue() - 0.5); renderPropsAnalyzer(); });
+  bind("#propsLineUp", "click", () => { state.props.line = propsLineValue() + 0.5; renderPropsAnalyzer(); });
+  bind("#propsDays", "change", (event) => {
     const days = Number(event.currentTarget.value);
     if (!Number.isInteger(days) || days < 1 || days > 14) return;
     state.props.days = days;
     loadProps();
   });
-  $("#propsTeam").addEventListener("change", (event) => {
+  bind("#propsTeam", "change", (event) => {
     state.props.team = event.target.value;
     loadProps();
   });
-  $("#propsLimit").addEventListener("change", (event) => {
+  bind("#propsLimit", "change", (event) => {
     state.props.limit = Number(event.target.value);
     loadProps();
   });
 
-  $("#pdClose").addEventListener("click", closePlayerDetail);
-  $("#playerDetail").addEventListener("click", (event) => {
+  bind("#pdClose", "click", closePlayerDetail);
+  bind("#playerDetail", "click", (event) => {
     if (event.target === $("#playerDetail")) closePlayerDetail();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !$("#playerDetail").hidden) closePlayerDetail();
   });
-  $("#pdTabs").addEventListener("click", (event) => {
+  bind("#pdTabs", "click", (event) => {
     const button = event.target.closest("[data-stat]");
     if (!button || !state.detail.data) return;
     state.detail.stat = button.dataset.stat;
@@ -2518,28 +2527,28 @@ function bindEvents() {
     renderDetailTabs(state.detail.data);
     renderDetailDynamic();
   });
-  $("#pdLineDown").addEventListener("click", () => adjustDetailLine(-0.5));
-  $("#pdLineUp").addEventListener("click", () => adjustDetailLine(0.5));
-  $("#pdLineInput").addEventListener("change", (event) => {
+  bind("#pdLineDown", "click", () => adjustDetailLine(-0.5));
+  bind("#pdLineUp", "click", () => adjustDetailLine(0.5));
+  bind("#pdLineInput", "change", (event) => {
     const value = Number(event.target.value);
     if (!Number.isFinite(value) || value < 0) return;
     state.detail.line = Math.round(value * 2) / 2;
     renderDetailDynamic();
   });
-  $("#pdQuickViews").addEventListener("click", (event) => {
+  bind("#pdQuickViews", "click", (event) => {
     const button = event.target.closest("[data-range]");
     if (!button) return;
     state.detail.range =
       button.dataset.range === "all" ? "all" : Number(button.dataset.range);
     renderDetailDynamic();
   });
-  $("#pdVenueFilter").addEventListener("click", (event) => {
+  bind("#pdVenueFilter", "click", (event) => {
     const button = event.target.closest("[data-venue]");
     if (!button) return;
     state.detail.venue = button.dataset.venue;
     renderDetailDynamic();
   });
-  $("#pdGameList").addEventListener("click", (event) => {
+  bind("#pdGameList", "click", (event) => {
     const button = event.target.closest("[data-game]");
     if (!button || !state.detail.data) return;
     if (button.dataset.game === "next") {
@@ -2556,12 +2565,12 @@ function bindEvents() {
     );
     renderDetailDynamic();
   });
-  $("#pdTeammates").addEventListener("click", (event) => {
+  bind("#pdTeammates", "click", (event) => {
     const button = event.target.closest("[data-player-id]");
     if (!button) return;
     openPlayerDetail(button.dataset.playerId, { opener: button });
   });
-  $("#pdAnalysis").addEventListener("click", () => {
+  bind("#pdAnalysis", "click", () => {
     if (state.detail.data?.player?.team) {
       openAnalysisForTeam(state.detail.data.player.team);
     }
@@ -2589,7 +2598,7 @@ function bindEvents() {
     });
   }
 
-  $("#predictForm").addEventListener("submit", submitPrediction);
+  bind("#predictForm", "submit", submitPrediction);
 
   // Refresco silencioso: la NBA actualiza el marcador y los finales aparecen solos.
   window.setInterval(() => {
@@ -2603,8 +2612,8 @@ function bindEvents() {
 }
 
 async function init() {
-  bindEvents();
   try {
+    bindEvents();
     const meta = await api("/api/meta");
     state.meta = meta;
     state.line = Number(meta.default_line || 225.5);
