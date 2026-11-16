@@ -2255,6 +2255,26 @@ function activateTab(name) {
 }
 
 function bindEvents() {
+  // La navegación de NBA Cards se registra primero para que un fallo
+  // en otro control de la interfaz no deje inutilizable la sección Jugadores.
+  const playersBody = $("#playersBody");
+  if (playersBody && !playersBody.dataset.cardNavigationBound) {
+    playersBody.dataset.cardNavigationBound = "true";
+    playersBody.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+      const row = target?.closest("tr[data-player-id]");
+      if (!row || !playersBody.contains(row)) return;
+      event.preventDefault();
+      const playerId = Number(row.dataset.playerId);
+      if (!Number.isInteger(playerId) || playerId <= 0) {
+        showToast("No se encontró un ID válido para este jugador.");
+        return;
+      }
+      openPlayerDetail(playerId, {
+        opener: row.querySelector(".player-link") || row
+      });
+    });
+  }
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
   });
@@ -2490,16 +2510,17 @@ function bindEvents() {
     }
   });
 
-  ["#playersBody", "#propsBody"].forEach((selector) => {
-    const body = $(selector);
-    if (!body) return;
-    body.addEventListener("click", (event) => {
-      const row = event.target.closest("[data-player-id]");
-      if (!row) return;
-      const opener = row.querySelector?.(".player-link") || row;
-      openPlayerDetail(row.dataset.playerId, { opener });
+  const propsBody = $("#propsBody");
+  if (propsBody) {
+    propsBody.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+      const row = target?.closest("[data-player-id]");
+      if (!row || !propsBody.contains(row)) return;
+      openPlayerDetail(row.dataset.playerId, {
+        opener: row.querySelector?.(".player-link") || row
+      });
     });
-  });
+  }
 
   $("#predictForm").addEventListener("submit", submitPrediction);
 
