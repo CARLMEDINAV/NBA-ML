@@ -465,6 +465,27 @@ function setLine(value) {
   }
 }
 
+const NBA_LOGO_SLUGS = {ATL:"atl",BOS:"bos",BKN:"bkn",CHA:"cha",CHI:"chi",CLE:"cle",DAL:"dal",DEN:"den",DET:"det",GSW:"gs",HOU:"hou",IND:"ind",LAC:"lac",LAL:"lal",MEM:"mem",MIA:"mia",MIL:"mil",MIN:"min",NOP:"no",NYK:"ny",OKC:"okc",ORL:"orl",PHI:"phi",PHX:"phx",POR:"por",SAC:"sac",SAS:"sa",TOR:"tor",UTA:"utah",WAS:"wsh"};
+function upcomingTeamLogo(team) { const slug = NBA_LOGO_SLUGS[String(team || "").toUpperCase()]; return slug ? '<img class="upcoming-team-logo" src="https://a.espncdn.com/i/teamlogos/nba/500/' + slug + '.png" alt="" loading="lazy" onerror="this.hidden=true">' : ""; }
+function upcomingCard(game) {
+  const side = String(game.lean || "").toUpperCase();
+  const tone = side === "OVER" ? "over" : side === "UNDER" ? "under" : "neutral";
+  const raw = Number(game.probability_over);
+  const probability = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw > 1 ? raw / 100 : raw)) : null;
+  const width = probability === null ? 0 : Math.round(probability * 100);
+  return '<article class="upcoming-game-card signal-' + tone + '"><div class="upcoming-card-top"><span>' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + '</span><span class="pill ' + (tone === "over" ? "pill-over" : tone === "under" ? "pill-under" : "pill-neutral") + '">' + esc(side || "NEUTRAL") + '</span></div>' +
+    '<div class="upcoming-matchup"><div class="upcoming-team">' + upcomingTeamLogo(game.away) + '<strong>' + esc(game.away || "Visitante") + '</strong><small>VISITANTE</small></div><span class="upcoming-at">@</span><div class="upcoming-team">' + upcomingTeamLogo(game.home) + '<strong>' + esc(game.home || "Local") + '</strong><small>LOCAL</small></div></div>' +
+    '<div class="upcoming-total"><span>Total proyectado</span><strong>' + num(game.predicted_total) + '</strong></div><div class="upcoming-card-stats"><div><small>IC 80%</small><strong>' + num(game.interval_low,0) + "–" + num(game.interval_high,0) + '</strong></div><div><small>P(over)</small><strong>' + pct(game.probability_over) + '</strong></div><div><small>Hándicap</small><strong>' + esc(game.model_handicap || "—") + '</strong></div></div>' +
+    '<div class="upcoming-probability"><div><span>Probabilidad OVER</span><b>' + (probability === null ? "—" : width + "%") + '</b></div><div class="upcoming-probability-track"><i style="width:' + width + '%"></i></div></div></article>';
+}
+function setUpcomingView(view, persist) {
+  const selected = view === "table" ? "table" : "cards";
+  const cards = $("#upcomingCards"), table = $(".upcoming-table-wrap");
+  if (!cards || !table) return;
+  cards.hidden = selected !== "cards"; table.hidden = selected !== "table";
+  $$("[data-upcoming-view]").forEach((button) => { const active = button.dataset.upcomingView === selected; button.classList.toggle("is-active", active); button.setAttribute("aria-pressed", String(active)); });
+  if (persist !== false) { try { localStorage.setItem("nba-upcoming-view", selected); } catch (_) {} }
+}
 async function loadUpcoming(silent = false) {
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
@@ -497,6 +518,7 @@ async function loadUpcoming(silent = false) {
     $("#upcomingSummary").setAttribute("aria-busy", "false");
 
     if (!data.games.length) {
+      $("#upcomingCards").innerHTML = '<div class="empty upcoming-empty">No hay partidos programados en ese rango para el filtro elegido.</div>';
       emptyRow(tbody, 9, "No hay partidos programados en ese rango para el filtro elegido.");
       $("#upcomingNote").textContent = [
         "Prueba a ampliar los días o quitar el filtro de equipo.",
@@ -508,6 +530,7 @@ async function loadUpcoming(silent = false) {
       return;
     }
 
+    $("#upcomingCards").innerHTML = data.games.map(upcomingCard).join("");
     tbody.innerHTML = data.games
       .map(
         (game) => `
@@ -538,7 +561,9 @@ async function loadUpcoming(silent = false) {
     );
   } catch (error) {
     if (!silent) {
+      $("#upcomingCards").innerHTML = '<div class="upcoming-error"><strong>No se pudieron cargar los partidos.</strong><p>Comprueba la conexión y vuelve a intentarlo.</p><button type="button" class="btn btn-ghost" id="upcomingRetry">Reintentar</button></div>';
       emptyRow(tbody, 9, "No se pudieron cargar los próximos partidos.");
+      $("#upcomingRetry")?.addEventListener("click", () => loadUpcoming());
       notice($("#upcomingNotice"), error.message, true);
       showToast(error.message);
     }
@@ -2259,6 +2284,9 @@ function activateTab(name) {
 }
 
 function bindEvents() {
+  let savedUpcomingView = "cards";
+  try { savedUpcomingView = localStorage.getItem("nba-upcoming-view") || "cards"; } catch (_) {}
+  setUpcomingView(savedUpcomingView, false);
   // La navegación de NBA Cards se registra primero para que un fallo
   // en otro control de la interfaz no deje inutilizable la sección Jugadores.
   const playersBody = $("#playersBody");
@@ -2287,6 +2315,7 @@ function bindEvents() {
   $("#lineUp").addEventListener("click", () => setLine(state.line + 0.5));
 
   $("#upcomingRefresh").addEventListener("click", loadUpcoming);
+  $("[data-upcoming-view]").forEach((button) => button.addEventListener("click", () => setUpcomingView(button.dataset.upcomingView)));
   $("#upcomingDays").addEventListener("change", (event) => {
     state.upcoming.days = Number(event.target.value);
     loadUpcoming();
