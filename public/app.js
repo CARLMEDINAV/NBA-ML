@@ -1158,6 +1158,7 @@ async function loadProps(silent = false) {
     notice($("#propsNotice"), [data.warning, missingTeamsText].filter(Boolean).join(" "));
 
     state.props.players = players;
+    renderPropsCandidates();
     window.dispatchEvent(new CustomEvent("nba:props-ready"));
     if (state.props.selectedPlayerId && !players.some((player) => String(player.player_id) === String(state.props.selectedPlayerId))) {
       state.props.selectedPlayerId = "";
@@ -1206,6 +1207,51 @@ async function loadProps(silent = false) {
   } finally {
     setBusy(button, false);
   }
+}
+
+
+function renderPropsCandidates() {
+  const container = $("#propsCandidates");
+  const count = $("#propsCandidateCount");
+  if (!container) return;
+  const market = $("#propsMarket")?.value || "pra";
+  const fields = { pts: "projected_pts", reb: "projected_reb", ast: "projected_ast", pra: "projected_pra" };
+  const labels = { pts: "PTS", reb: "REB", ast: "AST", pra: "PRA" };
+  const players = [...(state.props.players || [])]
+    .filter((player) => Number.isFinite(Number(player[fields[market]])))
+    .sort((a, b) => {
+      const ga = propGradeInfo(a).confidence;
+      const gb = propGradeInfo(b).confidence;
+      return gb - ga || Number(b[fields[market]]) - Number(a[fields[market]]);
+    });
+  if (count) count.textContent = players.length + (players.length === 1 ? " candidato" : " candidatos");
+  if (!players.length) {
+    container.innerHTML = '<div class="props-candidates-empty">No hay candidatos para los filtros seleccionados. Amplía los días o cambia el equipo.</div>';
+    return;
+  }
+  container.innerHTML = players.map((player) => {
+    const game = player.game || {};
+    const opponent = player.opponent || (String(player.team) === String(game.home) ? game.away : game.home) || "—";
+    const isHome = player.is_home !== undefined ? Boolean(player.is_home) : String(player.team) === String(game.home);
+    const { confidence, grade } = propGradeInfo(player);
+    const gradeLabel = PROP_GRADE_LABELS[grade] || "Baja";
+    const headshot = player.headshot_url || "";
+    const statValue = Number(player[fields[market]]);
+    const metrics = [
+      ["PTS", player.projected_pts], ["REB", player.projected_reb],
+      ["AST", player.projected_ast], ["PRA", player.projected_pra]
+    ].map(([label, value]) => '<span><small>' + label + '</small><b>' + (Number.isFinite(Number(value)) ? num(value) : "—") + '</b></span>').join("");
+    const min = Number.isFinite(Number(player.projected_min)) ? num(player.projected_min) + " MIN L5" : "";
+    return '<article class="props-candidate-card">' +
+      '<div class="props-candidate-top"><div class="props-candidate-player">' +
+      (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '<span class="props-candidate-avatar">' + esc((player.player_name || "NBA").split(" ").map((part) => part[0]).slice(0,2).join("").toUpperCase()) + '</span>') +
+      '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + (isHome ? "LOCAL" : "VISITA") + ' vs ' + esc(opponent) + '</small></div></div>' +
+      '<span class="props-candidate-grade grade-' + grade.toLowerCase() + '"><b>' + grade + '</b><small>' + Math.round(confidence * 100) + '%</small></span></div>' +
+      '<div class="props-candidate-projection"><div><small>PROYECCIÓN ' + labels[market] + '</small><strong>' + num(statValue) + '</strong></div><span>' + esc(gradeLabel) + '<small>Confianza general PRA</small></span></div>' +
+      '<div class="props-candidate-metrics">' + metrics + '</div>' +
+      '<div class="props-candidate-footer"><span>' + esc(min || (Number.isFinite(Number(player.gp)) ? player.gp + " PJ temporada" : "Proyección del modelo")) + '</span><button type="button" class="props-candidate-open" data-props-player="' + esc(player.player_id) + '" data-props-stat="' + market + '">Ver análisis <span aria-hidden="true">→</span></button></div>' +
+      '</article>';
+  }).join("");
 }
 
 function renderPropsPlayerOptions() {
@@ -2409,6 +2455,21 @@ function bindEvents() {
   });
 
   $("#propsRefresh").addEventListener("click", () => loadProps());
+  $("#propsMarket").addEventListener("change", renderPropsCandidates);
+  $("#propsCandidates").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-props-player]");
+    if (!button) return;
+    const playerId = String(button.dataset.propsPlayer || "");
+    if (!playerId) return;
+    state.props.selectedPlayerId = playerId;
+    state.props.selectedStat = button.dataset.propsStat || "pra";
+    state.props.card = null;
+    state.props.line = null;
+    $("#propsPlayer").value = playerId;
+    $("#propsStat").value = state.props.selectedStat;
+    loadPropsPlayerCard(playerId);
+    $("#propsAnalyzerTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   $("#positionVsRefresh").addEventListener("click", loadPositionVsOpponent);
   $("#positionVsSort").addEventListener("change", renderPositionVsPlayers);
   $("#positionVsTeam").addEventListener("change", loadPositionVsOpponent);
