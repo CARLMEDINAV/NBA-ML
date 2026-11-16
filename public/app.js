@@ -17,7 +17,7 @@ const state = {
   active: "upcoming",
   loaded: { upcoming: false, analysis: false, external: false, results: false, players: false, props: false, comparison: false },
   comparisonModel: "ridge",
-  upcoming: { days: 7, team: "" },
+  upcoming: { days: 5, team: "", requestId: 0 },
   analysis: { days: 7, team: "" },
   results: { season: "2026-27", team: "", limit: 25, window: 200 },
   players: {
@@ -490,6 +490,7 @@ function setUpcomingView(view, persist) {
   if (persist !== false) { try { localStorage.setItem("nba-upcoming-view", selected); } catch (_) {} }
 }
 async function loadUpcoming(silent = false) {
+  const requestId = ++state.upcoming.requestId;
   const tbody = $("#upcomingBody");
   const button = $("#upcomingRefresh");
   if (!silent) {
@@ -508,6 +509,7 @@ async function loadUpcoming(silent = false) {
       live: 1,
       injuries: 1,
     });
+    if (requestId !== state.upcoming.requestId) return;
     state.loaded.upcoming = true;
     $("#upcomingRange").textContent = `${data.start} → ${data.end}`;
     if (!data.games.length) {
@@ -553,6 +555,7 @@ async function loadUpcoming(silent = false) {
       Boolean(data.warning || data.injuries_warning),
     );
   } catch (error) {
+    if (requestId !== state.upcoming.requestId) return;
     if (!silent) {
       $("#upcomingCards").innerHTML = '<div class="upcoming-error"><strong>No se pudieron cargar los partidos.</strong><p>Comprueba la conexión y vuelve a intentarlo.</p><button type="button" class="btn btn-ghost" id="upcomingRetry">Reintentar</button></div>';
       emptyRow(tbody, 9, "No se pudieron cargar los próximos partidos.");
