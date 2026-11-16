@@ -2366,7 +2366,7 @@ function bindEvents() {
   bind("#lineUp", "click", () => setLine(state.line + 0.5));
 
   bind("#upcomingRefresh", "click", loadUpcoming);
-  $("[data-upcoming-view]").forEach((button) => button.addEventListener("click", () => setUpcomingView(button.dataset.upcomingView)));
+  $$("[data-upcoming-view]").forEach((button) => button.addEventListener("click", () => setUpcomingView(button.dataset.upcomingView)));
   bind("#upcomingDays", "change", (event) => {
     state.upcoming.days = Number(event.target.value);
     loadUpcoming();
