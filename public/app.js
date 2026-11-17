@@ -704,7 +704,10 @@ function resultsHandicapGrade(game) {
   const handicap = String(game.model_handicap || "").trim();
   const margin = Number(game.actual_margin);
   if (!handicap || !Number.isFinite(margin)) return null;
-  if (/^pick.?em$/i.test(handicap)) return Math.abs(margin) < 0.0001 ? "push" : "hit";
+  if (/^pick.?em$/i.test(handicap)) {
+    if (Math.abs(margin) < 0.0001) return "push";
+    return game.possible_winner && game.actual_winner && String(game.possible_winner).trim().toLowerCase() === String(game.actual_winner).trim().toLowerCase() ? "hit" : "miss";
+  }
   const match = handicap.match(/^(.*?)\s+-([\d.]+)$/);
   if (!match) return null;
   const favorite = match[1].trim().toLowerCase();
@@ -720,7 +723,7 @@ function resultsCard(game) {
   const total = Number(game.total_points);
   const line = Number(game.line);
   const lean = String(game.model_lean || "").toUpperCase();
-  const overHit = game.hit === 1 ? true : game.hit === 0 ? false : null;
+  const overHit = game.actual_result === "PUSH" ? "push" : game.hit === 1 ? true : game.hit === 0 ? false : null;
   const handicapGrade = resultsHandicapGrade(game);
   const winnerHit = game.possible_winner && game.actual_winner
     ? String(game.possible_winner).trim().toLowerCase() === String(game.actual_winner).trim().toLowerCase()
@@ -729,6 +732,9 @@ function resultsCard(game) {
   const handicapOutcome = handicapGrade === "push"
     ? '<span class="results-outcome is-push">PUSH</span>'
     : resultOutcomePill(handicapHit);
+  const overOutcome = overHit === "push"
+    ? '<span class="results-outcome is-push">PUSH</span>'
+    : resultOutcomePill(overHit);
   const actualSide = game.actual_result || "—";
   const predictedSide = lean || "SIN SEÑAL";
   const homeScore = Number(game.home_score);
@@ -749,7 +755,7 @@ function resultsCard(game) {
       '<span>Línea<strong>' + (Number.isFinite(line) ? num(line, 1) : "—") + '</strong></span>' +
     '</div>' +
     '<div class="results-card-picks">' +
-      '<div class="results-pick"><span class="results-pick-label">OVER / UNDER</span><strong>' + esc(predictedSide) + '</strong><small>Real: ' + esc(actualSide) + '</small>' + resultOutcomePill(overHit) + '</div>' +
+      '<div class="results-pick"><span class="results-pick-label">OVER / UNDER</span><strong>' + esc(predictedSide) + '</strong><small>Real: ' + esc(actualSide) + '</small>' + overOutcome + '</div>' +
       '<div class="results-pick"><span class="results-pick-label">HÁNDICAP</span><strong>' + esc(game.model_handicap || "Sin proyección") + '</strong><small>Margen real: ' + (game.actual_margin == null ? "—" : signed(game.actual_margin, 1)) + '</small>' + handicapOutcome + '</div>' +
       '<div class="results-pick"><span class="results-pick-label">GANADOR</span><strong>' + esc(game.possible_winner || "Sin proyección") + '</strong><small>Ganó: ' + esc(game.actual_winner || "—") + '</small>' + resultOutcomePill(winnerHit) + '</div>' +
     '</div></article>';
