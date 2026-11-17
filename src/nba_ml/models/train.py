@@ -86,6 +86,11 @@ ARTIFACT_PATH = MODELS_DIR / "model.joblib"
 MARGIN_TARGET = "home_margin"
 MARGIN_ALPHA = 30.0
 
+# Cada tres temporadas la influencia de una observación se reduce a la mitad.
+# Así se conserva el contexto histórico sin tratar una dinastía antigua como actual.
+RECENCY_HALF_LIFE_SEASONS = 3.0
+RECENT_WINDOW_SEASONS = 5
+
 
 # ---------------------------------------------------------------------------
 # Metricas y particiones
@@ -123,6 +128,32 @@ def split_by_season(dataset: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, 
         validation.sort_values(["game_date", "game_id"]),
         test.sort_values(["game_date", "game_id"]),
     )
+
+
+def season_sample_weights(
+    frame: pd.DataFrame,
+    half_life: float = RECENCY_HALF_LIFE_SEASONS,
+) -> np.ndarray:
+    """Pesos exponenciales por temporada; la más reciente recibe peso 1."""
+    years = frame["season"].map(season_index).to_numpy(dtype=float)
+    if not len(years):
+        return np.array([], dtype=float)
+    age = years.max() - years
+    return np.power(0.5, age / half_life)
+
+
+def fit_weighted(
+    model,
+    features: pd.DataFrame,
+    target: pd.Series,
+    sample_weight: np.ndarray,
+):
+    """Ajusta Pipeline o estimador directo usando pesos temporales."""
+    if isinstance(model, Pipeline):
+        model.fit(features, target, model__sample_weight=sample_weight)
+    else:
+        model.fit(features, target, sample_weight=sample_weight)
+    return model
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +195,9 @@ def make_model(name: str, params: dict | None = None):
 
 
 def tune_models(
-    x_train: pd.DataFrame, y_train: pd.Series
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    sample_weight: np.ndarray,
 ) -> dict[str, dict[str, object]]:
     """Busca hiperparametros con CV temporal dentro del conjunto de train."""
     cv = TimeSeriesSplit(n_splits=3)
@@ -177,7 +210,7 @@ def tune_models(
         cv=cv,
         n_jobs=-1,
     )
-    ridge.fit(x_train, y_train)
+    ridge.fit(x_train, y_train, model__sample_weight=sample_weight)
     results["ridge"] = {
         "search": ridge,
         "params": ridge.best_params_,
@@ -195,7 +228,7 @@ def tune_models(
         cv=cv,
         n_jobs=-1,
     )
-    forest.fit(x_train, y_train)
+    forest.fit(x_train, y_train, model__sample_weight=sample_weight)
     results["random_forest"] = {
         "search": forest,
         "params": forest.best_params_,
@@ -221,7 +254,7 @@ def tune_models(
         random_state=RANDOM_STATE,
         refit=True,
     )
-    boosting.fit(x_train, y_train)
+    boosting.fit(x_train, y_train, sample_weight=sample_weight)
     results["hist_gradient_boosting"] = {
         "search": boosting,
         "params": boosting.best_params_,
@@ -255,7 +288,7 @@ def walk_forward(
             continue
 
         model = make_model(model_name, params)
-        model.fit(train[FEATURES], train[TARGET])
+        fit_weighted(model, train[FEATURES], train[TARGET], season_sample_weights(train))
         predictions = model.predict(test[FEATURES])
         metrics = regression_metrics(test[TARGET].to_numpy(), predictions)
         naive = test["form_total"].fillna(train[TARGET].mean()).to_numpy()
@@ -308,7 +341,7 @@ def walk_forward_margin(
             continue
 
         model = make_model("ridge", {"model__alpha": alpha})
-        model.fit(train[MARGIN_FEATURES], train[MARGIN_TARGET])
+        fit_weighted(model, train[MARGIN_FEATURES], train[MARGIN_TARGET], season_sample_weights(train))
         predictions = model.predict(test[MARGIN_FEATURES])
         actual = test[MARGIN_TARGET].to_numpy(dtype=float)
         metrics = regression_metrics(actual, predictions)
@@ -326,12 +359,38 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
     development = pd.concat([train_frame, validation_frame], ignore_index=True)
 
     evaluation = make_model("ridge", {"model__alpha": alpha})
-    evaluation.fit(development[MARGIN_FEATURES], development[MARGIN_TARGET])
+    fit_weighted(
+        evaluation,
+        development[MARGIN_FEATURES],
+        development[MARGIN_TARGET],
+        season_sample_weights(development),
+    )
     test_predictions = evaluation.predict(test_frame[MARGIN_FEATURES])
     test_actual = test_frame[MARGIN_TARGET].to_numpy(dtype=float)
     test_metrics = regression_metrics(test_actual, test_predictions)
     test_metrics["winner_accuracy"] = float(
         np.mean((test_predictions > 0) == (test_actual > 0))
+    )
+
+    # Contraste: mismo algoritmo entrenado solo con las cinco temporadas más
+    # recientes disponibles antes del test 2025-26.
+    development_years = development["season"].map(season_index)
+    recent_start_year = int(development_years.max()) - RECENT_WINDOW_SEASONS + 1
+    recent_development = development[development_years >= recent_start_year]
+    recent_model = make_model("ridge", {"model__alpha": alpha})
+    fit_weighted(
+        recent_model,
+        recent_development[MARGIN_FEATURES],
+        recent_development[MARGIN_TARGET],
+        season_sample_weights(recent_development),
+    )
+    recent_predictions = recent_model.predict(test_frame[MARGIN_FEATURES])
+    recent_test_metrics = regression_metrics(test_actual, recent_predictions)
+    recent_test_metrics["winner_accuracy"] = float(
+        np.mean((recent_predictions > 0) == (test_actual > 0))
+    )
+    recent_start_season = (
+        f"{recent_start_year}-{str(recent_start_year + 1)[-2:]}"
     )
 
     walk_rows, residuals = walk_forward_margin(dataset, alpha)
@@ -346,7 +405,12 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
     test_table = test_table.rename(columns={"home_margin": "actual_margin"})
 
     production = make_model("ridge", {"model__alpha": alpha})
-    production.fit(dataset[MARGIN_FEATURES], dataset[MARGIN_TARGET])
+    fit_weighted(
+        production,
+        dataset[MARGIN_FEATURES],
+        dataset[MARGIN_TARGET],
+        season_sample_weights(dataset),
+    )
     return {
         "model": production,
         "residuals": residuals,
@@ -356,6 +420,8 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
         "walk_forward": walk_rows,
         "alpha": alpha,
         "features": MARGIN_FEATURES,
+        "recent_window_test_metrics": recent_test_metrics,
+        "recent_window_start": recent_start_season,
     }
 
 
@@ -544,7 +610,8 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         len(test_frame),
     )
 
-    tuned = tune_models(x_train, y_train)
+    train_weights = season_sample_weights(train_frame)
+    tuned = tune_models(x_train, y_train, train_weights)
 
     # Comparacion honesta en validacion (los searches ya estan ajustados en train).
     validation_rows: list[dict[str, object]] = []
@@ -564,7 +631,12 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
     # Evaluacion final: reentrenar con train + validacion y predecir test.
     development = pd.concat([train_frame, validation_frame], ignore_index=True)
     final_model = make_model(best_name, best_params)
-    final_model.fit(development[FEATURES], development[TARGET])
+    fit_weighted(
+        final_model,
+        development[FEATURES],
+        development[TARGET],
+        season_sample_weights(development),
+    )
     test_predictions = final_model.predict(test_frame[FEATURES])
     test_metrics = regression_metrics(test_frame[TARGET].to_numpy(), test_predictions)
 
@@ -587,7 +659,12 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
     test_model_predictions: dict[str, np.ndarray] = {}
     for candidate_name, candidate_info in tuned.items():
         candidate = make_model(candidate_name, candidate_info["params"])
-        candidate.fit(development[FEATURES], development[TARGET])
+        fit_weighted(
+            candidate,
+            development[FEATURES],
+            development[TARGET],
+            season_sample_weights(development),
+        )
         candidate_pred = candidate.predict(test_frame[FEATURES])
         test_model_predictions[candidate_name] = candidate_pred
         candidate_metrics = regression_metrics(test_frame[TARGET].to_numpy(), candidate_pred)
@@ -683,7 +760,12 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
 
     # Artefacto final para produccion: todas las temporadas disponibles.
     production_model = make_model(best_name, best_params)
-    production_model.fit(dataset[FEATURES], dataset[TARGET])
+    fit_weighted(
+        production_model,
+        dataset[FEATURES],
+        dataset[TARGET],
+        season_sample_weights(dataset),
+    )
     artifact = {
         "model": production_model,
         "features": FEATURES,
@@ -711,6 +793,8 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         "margin_sigma": margin["sigma"],
         "margin_test_metrics": margin["test_metrics"],
         "margin_walk_forward": margin["walk_forward"],
+        "margin_recent_window_test_metrics": margin["recent_window_test_metrics"],
+        "recency_half_life_seasons": RECENCY_HALF_LIFE_SEASONS,
     }
     joblib.dump(artifact, ARTIFACT_PATH)
     LOG.info("Modelo guardado en %s", ARTIFACT_PATH)
@@ -738,6 +822,8 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
             "sigma": margin["sigma"],
             "test_metrics": margin["test_metrics"],
             "walk_forward": margin["walk_forward"],
+            "recent_window_start": margin["recent_window_start"],
+            "recent_window_test_metrics": margin["recent_window_test_metrics"],
         },
         "top_features": importance.head(15).to_dict("records"),
     }
