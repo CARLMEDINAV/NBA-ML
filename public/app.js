@@ -482,7 +482,7 @@ function upcomingCard(game) {
     '<div class="upcoming-probability"><div><span>Probabilidad OVER</span><b>' + (probability === null ? "—" : width + "%") + '</b></div><div class="upcoming-probability-track"><i style="width:' + width + '%"></i></div></div></article>';
 }
 function setUpcomingView(view, persist) {
-  const selected = view === "table" ? "table" : "cards";
+  const selected = "cards";
   const cards = $("#upcomingCards"), table = $(".upcoming-table-wrap");
   if (!cards || !table) return;
   cards.hidden = selected !== "cards"; table.hidden = selected !== "table";
@@ -1041,6 +1041,7 @@ async function loadPlayers() {
     }
 
     if (!players.length) {
+      $("#playersCards").innerHTML = '<div class="nba-cards-empty">No hay jugadores que cumplan esos filtros.</div>';
       emptyRow(tbody, 9, "No hay jugadores que cumplan esos filtros.");
       $("#playersNote").textContent = "Prueba a bajar el mínimo de partidos o quitar la búsqueda.";
       return;
@@ -1110,10 +1111,30 @@ async function loadPlayers() {
         </tr>`;
       })
       .join("");
+    $("#playersCards").innerHTML = players.map((player, index) => {
+      const headshotUrl = player.headshot_url ||
+        (player.player_id ? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.player_id}.png` : "");
+      const canOpenDetail = Number.isFinite(Number(player.player_id)) && Number(player.player_id) > 0;
+      const avatar = headshotUrl
+        ? `<img src="${esc(headshotUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`
+        : `<span class="nba-player-card-fallback">${esc(initials(player.player_name))}</span>`;
+      return `<button type="button" class="nba-player-card" ${canOpenDetail ? `data-player-id="${esc(player.player_id)}"` : "disabled"} title="${canOpenDetail ? "Abrir ficha del jugador" : "Ficha no disponible"}">
+        <span class="nba-player-card-head"><small>#${index + 1} · ${esc(player.team || "NBA")}</small><span>${num(player.gp, 0)} PJ</span></span>
+        <span class="nba-player-card-identity">${avatar}<span><strong>${esc(player.player_name)}</strong><small>${esc(data.season)} · ${data.mode === "pergame" ? "Por partido" : "Totales"}</small></span></span>
+        <span class="nba-player-card-stats">
+          <span><small>PTS</small><b>${num(player.pts)}</b></span>
+          <span><small>REB</small><b>${num(player.reb)}</b></span>
+          <span><small>AST</small><b>${num(player.ast)}</b></span>
+          <span class="is-highlight"><small>PRA</small><b>${num(player.pra)}</b></span>
+        </span>
+        <span class="nba-player-card-foot"><span>MIN ${num(player.min)}</span><span>Ver ficha <i aria-hidden="true">↗</i></span></span>
+      </button>`;
+    }).join("");
     const rosterNote = data.season === "2025-26" ? "equipos de esa temporada" : "equipos actuales";
     const sortLabel = PLAYER_SORT_LABELS[state.players.sort] || "PRA";
     $("#playersNote").textContent = `${data.count} jugadores · ${rosterNote} · ordenado por ${sortLabel} · mínimo ${state.players.minGp} partidos.`;
   } catch (error) {
+    $("#playersCards").innerHTML = '<div class="nba-cards-empty">No se pudieron cargar los jugadores.</div>';
     emptyRow(tbody, 9, "No se pudieron cargar los jugadores.");
     notice($("#playersNotice"), error.message, true);
     showToast(error.message);
@@ -2103,7 +2124,7 @@ async function submitPrediction(event) {
     const high = Number(result.interval_80[1]);
     box.dataset.ready = "1";
     box.innerHTML = `
-      <div class="result-hero">
+      <div class="result-hero nba-prediction-card">
         <div class="result-total">
           <div class="k">Total previsto</div>
           <div class="big">${num(result.predicted_total)}<small> pts</small></div>
@@ -2145,14 +2166,14 @@ async function loadTeamImpactPlayers() {
     select.innerHTML = '<option value="">Selecciona primero un equipo</option>';
     $("#teamImpactSummary").innerHTML = "";
     $("#teamImpactCards").innerHTML = "";
-    $("#teamImpactGames").innerHTML = "";
+    $("#teamImpactGames").innerHTML = ""; $("#teamImpactGamesCards").innerHTML = "";
     notice($("#teamImpactNotice"), "Selecciona un equipo para cargar sus jugadores.");
     return;
   }
   select.innerHTML = '<option value="">Cargando jugadores…</option>';
   $("#teamImpactSummary").innerHTML = "";
   $("#teamImpactCards").innerHTML = "";
-  $("#teamImpactGames").innerHTML = "";
+  $("#teamImpactGames").innerHTML = ""; $("#teamImpactGamesCards").innerHTML = "";
   try {
     const data = await api("/api/team-impact-players", { team });
     select.innerHTML = '<option value="">Selecciona jugador</option>';
@@ -2184,7 +2205,7 @@ async function loadTeamImpact() {
     if (!data.available) {
       $("#teamImpactSummary").innerHTML = "";
       $("#teamImpactCards").innerHTML = "";
-      $("#teamImpactGames").innerHTML = "";
+      $("#teamImpactGames").innerHTML = ""; $("#teamImpactGamesCards").innerHTML = "";
       notice($("#teamImpactNotice"), data.reason || "No hay datos suficientes.");
       return;
     }
@@ -2203,16 +2224,14 @@ async function loadTeamImpact() {
       '</b><small>Parcial: ' + num(partial[key]) + ' · Sin participación: ' + num(no[key]) + '</small><em>Completa vs ausencia: ' +
       delta(yes[key], no[key]) + '</em></div>'
     ).join("");
-    $("#teamImpactGames").innerHTML = (data.games || []).map((game) => {
+    $("#teamImpactGamesCards").innerHTML = (data.games || []).map((game) => {
       const label = game.participation_label || (game.participated ? "Participó" : "Sin participación");
       const detail = game.status_detail ? " · " + game.status_detail : "";
-      return '<tr><td>' + esc(numericDate(game.date)) + '</td><td>' + esc(game.opponent) +
-        '</td><td>' + esc(game.result || "—") + '</td><td class="num">' + num(game.points_for) +
-        '</td><td class="num">' + num(game.points_against) + '</td><td class="num">' +
-        num(game.game_total) + '</td><td class="num">' + num(game.minutes, 1) +
-        '</td><td><span class="pill ' + (game.partial ? "pill-neutral" : game.participated ? "pill-over" : "pill-neutral") +
-        '">' + esc(label) + '</span>' + (detail ? '<small class="market-line">' + esc(detail) + '</small>' : '') +
-        '</td></tr>';
+      return '<article class="nba-team-game-card">' +
+        '<div class="nba-card-topline"><span>' + esc(numericDate(game.date)) + ' · ' + esc(game.opponent) + '</span><span class="pill ' + (game.partial ? "pill-neutral" : game.participated ? "pill-over" : "pill-neutral") + '">' + esc(label) + '</span></div>' +
+        '<div class="nba-team-game-result"><strong>' + esc(game.result || "—") + '</strong><span>Total <b>' + num(game.game_total) + '</b></span></div>' +
+        '<div class="nba-team-game-stats"><span><small>PF</small><b>' + num(game.points_for) + '</b></span><span><small>PC</small><b>' + num(game.points_against) + '</b></span><span><small>MIN</small><b>' + num(game.minutes, 1) + '</b></span></div>' +
+        (detail ? '<small class="market-line">' + esc(detail) + '</small>' : '') + '</article>';
     }).join("");
     notice($("#teamImpactNotice"), [data.note, data.sample_warning].filter(Boolean).join(" "));
   } catch (error) {
@@ -2244,19 +2263,16 @@ async function loadTeammateAbsenceImpact() {
       summaryCard("Compañeros evaluados", String((data.teammates || []).length), "muestras comparables")
     ].join("");
     if (!data.available) {
-      $("#teammateImpactBody").innerHTML = "";
+      $("#teammateImpactBody").innerHTML = ""; $("#teammateImpactCards").innerHTML = "";
       notice($("#teammateImpactNotice"), data.reason || "No hay datos suficientes.");
       return;
     }
-    $("#teammateImpactBody").innerHTML = data.teammates.map((player) => {
+    $("#teammateImpactCards").innerHTML = data.teammates.map((player) => {
       const delta = player.delta_pts == null ? "—" : signed(player.delta_pts, 1);
       const cls = player.delta_pts > 0 ? "pill-over" : player.delta_pts < 0 ? "pill-under" : "pill-neutral";
-      return '<tr><td>' + esc(player.name) + '</td><td class="num">' + num(player.with_star.pts) +
-        '</td><td class="num">' + num(player.without_star.pts) + '</td><td class="num"><span class="pill ' + cls + '">' +
-        delta + '</span></td><td class="num">' + num(player.with_star.min) + ' / ' + num(player.without_star.min) +
-        '</td><td class="num">' + num(player.without_star.ast) + '</td><td class="num">' + num(player.without_star.reb) +
-        '</td><td class="num">' + signed((player.delta_usage || 0) * 100, 1) + ' pp</td><td class="num">' +
-        player.with_star.games + ' / ' + player.without_star.games + '</td></tr>';
+      return '<article class="nba-teammate-card"><div class="nba-card-topline"><strong>' + esc(player.name) + '</strong><span class="pill ' + cls + '">' + delta + ' PTS</span></div>' +
+        '<div class="nba-teammate-comparison"><span><small>PTS con</small><b>' + num(player.with_star.pts) + '</b></span><span><small>PTS sin</small><b>' + num(player.without_star.pts) + '</b></span><span><small>MIN con/sin</small><b>' + num(player.with_star.min) + ' / ' + num(player.without_star.min) + '</b></span></div>' +
+        '<div class="nba-teammate-foot"><span>AST sin ' + num(player.without_star.ast) + ' · REB sin ' + num(player.without_star.reb) + '</span><span>USO ' + signed((player.delta_usage || 0) * 100, 1) + ' pp</span><span>Muestras ' + player.with_star.games + ' / ' + player.without_star.games + '</span></div></article>';
     }).join("");
     notice($("#teammateImpactNotice"), data.note || "");
   } catch (error) {
@@ -2458,6 +2474,17 @@ function bindEvents() {
       openPlayerDetail(playerId, {
         opener: row.querySelector(".player-link") || row
       });
+    });
+  }
+  const playersCards = $("#playersCards");
+  if (playersCards && !playersCards.dataset.cardNavigationBound) {
+    playersCards.dataset.cardNavigationBound = "true";
+    playersCards.addEventListener("click", (event) => {
+      const card = event.target instanceof Element ? event.target.closest(".nba-player-card[data-player-id]") : null;
+      if (!card || !playersCards.contains(card)) return;
+      const playerId = Number(card.dataset.playerId);
+      if (!Number.isInteger(playerId) || playerId <= 0) return;
+      openPlayerDetail(playerId, { opener: card });
     });
   }
   $$(".tab").forEach((button) => {
