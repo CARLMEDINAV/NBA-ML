@@ -186,7 +186,15 @@
           <button class="results-nav-btn" type="button" role="tab" id="results-tab-errors" aria-selected="false" aria-controls="results-view-errors" data-results-view="errors">Errores extremos</button>
         </nav>
         <section class="results-view is-active" id="results-view-history" role="tabpanel" aria-labelledby="results-tab-history">
-          <div class="table-wrap">
+          <div class="results-display-row">
+            <span class="muted">Formato de resultados</span>
+            <div class="results-display-toggle" id="resultsDisplayToggle" role="group" aria-label="Formato de resultados">
+              <button type="button" class="is-active" data-results-display="cards" aria-pressed="true">NBA Cards</button>
+              <button type="button" data-results-display="table" aria-pressed="false">Tabla</button>
+            </div>
+          </div>
+          <div class="results-cards-grid" id="resultsCards" aria-live="polite"></div>
+          <div class="table-wrap" id="resultsTableWrap" hidden>
             <table aria-label="Resultados con total real, predicción y acierto">
               <thead><tr>
                 <th scope="col">Fecha</th><th scope="col">Partido</th><th scope="col" class="num">Total real</th>
