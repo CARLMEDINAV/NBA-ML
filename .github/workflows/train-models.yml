@@ -13,7 +13,7 @@ concurrency:
 jobs:
   train-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 90
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
@@ -31,11 +31,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/raw
-          key: nba-raw-v1-${{ runner.os }}-${{ github.run_id }}
+          key: nba-raw-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
+            nba-raw-v2-${{ runner.os }}-
             nba-raw-v1-${{ runner.os }}-
 
       - name: Descargar temporadas históricas
+        timeout-minutes: 15
         env:
           PYTHONPATH: src
         run: python -m nba_ml download
@@ -45,7 +47,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/raw
-          key: nba-raw-v1-${{ runner.os }}-${{ github.run_id }}
+          key: nba-raw-v2-${{ runner.os }}-${{ github.run_id }}
 
       - name: Construir dataset sin fuga temporal
         env:
