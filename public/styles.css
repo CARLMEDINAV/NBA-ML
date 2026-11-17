@@ -3344,6 +3344,26 @@ transform: none;
 .props-player-identity small{color:#94a3b8;font-size:.68rem}
 .props-selected-stat{color:#fbbf24;font:800 .67rem var(--mono);white-space:nowrap}
 .props-hit-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.props-market-ranking{grid-column:1/-1;margin-top:5px;padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:14px;background:rgba(2,6,23,.28)}
+.props-market-ranking-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+.props-market-ranking-head>div{display:grid;gap:4px}
+.props-market-ranking-head strong{color:#f1f5f9;font-size:.86rem}
+.props-market-ranking-head small,.props-market-ranking-head>span{color:#94a3b8;font-size:.68rem}
+.props-market-ranking-head>span b{color:#6ee7b7}
+.props-rank-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.props-rank-card{min-width:0;padding:11px;border:1px solid rgba(148,163,184,.13);border-radius:11px;background:rgba(15,23,42,.62)}
+.props-rank-top{display:flex;align-items:center;gap:7px;min-width:0}
+.props-rank-top>strong{overflow:hidden;color:#e2e8f0;font-size:.72rem;text-overflow:ellipsis;white-space:nowrap}
+.props-rank-top>b{margin-left:auto;color:#f8fafc;font:800 .82rem var(--mono);white-space:nowrap}
+.props-rank-position{color:#64748b;font:700 .62rem var(--mono)}
+.props-rank-card .props-hit-track{height:4px;margin:9px 0 7px}
+.props-rank-card.is-strong .props-hit-track i{background:#34d399}
+.props-rank-card.is-mid .props-hit-track i{background:#f59e0b}
+.props-rank-card.is-low .props-hit-track i{background:#fb7185}
+.props-rank-card>small{display:block;color:#94a3b8;font-size:.61rem;line-height:1.4}
+@media(max-width:900px){.props-rank-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){.props-market-ranking{padding:12px}.props-market-ranking-head{align-items:flex-start;flex-direction:column}.props-rank-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:360px){.props-rank-grid{grid-template-columns:1fr}}
 .props-hit-card{position:relative;overflow:hidden;padding:17px;border:1px solid rgba(148,163,184,.16);border-radius:14px;background:rgba(2,6,23,.45)}
 .props-hit-card>span{display:block;color:#9eacc2;font:800 .65rem var(--mono);letter-spacing:.1em}
 .props-hit-card>strong{display:block;margin:9px 0 3px;color:#f8fafc;font:850 clamp(1.9rem,4vw,2.5rem) var(--mono);letter-spacing:-.06em;font-variant-numeric:tabular-nums}
