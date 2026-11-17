@@ -18,10 +18,11 @@ MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
-# Historial desde 2015-16 y temporada actual para mantener el modelo actualizado.
+# Ultimas cinco temporadas, incluida la temporada actual en curso.
+# 2022-23, 2023-24, 2024-25, 2025-26 y 2026-27.
 CURRENT_SEASON = "2026-27"
 SEASONS: tuple[str, ...] = tuple(
-    f"{year}-{str(year + 1)[-2:]}" for year in range(2015, 2027)
+    f"{year}-{str(year + 1)[-2:]}" for year in range(2022, 2027)
 )
 SEASON_TYPE = "Regular Season"
 
