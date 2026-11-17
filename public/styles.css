@@ -4141,3 +4141,35 @@ touch-action: manipulation;
   .props-candidate-card .upcoming-card-stats strong{font-size:.64rem}
   .props-candidate-card .props-candidate-footer{align-items:center;flex-direction:row}
 }
+
+
+/* NBA Cards para el historial de resultados */
+.results-display-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 16px}
+.results-display-toggle{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.035)}
+.results-display-toggle button{border:0;border-radius:8px;padding:8px 13px;background:transparent;color:var(--muted);font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}
+.results-display-toggle button.is-active{background:linear-gradient(135deg,var(--orange),var(--orange-2));color:#17120f}
+.results-cards-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.results-game-card{min-width:0;padding:16px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025));box-shadow:0 12px 28px rgba(0,0,0,.14)}
+.results-card-head{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.04em}
+.results-final-tag{padding:4px 8px;border-radius:999px;background:rgba(69,214,160,.12);color:var(--green);font-size:.65rem}
+.results-matchup{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:16px 0 13px}
+.results-team{display:flex;align-items:center;gap:8px;min-width:0;font-weight:800}
+.results-team img{width:32px;height:32px;object-fit:contain;flex:0 0 auto}
+.results-home{justify-content:flex-end}
+.results-score{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:1.25rem;font-weight:900}
+.results-score span{color:var(--faint);font-size:.8rem}
+.results-card-total{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.results-card-total span{display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:.7rem}
+.results-card-total strong{color:var(--text);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.9rem}
+.results-card-picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding-top:12px}
+.results-pick{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;padding:9px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(0,0,0,.12)}
+.results-pick-label{color:var(--muted);font-size:.62rem;font-weight:800;letter-spacing:.06em}
+.results-pick>strong{max-width:100%;overflow-wrap:anywhere;font-size:.8rem}
+.results-pick small{color:var(--muted);font-size:.68rem;line-height:1.35}
+.results-outcome{display:inline-flex;align-items:center;justify-content:center;margin-top:3px;padding:4px 7px;border-radius:7px;font-size:.62rem;font-weight:900;letter-spacing:.03em}
+.results-outcome.is-hit{background:rgba(69,214,160,.13);color:var(--green)}
+.results-outcome.is-miss{background:rgba(255,107,129,.13);color:var(--red)}
+.results-outcome.is-na{background:rgba(148,163,184,.12);color:var(--muted)}
+.results-outcome.is-push{background:rgba(255,155,84,.13);color:var(--orange)}
+@media(max-width:760px){.results-cards-grid{grid-template-columns:1fr}.results-game-card{padding:13px}.results-card-picks{gap:6px}.results-pick{padding:8px 6px}.results-pick>strong{font-size:.74rem}}
+@media(max-width:380px){.results-matchup{gap:5px}.results-team{gap:4px;font-size:.78rem}.results-team img{width:25px;height:25px}.results-score{gap:4px;font-size:1.05rem}.results-card-total strong{font-size:.8rem}}
