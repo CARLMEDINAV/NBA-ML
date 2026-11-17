@@ -1355,7 +1355,29 @@ function renderPropsAnalyzer() {
     const headshot = player.headshot_url || "";
     summary.innerHTML = '<div class="props-player-identity">' + (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.remove()">' : "") + '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + esc(player.season || "") + ' · ' + games.length + ' partidos recientes</small></div></div><span class="props-selected-stat">' + esc(statLabel) + ' · L5 / L10</span>';
   }
-  if (results) results.innerHTML = buildCard(values.slice(0,5), "ÚLTIMOS 5") + buildCard(values.slice(0,10), "ÚLTIMOS 10");
+  const ranking = DETAIL_STATS.map((item) => {
+    const fields = requiredFields[item.key] || [item.key];
+    const sample = games.filter((game) => fields.every((key) =>
+      game[key] !== null && game[key] !== undefined && game[key] !== "" && Number.isFinite(Number(game[key]))
+    )).slice(0, 10).map((game) => ({ game, value: pdStatValue(game, item.key) }))
+      .filter((entry) => Number.isFinite(entry.value));
+    const referenceLine = pdDefaultLine(card, item.key);
+    const hits = sample.filter((entry) => entry.value >= referenceLine).length;
+    return { ...item, sample, hits, total: sample.length, rate: sample.length ? hits / sample.length : null, line: referenceLine,
+      average: sample.length ? sample.reduce((sum, entry) => sum + entry.value, 0) / sample.length : null };
+  }).sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || b.total - a.total || a.label.localeCompare(b.label));
+  const rankingCards = ranking.map((item, index) => {
+    const rate = item.rate;
+    const tone = rate === null ? "is-empty" : rate >= .7 ? "is-strong" : rate >= .5 ? "is-mid" : "is-low";
+    return '<article class="props-rank-card ' + tone + '"><div class="props-rank-top"><span class="props-rank-position">#' + (index + 1) + '</span><strong>' + esc(item.label) + '</strong><b>' + (rate === null ? "—" : pct(rate)) + '</b></div><div class="props-hit-track"><i style="width:' + (rate === null ? 0 : Math.round(rate * 100)) + '%"></i></div><small>' + item.hits + '/' + item.total + ' aciertos · línea ' + num(item.line) + ' · media ' + (item.average === null ? "—" : num(item.average)) + '</small></article>';
+  }).join("");
+  const best = ranking.find((item) => item.total > 0);
+  if (results) results.innerHTML =
+    buildCard(values.slice(0,5), "ÚLTIMOS 5") +
+    buildCard(values.slice(0,10), "ÚLTIMOS 10") +
+    '<section class="props-market-ranking"><div class="props-market-ranking-head"><div><strong>Hit rate por estadística</strong><small>Últimos 10 partidos · línea de referencia del modelo</small></div>' +
+    (best ? '<span>Mejor mercado: <b>' + esc(best.label) + ' · ' + pct(best.rate) + '</b></span>' : '') +
+    '</div><div class="props-rank-grid">' + rankingCards + '</div></section>';
 
   const lastTen = values.slice(0,10).reverse();
   if (chart) {
