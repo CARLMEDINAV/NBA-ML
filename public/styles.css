@@ -4176,3 +4176,46 @@ touch-action: manipulation;
 
 /* Respeta el atributo hidden en los dos formatos de Resultados. */
 #resultsCards[hidden], #resultsTableWrap[hidden]{display:none!important}
+
+
+/* NBA CARDS — sistema visual unificado para todas las secciones */
+.nba-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:12px 0 18px}
+.nba-cards-empty{grid-column:1/-1;padding:18px;border:1px dashed var(--border);border-radius:15px;color:var(--muted);background:rgba(255,255,255,.025);text-align:center}
+.nba-player-card{display:flex;flex-direction:column;gap:13px;min-width:0;width:100%;padding:14px;text-align:left;color:var(--text);font:inherit;border:1px solid var(--border);border-radius:17px;background:linear-gradient(145deg,rgba(22,34,57,.96),rgba(9,15,28,.98));box-shadow:0 10px 26px rgba(0,0,0,.16);cursor:pointer;transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+.nba-player-card:hover{border-color:rgba(255,155,84,.5);transform:translateY(-2px);box-shadow:0 15px 32px rgba(0,0,0,.24)}
+.nba-player-card:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
+.nba-player-card:disabled{cursor:default;opacity:.72}
+.nba-player-card-head,.nba-card-topline,.nba-player-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nba-player-card-head,.nba-player-card-foot,.nba-card-topline{color:var(--muted);font-size:.7rem}
+.nba-player-card-identity{display:flex;align-items:center;gap:11px;min-width:0}
+.nba-player-card-identity img,.nba-player-card-fallback{width:48px;height:48px;flex:none;border-radius:12px;object-fit:cover;background:rgba(255,255,255,.07)}
+.nba-player-card-fallback{display:grid;place-items:center;color:var(--orange);font-weight:900}
+.nba-player-card-identity>span:last-child{display:grid;gap:4px;min-width:0}
+.nba-player-card-identity strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92rem}
+.nba-player-card-identity small{color:var(--muted);font-size:.68rem}
+.nba-player-card-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.nba-player-card-stats>span,.nba-teammate-comparison>span{display:grid;gap:4px;min-width:0;padding:9px 7px;border:1px solid rgba(255,255,255,.055);border-radius:10px;background:rgba(255,255,255,.035)}
+.nba-player-card-stats small,.nba-team-game-stats small,.nba-teammate-comparison small{color:var(--faint);font-size:.6rem;font-weight:800;letter-spacing:.06em}
+.nba-player-card-stats b,.nba-teammate-comparison b{font:700 .9rem var(--mono);font-feature-settings:"tnum"}
+.nba-player-card-stats .is-highlight{border-color:rgba(255,155,84,.25);background:rgba(255,155,84,.08)}
+.nba-player-card-stats .is-highlight b{color:var(--orange)}
+.nba-player-card-foot{padding-top:10px;border-top:1px solid var(--border)}
+.nba-player-card-foot span:last-child{color:var(--orange);font-weight:800}
+.nba-team-game-card,.nba-teammate-card{display:flex;flex-direction:column;gap:11px;min-width:0;padding:14px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(145deg,rgba(22,34,57,.9),rgba(9,15,28,.96));box-shadow:0 8px 22px rgba(0,0,0,.12)}
+.nba-card-topline{flex-wrap:wrap}
+.nba-team-game-result{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.nba-team-game-result>strong{font-size:1.05rem}
+.nba-team-game-result>span{color:var(--muted);font-size:.75rem}
+.nba-team-game-result b{color:var(--text);font:700 1rem var(--mono)}
+.nba-team-game-stats,.nba-teammate-comparison{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.nba-team-game-stats>span{display:grid;gap:4px;padding:8px;border-radius:10px;background:rgba(255,255,255,.035)}
+.nba-team-game-stats b{font:700 .86rem var(--mono)}
+.nba-teammate-card .nba-card-topline strong{color:var(--text);font-size:.88rem}
+.nba-teammate-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;color:var(--muted);font-size:.66rem}
+.nba-prediction-card{overflow:hidden;border:1px solid var(--border);border-radius:18px;background:linear-gradient(145deg,rgba(22,34,57,.98),rgba(8,14,27,.98));box-shadow:0 14px 34px rgba(0,0,0,.2)}
+.analysis-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.analysis-section .analysis-card,.upcoming-game-card,.results-game-card,.props-candidate-card{border-radius:16px;box-shadow:0 9px 24px rgba(0,0,0,.15)}
+.team-impact-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.upcoming-viewbar,.results-display-row{display:none!important}
+@media(max-width:700px){.nba-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.nba-player-card{padding:10px;gap:9px;border-radius:13px}.nba-player-card-identity{gap:7px}.nba-player-card-identity img,.nba-player-card-fallback{width:36px;height:36px;border-radius:9px}.nba-player-card-identity strong{font-size:.76rem}.nba-player-card-identity small{font-size:.58rem}.nba-player-card-stats{gap:4px}.nba-player-card-stats>span{padding:7px 5px}.nba-player-card-stats b{font-size:.73rem}.nba-player-card-stats small{font-size:.53rem}.nba-player-card-head,.nba-player-card-foot{font-size:.61rem}.nba-team-game-card,.nba-teammate-card{padding:10px;border-radius:13px}.nba-teammate-foot{font-size:.59rem}}
+@media(max-width:390px){.nba-card-grid{grid-template-columns:1fr}.nba-player-card-stats b{font-size:.82rem}}
