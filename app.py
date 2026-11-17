@@ -5756,6 +5756,8 @@ def results(
                 "game_date": pd.Timestamp(row.game_date).strftime("%Y-%m-%d"),
                 "home_team": row.home_team,
                 "away_team": row.away_team,
+                "home_score": getattr(row, "home_score", getattr(row, "home_pts", None)),
+                "away_score": getattr(row, "away_score", getattr(row, "away_pts", None)),
                 "total_points": row.total_points,
                 "predicted_total": row.predicted_total,
                 "error": float(row.predicted_total) - float(row.total_points),
