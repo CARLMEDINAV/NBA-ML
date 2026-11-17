@@ -4173,3 +4173,6 @@ touch-action: manipulation;
 .results-outcome.is-push{background:rgba(255,155,84,.13);color:var(--orange)}
 @media(max-width:760px){.results-cards-grid{grid-template-columns:1fr}.results-game-card{padding:13px}.results-card-picks{gap:6px}.results-pick{padding:8px 6px}.results-pick>strong{font-size:.74rem}}
 @media(max-width:380px){.results-matchup{gap:5px}.results-team{gap:4px;font-size:.78rem}.results-team img{width:25px;height:25px}.results-score{gap:4px;font-size:1.05rem}.results-card-total strong{font-size:.8rem}}
+
+/* Respeta el atributo hidden en los dos formatos de Resultados. */
+#resultsCards[hidden], #resultsTableWrap[hidden]{display:none!important}
