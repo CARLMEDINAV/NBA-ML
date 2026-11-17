@@ -117,6 +117,7 @@ ANALYSIS_FEATURES = (
     "opp_pts_exp_away",
     "pace_exp_home",
     "pace_exp_away",
+    "win_rate_diff",
 )
 
 
@@ -160,8 +161,8 @@ def predict_game(
                 gap,
             )
 
-    features = build_feature_row(home_state, away_state)
-    features = features[artifact["features"]]
+    feature_frame = build_feature_row(home_state, away_state)
+    features = feature_frame[artifact["features"]]
     predicted = float(artifact["model"].predict(features)[0])
 
     residuals = np.asarray(artifact["residuals"], dtype=float)
@@ -179,7 +180,11 @@ def predict_game(
     margin_residuals = np.asarray(artifact.get("margin_residuals", []), dtype=float)
     margin_model = artifact.get("margin_model")
     if margin_model is not None:
-        predicted_margin = float(margin_model.predict(features)[0])
+        # El modelo de margen puede usar señales adicionales a las del total.
+        # Compatibilidad: los artefactos antiguos siguen usando sus features originales.
+        margin_features = artifact.get("margin_features", artifact["features"])
+        margin_input = feature_frame[margin_features]
+        predicted_margin = float(margin_model.predict(margin_input)[0])
         projected_home = (predicted + predicted_margin) / 2.0
         projected_away = (predicted - predicted_margin) / 2.0
         model_home_spread = -predicted_margin
