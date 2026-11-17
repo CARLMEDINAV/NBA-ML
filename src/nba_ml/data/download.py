@@ -117,14 +117,8 @@ def download(
                     continue
         frames[season] = frame
 
-    # Incorpora caches históricas aunque no estén en la lista solicitada.
-    for cache in sorted(RAW_DIR.glob("team_game_logs_*.csv")):
-        season = cache.stem.removeprefix("team_game_logs_").replace("_", "-")
-        if season in frames:
-            continue
-        frame = pd.read_csv(cache, dtype={"GAME_ID": str, "SEASON_ID": str})
-        frame["SEASON"] = season
-        frames[season] = frame
+    # Solo se incluyen las temporadas solicitadas. Esto evita que caches
+    # antiguas restauradas por GitHub Actions amplien el historial sin querer.
 
     if not frames:
         raise RuntimeError(
