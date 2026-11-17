@@ -287,6 +287,11 @@ def walk_forward(
     return rows, np.concatenate(residuals) if residuals else np.array([])
 
 
+# El margen/ganador debe reaccionar a la forma reciente de victorias,
+# aunque el modelo de totales mantenga su conjunto de features independiente.
+MARGIN_FEATURES = list(dict.fromkeys([*FEATURES, "win_rate_diff"]))
+
+
 def walk_forward_margin(
     dataset: pd.DataFrame,
     alpha: float = MARGIN_ALPHA,
@@ -303,8 +308,8 @@ def walk_forward_margin(
             continue
 
         model = make_model("ridge", {"model__alpha": alpha})
-        model.fit(train[FEATURES], train[MARGIN_TARGET])
-        predictions = model.predict(test[FEATURES])
+        model.fit(train[MARGIN_FEATURES], train[MARGIN_TARGET])
+        predictions = model.predict(test[MARGIN_FEATURES])
         actual = test[MARGIN_TARGET].to_numpy(dtype=float)
         metrics = regression_metrics(actual, predictions)
         metrics["season"] = season
@@ -321,8 +326,8 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
     development = pd.concat([train_frame, validation_frame], ignore_index=True)
 
     evaluation = make_model("ridge", {"model__alpha": alpha})
-    evaluation.fit(development[FEATURES], development[MARGIN_TARGET])
-    test_predictions = evaluation.predict(test_frame[FEATURES])
+    evaluation.fit(development[MARGIN_FEATURES], development[MARGIN_TARGET])
+    test_predictions = evaluation.predict(test_frame[MARGIN_FEATURES])
     test_actual = test_frame[MARGIN_TARGET].to_numpy(dtype=float)
     test_metrics = regression_metrics(test_actual, test_predictions)
     test_metrics["winner_accuracy"] = float(
@@ -341,7 +346,7 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
     test_table = test_table.rename(columns={"home_margin": "actual_margin"})
 
     production = make_model("ridge", {"model__alpha": alpha})
-    production.fit(dataset[FEATURES], dataset[MARGIN_TARGET])
+    production.fit(dataset[MARGIN_FEATURES], dataset[MARGIN_TARGET])
     return {
         "model": production,
         "residuals": residuals,
@@ -350,6 +355,7 @@ def train_margin_model(dataset: pd.DataFrame, alpha: float = MARGIN_ALPHA) -> di
         "test_predictions": test_table,
         "walk_forward": walk_rows,
         "alpha": alpha,
+        "features": MARGIN_FEATURES,
     }
 
 
@@ -700,6 +706,7 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
             "selection_note": "Modelo elegido por MAE en validacion; test reservado para evaluacion final.",
         },
         "margin_model": margin["model"],
+        "margin_features": margin["features"],
         "margin_residuals": margin["residuals"],
         "margin_sigma": margin["sigma"],
         "margin_test_metrics": margin["test_metrics"],
