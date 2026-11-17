@@ -805,7 +805,6 @@ def train(dataset: pd.DataFrame | None = None) -> dict[str, object]:
         "margin_test_metrics": margin["test_metrics"],
         "margin_walk_forward": margin["walk_forward"],
         "margin_recent_window_test_metrics": margin["recent_window_test_metrics"],
-        "recency_half_life_seasons": RECENCY_HALF_LIFE_SEASONS,
     }
     joblib.dump(artifact, ARTIFACT_PATH)
     LOG.info("Modelo guardado en %s", ARTIFACT_PATH)
