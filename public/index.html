@@ -16,7 +16,7 @@
   <meta name="twitter:description" content="Predicción del total de puntos NBA, hándicap y props de jugadores.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230b1020'/%3E%3Ctext x='16' y='21' font-family='system-ui,sans-serif' font-size='14' font-weight='700' text-anchor='middle' fill='%23f97316'%3ENT%3C/text%3E%3C/svg%3E">
   <link rel="dns-prefetch" href="https://stats.nba.com">
-  <link rel="stylesheet" href="/styles.css?v=20261116-4">
+  <link rel="stylesheet" href="/styles.css?v=20261117-cards1">
 </head>
 <body>
   <div class="page">
@@ -132,7 +132,7 @@
         </div>
         <div id="analysisNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="analysisSummary" aria-live="polite"></div>
-        <div class="table-wrap analysis-table-wrap" tabindex="0" role="region" aria-label="Tabla de análisis por partido. Usa las flechas del teclado para desplazarte horizontalmente.">
+        <div class="table-wrap analysis-table-wrap" hidden tabindex="0" role="region" aria-label="Tabla de análisis por partido. Usa las flechas del teclado para desplazarte horizontalmente.">
           <table class="analysis-table" aria-label="Análisis por partido: proyecciones, ganador y hándicap">
             <thead>
               <tr>
@@ -296,7 +296,8 @@
         <div id="playersNotice" class="notice" role="status" hidden></div>
         <div class="summary-grid" id="playersSummary" aria-live="polite"></div>
         <div class="bars" id="playersBars"></div>
-        <div class="table-wrap">
+        <div id="playersCards" class="nba-card-grid players-cards-grid" aria-live="polite"></div>
+        <div class="table-wrap players-table-wrap" hidden>
           <table aria-label="Jugadores con medias por partido o totales">
             <thead>
               <tr>
@@ -588,7 +589,8 @@
         <div id="teamImpactNotice" class="notice" role="status"></div>
         <div id="teamImpactSummary" class="summary-grid"></div>
         <div id="teamImpactCards" class="team-impact-grid"></div>
-        <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Rival</th><th>Resultado</th><th class="num">PF</th><th class="num">PC</th><th class="num">Total</th><th class="num">MIN</th><th>Participación</th></tr></thead><tbody id="teamImpactGames"></tbody></table></div>
+        <div id="teamImpactGamesCards" class="nba-card-grid team-games-card-grid" aria-live="polite"></div>
+        <div class="table-wrap team-impact-table-wrap" hidden><table><thead><tr><th>Fecha</th><th>Rival</th><th>Resultado</th><th class="num">PF</th><th class="num">PC</th><th class="num">Total</th><th class="num">MIN</th><th>Participación</th></tr></thead><tbody id="teamImpactGames"></tbody></table></div>
         <p class="table-note" id="teamImpactNote">La comparación es descriptiva. Rival, localía, descanso, rotaciones y tamaño de muestra también afectan el resultado.</p>
       <section class="team-impact-secondary">
         <div class="section-head">
@@ -598,7 +600,8 @@
         </div>
         <div id="teammateImpactNotice" class="notice" role="status"></div>
         <div id="teammateImpactSummary" class="summary-grid"></div>
-        <div class="table-wrap"><table><thead><tr><th>Compañero</th><th class="num">PTS con</th><th class="num">PTS sin</th><th class="num">Δ PTS</th><th class="num">MIN con/sin</th><th class="num">AST sin</th><th class="num">REB sin</th><th class="num">USO Δ</th><th class="num">Muestras</th></tr></thead><tbody id="teammateImpactBody"></tbody></table></div>
+        <div id="teammateImpactCards" class="nba-card-grid teammate-card-grid" aria-live="polite"></div>
+        <div class="table-wrap teammate-impact-table-wrap" hidden><table><thead><tr><th>Compañero</th><th class="num">PTS con</th><th class="num">PTS sin</th><th class="num">Δ PTS</th><th class="num">MIN con/sin</th><th class="num">AST sin</th><th class="num">REB sin</th><th class="num">USO Δ</th><th class="num">Muestras</th></tr></thead><tbody id="teammateImpactBody"></tbody></table></div>
         <p class="table-note">Solo aparecen compañeros con al menos 2 partidos en cada grupo. Los partidos de participación parcial se contabilizan aparte y no se confunden con ausencias completas.</p>
       </section>
       </section>
@@ -762,7 +765,7 @@
     <p style="padding:1rem;margin:1rem;border:1px solid #f97316;border-radius:8px;color:#f97316;background:#0b1020;font-family:system-ui,sans-serif">
     </p>
   </noscript>
-  <script src="/app.js?v=20261116-8" defer></script>
+  <script src="/app.js?v=20261117-cards1" defer></script>
   <script src="/bet-builder.js?v=20261111-1" defer></script>
   <script src="/injuries.js?v=20261111-1" defer></script>
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
