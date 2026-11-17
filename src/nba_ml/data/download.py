@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ..config import RAW_DIR, SEASON_TYPE, SEASONS, ensure_directories
+from ..config import CURRENT_SEASON, RAW_DIR, SEASON_TYPE, SEASONS, ensure_directories
 
 LOG = logging.getLogger(__name__)
 
@@ -74,34 +74,50 @@ def download(
     force: bool = False,
     pause: float = 0.6,
 ) -> pd.DataFrame:
-    """Descarga (o lee de cache) las temporadas y escribe el CSV consolidado.
+    """Descarga temporadas disponibles y conserva el cache de las que fallen.
 
-    Parameters
-    ----------
-    seasons:
-        Temporadas a incluir, en formato ``"2024-25"``.
-    force:
-        Si es ``True`` vuelve a descargar aunque exista cache local.
-    pause:
-        Segundos de espera entre peticiones para no saturar la API.
+    Una temporada histórica sin cache no bloquea las demás. Se vuelve a
+    intentar en la siguiente ejecución. La temporada en curso se refresca
+    siempre para incorporar los partidos nuevos; si falla, usa su cache.
     """
     ensure_directories()
     frames: dict[str, pd.DataFrame] = {}
+    missing: list[str] = []
 
     for season in seasons:
         cache = _cache_path(season)
-        if cache.exists() and not force:
+        refresh_current = season == CURRENT_SEASON
+        if cache.exists() and not force and not refresh_current:
             LOG.info("Cache encontrada para %s", season)
             frame = pd.read_csv(cache, dtype={"GAME_ID": str, "SEASON_ID": str})
             frame["SEASON"] = season
         else:
-            frame = fetch_season(season)
-            frame.to_csv(cache, index=False, encoding="utf-8")
-            time.sleep(pause)
+            try:
+                frame = fetch_season(season)
+                frame.to_csv(cache, index=False, encoding="utf-8")
+                time.sleep(pause)
+            except Exception as exc:  # noqa: BLE001 - continuar con otras temporadas
+                if cache.exists():
+                    LOG.warning(
+                        "No se pudo actualizar %s; se conserva el cache local: %s",
+                        season,
+                        exc,
+                    )
+                    frame = pd.read_csv(
+                        cache, dtype={"GAME_ID": str, "SEASON_ID": str}
+                    )
+                    frame["SEASON"] = season
+                else:
+                    missing.append(season)
+                    LOG.error(
+                        "Temporada %s omitida; se reintentará en la próxima ejecución: %s",
+                        season,
+                        exc,
+                    )
+                    continue
         frames[season] = frame
 
-    # El consolidado incluye todas las temporadas cacheadas, de modo que
-    # `download --seasons 2026-27` anade la nueva sin perder el historico.
+    # Incorpora caches históricas aunque no estén en la lista solicitada.
     for cache in sorted(RAW_DIR.glob("team_game_logs_*.csv")):
         season = cache.stem.removeprefix("team_game_logs_").replace("_", "-")
         if season in frames:
@@ -109,6 +125,11 @@ def download(
         frame = pd.read_csv(cache, dtype={"GAME_ID": str, "SEASON_ID": str})
         frame["SEASON"] = season
         frames[season] = frame
+
+    if not frames:
+        raise RuntimeError(
+            "No se pudo obtener ninguna temporada; revisa la conexión con stats.nba.com."
+        )
 
     data = pd.concat(list(frames.values()), ignore_index=True)
     data = _normalize_types(data)
@@ -123,8 +144,14 @@ def download(
         len(frames),
         output,
     )
+    if missing:
+        LOG.warning(
+            "Quedaron %s temporadas sin datos (%s). El pipeline continúa y se "
+            "reintentarán en la próxima ejecución.",
+            len(missing),
+            ", ".join(missing),
+        )
     return data
-
 
 def load_raw() -> pd.DataFrame:
     """Carga el CSV consolidado generado por :func:`download`."""
