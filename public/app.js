@@ -694,6 +694,67 @@ async function loadAnalysis(silent = false) {
 }
 
 
+
+function resultOutcomePill(hit) {
+  if (hit === true) return '<span class="results-outcome is-hit">ACIERTO</span>';
+  if (hit === false) return '<span class="results-outcome is-miss">FALLO</span>';
+  return '<span class="results-outcome is-na">N/D</span>';
+}
+function resultsHandicapGrade(game) {
+  const handicap = String(game.model_handicap || "").trim();
+  const margin = Number(game.actual_margin);
+  if (!handicap || !Number.isFinite(margin)) return null;
+  if (/^pick.?em$/i.test(handicap)) return Math.abs(margin) < 0.0001 ? "push" : "hit";
+  const match = handicap.match(/^(.*?)\s+-([\d.]+)$/);
+  if (!match) return null;
+  const favorite = match[1].trim().toLowerCase();
+  const points = Number(match[2]);
+  if (!Number.isFinite(points)) return null;
+  const isHome = favorite === String(game.home_name || "").trim().toLowerCase();
+  const isAway = favorite === String(game.away_name || "").trim().toLowerCase();
+  if (!isHome && !isAway) return null;
+  const difference = (isHome ? margin : -margin) - points;
+  return Math.abs(difference) < 0.0001 ? "push" : difference > 0 ? "hit" : "miss";
+}
+function resultsCard(game) {
+  const total = Number(game.total_points);
+  const line = Number(game.line);
+  const lean = String(game.model_lean || "").toUpperCase();
+  const overHit = game.hit === 1 ? true : game.hit === 0 ? false : null;
+  const handicapGrade = resultsHandicapGrade(game);
+  const winnerHit = game.possible_winner && game.actual_winner
+    ? String(game.possible_winner).trim().toLowerCase() === String(game.actual_winner).trim().toLowerCase()
+    : null;
+  const handicapHit = handicapGrade === "hit" ? true : handicapGrade === "miss" ? false : null;
+  const handicapOutcome = handicapGrade === "push"
+    ? '<span class="results-outcome is-push">PUSH</span>'
+    : resultOutcomePill(handicapHit);
+  const actualSide = game.actual_result || "—";
+  const predictedSide = lean || "SIN SEÑAL";
+  const homeScore = Number(game.home_score);
+  const awayScore = Number(game.away_score);
+  const scoreMarkup = Number.isFinite(homeScore) && Number.isFinite(awayScore)
+    ? '<strong>' + num(awayScore, 0) + '</strong><span>–</span><strong>' + num(homeScore, 0) + '</strong>'
+    : '<strong>' + esc(game.away_team) + '</strong><span>vs</span><strong>' + esc(game.home_team) + '</strong>';
+  return '<article class="results-game-card">' +
+    '<div class="results-card-head"><span>' + esc(shortDate(game.game_date)) + '</span><span class="results-final-tag">FINAL</span></div>' +
+    '<div class="results-matchup">' +
+      '<div class="results-team results-away">' + upcomingTeamLogo(game.away_team) + '<span>' + esc(game.away_team) + '</span></div>' +
+      '<div class="results-score">' + scoreMarkup + '</div>' +
+      '<div class="results-team results-home">' + upcomingTeamLogo(game.home_team) + '<span>' + esc(game.home_team) + '</span></div>' +
+    '</div>' +
+    '<div class="results-card-total">' +
+      '<span>Total real<strong>' + num(total, 0) + '</strong></span>' +
+      '<span>Proyección<strong>' + num(game.predicted_total, 1) + '</strong></span>' +
+      '<span>Línea<strong>' + (Number.isFinite(line) ? num(line, 1) : "—") + '</strong></span>' +
+    '</div>' +
+    '<div class="results-card-picks">' +
+      '<div class="results-pick"><span class="results-pick-label">OVER / UNDER</span><strong>' + esc(predictedSide) + '</strong><small>Real: ' + esc(actualSide) + '</small>' + resultOutcomePill(overHit) + '</div>' +
+      '<div class="results-pick"><span class="results-pick-label">HÁNDICAP</span><strong>' + esc(game.model_handicap || "Sin proyección") + '</strong><small>Margen real: ' + (game.actual_margin == null ? "—" : signed(game.actual_margin, 1)) + '</small>' + handicapOutcome + '</div>' +
+      '<div class="results-pick"><span class="results-pick-label">GANADOR</span><strong>' + esc(game.possible_winner || "Sin proyección") + '</strong><small>Ganó: ' + esc(game.actual_winner || "—") + '</small>' + resultOutcomePill(winnerHit) + '</div>' +
+    '</div></article>';
+}
+
 async function loadResults(silent = false) {
   // La selección visible es la fuente de verdad: evita consultar 2025-26
   // cuando la interfaz ya muestra 2026-27 (estado antiguo o caché previa).
@@ -757,11 +818,13 @@ async function loadResults(silent = false) {
     $("#resultsEvalNote").textContent = "Brecha = porcentaje OVER observado menos P(over) media. Los rangos con pocos partidos son descriptivos, no evidencia de calibración. Los errores extremos identifican partidos para revisar; no demuestran por sí solos qué variable causó el fallo.";
 
     if (!data.games.length) {
+      $("#resultsCards").innerHTML = "";
       emptyRow(tbody, 11, "Todavía no hay partidos con resultado para esta temporada o filtro.");
       $("#resultsNote").textContent = data.caveat || "";
       return;
     }
 
+    $("#resultsCards").innerHTML = data.games.map(resultsCard).join("");
     tbody.innerHTML = data.games
       .map((game) => {
         const error = Number(game.error);
@@ -2393,6 +2456,19 @@ function bindEvents() {
   }
   $$(".tab").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.tab));
+  });
+  bind("#resultsDisplayToggle", "click", (event) => {
+    const button = event.target.closest("[data-results-display]");
+    if (!button) return;
+    const mode = button.dataset.resultsDisplay;
+    const cards = mode === "cards";
+    $("#resultsCards").hidden = !cards;
+    $("#resultsTableWrap").hidden = cards;
+    $("#resultsDisplayToggle [data-results-display]").forEach((item) => {
+      const active = item.dataset.resultsDisplay === mode;
+      item.classList.toggle("is-active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
   });
   bind("#lineInput", "change", (event) => setLine(event.target.value));
   bind("#lineDown", "click", () => setLine(state.line - 0.5));
