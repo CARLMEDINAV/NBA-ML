@@ -1375,7 +1375,7 @@ function renderPropsAnalyzer() {
   if (results) results.innerHTML =
     buildCard(values.slice(0,5), "ÚLTIMOS 5") +
     buildCard(values.slice(0,10), "ÚLTIMOS 10") +
-    '<section class="props-market-ranking"><div class="props-market-ranking-head"><div><strong>Hit rate por estadística</strong><small>Últimos 10 partidos · línea de referencia del modelo</small></div>' +
+    '<section class="props-market-ranking"><div class="props-market-ranking-head"><div><strong>Hit rate por estadística</strong><small>Últimos 10 partidos · proyección del modelo o media de temporada si no existe</small></div>' +
     (best ? '<span>Mejor mercado: <b>' + esc(best.label) + ' · ' + pct(best.rate) + '</b></span>' : '') +
     '</div><div class="props-rank-grid">' + rankingCards + '</div></section>';
 
