@@ -4227,7 +4227,7 @@ touch-action: manipulation;
 .nba-teammate-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center}
 .nba-teammate-initials{color:var(--muted);font-size:.72rem;font-weight:850}
 .nba-teammate-name{display:grid;gap:3px;min-width:0;flex:1}
-.nba-teammate-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:.84rem}
+.nba-teammate-name strong{display:block;overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere;word-break:normal;color:var(--text);font-size:.84rem;line-height:1.2}
 .nba-teammate-name small{color:var(--faint);font-size:.64rem}
 .nba-teammate-heading .pill{flex:0 0 auto}
 .nba-team-matchup{display:flex;align-items:center;justify-content:center;gap:13px;min-height:66px;padding:7px 0}
@@ -4235,5 +4235,6 @@ touch-action: manipulation;
 .nba-team-logo{position:absolute;inset:5px;width:calc(100% - 10px);height:calc(100% - 10px);object-fit:contain}
 .nba-team-logo-fallback{color:var(--muted);font-size:.58rem;font-weight:900}
 .nba-matchup-vs{color:var(--faint);font-size:.64rem;font-weight:900;letter-spacing:.12em}
-.nba-matchup-opponent{display:none}
-@media(max-width:700px){.nba-teammate-avatar{width:40px;height:40px;flex-basis:40px;border-radius:11px}.nba-teammate-heading{gap:8px}.nba-teammate-name strong{font-size:.76rem}.nba-team-matchup{min-height:58px;gap:10px}.nba-team-logo-wrap{width:42px;height:42px;flex-basis:42px}}
+.nba-team-matchup{flex-wrap:wrap;row-gap:2px}
+.nba-matchup-opponent{display:block;flex:0 0 100%;text-align:center;color:var(--muted);font-size:.68rem;font-weight:700;letter-spacing:.02em}
+@media(max-width:700px){.nba-teammate-avatar{width:40px;height:40px;flex-basis:40px;border-radius:11px}.nba-teammate-heading{gap:8px}.nba-teammate-name strong{font-size:.78rem;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}.nba-team-matchup{min-height:58px;gap:10px}.nba-team-logo-wrap{width:42px;height:42px;flex-basis:42px}}
