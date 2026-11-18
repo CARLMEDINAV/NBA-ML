@@ -2244,7 +2244,7 @@ async function loadTeamImpact() {
     $("#teamImpactGamesCards").innerHTML = (data.games || []).map((game) => {
       const label = game.participation_label || (game.participated ? "Participó" : "Sin participación");
       const detail = game.status_detail ? " · " + game.status_detail : "";
-      const opponentCode = (String(game.opponent || "").match(/\\b[A-Z]{2,3}\\b/g) || []).find((code) => code !== String(team).toUpperCase()) || "";
+      const opponentCode = (String(game.opponent || "").match(/\b[A-Z]{2,3}\b/g) || []).find((code) => code !== String(team).toUpperCase()) || "";
       const matchup = nbaTeamLogoMarkup(team) + '<span class="nba-matchup-vs">VS</span>' + nbaTeamLogoMarkup(opponentCode);
       return '<article class="nba-team-game-card">' +
         '<div class="nba-card-topline"><span>' + esc(numericDate(game.date)) + '</span><span class="pill ' + (game.partial ? "pill-neutral" : game.participated ? "pill-over" : "pill-neutral") + '">' + esc(label) + '</span></div>' +
