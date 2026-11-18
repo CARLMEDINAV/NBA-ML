@@ -4219,3 +4219,21 @@ touch-action: manipulation;
 .upcoming-viewbar,.results-display-row{display:none!important}
 @media(max-width:700px){.nba-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.nba-player-card{padding:10px;gap:9px;border-radius:13px}.nba-player-card-identity{gap:7px}.nba-player-card-identity img,.nba-player-card-fallback{width:36px;height:36px;border-radius:9px}.nba-player-card-identity strong{font-size:.76rem}.nba-player-card-identity small{font-size:.58rem}.nba-player-card-stats{gap:4px}.nba-player-card-stats>span{padding:7px 5px}.nba-player-card-stats b{font-size:.73rem}.nba-player-card-stats small{font-size:.53rem}.nba-player-card-head,.nba-player-card-foot{font-size:.61rem}.nba-team-game-card,.nba-teammate-card{padding:10px;border-radius:13px}.nba-teammate-foot{font-size:.59rem}}
 @media(max-width:390px){.nba-card-grid{grid-template-columns:1fr}.nba-player-card-stats b{font-size:.82rem}}
+
+
+/* NBA Cards · fotos de compañeros y logos de enfrentamientos */
+.nba-teammate-heading{display:flex;align-items:center;gap:10px;min-width:0}
+.nba-teammate-avatar{position:relative;display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;overflow:hidden;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(255,255,255,.025))}
+.nba-teammate-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center}
+.nba-teammate-initials{color:var(--muted);font-size:.72rem;font-weight:850}
+.nba-teammate-name{display:grid;gap:3px;min-width:0;flex:1}
+.nba-teammate-name strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:.84rem}
+.nba-teammate-name small{color:var(--faint);font-size:.64rem}
+.nba-teammate-heading .pill{flex:0 0 auto}
+.nba-team-matchup{display:flex;align-items:center;justify-content:center;gap:13px;min-height:66px;padding:7px 0}
+.nba-team-logo-wrap{position:relative;display:grid;place-items:center;width:48px;height:48px;flex:0 0 48px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.045)}
+.nba-team-logo{position:absolute;inset:5px;width:calc(100% - 10px);height:calc(100% - 10px);object-fit:contain}
+.nba-team-logo-fallback{color:var(--muted);font-size:.58rem;font-weight:900}
+.nba-matchup-vs{color:var(--faint);font-size:.64rem;font-weight:900;letter-spacing:.12em}
+.nba-matchup-opponent{display:none}
+@media(max-width:700px){.nba-teammate-avatar{width:40px;height:40px;flex-basis:40px;border-radius:11px}.nba-teammate-heading{gap:8px}.nba-teammate-name strong{font-size:.76rem}.nba-team-matchup{min-height:58px;gap:10px}.nba-team-logo-wrap{width:42px;height:42px;flex-basis:42px}}
