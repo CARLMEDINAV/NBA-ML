@@ -145,6 +145,23 @@ function numericDate(value) {
   });
 }
 
+const NBA_TEAM_IDS = {
+  ATL:1610612737,BOS:1610612738,CLE:1610612739,NOP:1610612740,CHI:1610612741,DAL:1610612742,DEN:1610612743,GSW:1610612744,HOU:1610612745,LAC:1610612746,LAL:1610612747,MIA:1610612748,MIL:1610612749,MIN:1610612750,BKN:1610612751,NYK:1610612752,ORL:1610612753,IND:1610612754,PHI:1610612755,PHX:1610612756,POR:1610612757,SAC:1610612758,SAS:1610612759,OKC:1610612760,TOR:1610612761,UTA:1610612762,MEM:1610612763,WAS:1610612764,DET:1610612765,CHA:1610612766
+};
+function nbaTeamLogoUrl(team) {
+  const id = NBA_TEAM_IDS[String(team || "").toUpperCase()];
+  return id ? `https://cdn.nba.com/logos/nba/${id}/global/L/logo.svg` : "";
+}
+function nbaTeamLogoMarkup(team, label = "") {
+  const code = String(team || "").toUpperCase();
+  const url = nbaTeamLogoUrl(code);
+  return `<span class="nba-team-logo-wrap" title="${esc(label || code)}"><span class="nba-team-logo-fallback">${esc(code || "NBA")}</span>${url ? `<img class="nba-team-logo" src="${esc(url)}" alt="${esc(label || code)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>`;
+}
+function nbaPlayerHeadshotUrl(playerId) {
+  const id = Number(playerId);
+  return Number.isFinite(id) && id > 0 ? `https://cdn.nba.com/headshots/nba/latest/260x190/${id}.png` : "";
+}
+
 function initials(name) {
   const parts = String(name || "")
     .trim()
@@ -2227,8 +2244,11 @@ async function loadTeamImpact() {
     $("#teamImpactGamesCards").innerHTML = (data.games || []).map((game) => {
       const label = game.participation_label || (game.participated ? "Participó" : "Sin participación");
       const detail = game.status_detail ? " · " + game.status_detail : "";
+      const opponentCode = (String(game.opponent || "").match(/\\b[A-Z]{2,3}\\b/g) || []).find((code) => code !== String(team).toUpperCase()) || "";
+      const matchup = nbaTeamLogoMarkup(team) + '<span class="nba-matchup-vs">VS</span>' + nbaTeamLogoMarkup(opponentCode);
       return '<article class="nba-team-game-card">' +
-        '<div class="nba-card-topline"><span>' + esc(numericDate(game.date)) + ' · ' + esc(game.opponent) + '</span><span class="pill ' + (game.partial ? "pill-neutral" : game.participated ? "pill-over" : "pill-neutral") + '">' + esc(label) + '</span></div>' +
+        '<div class="nba-card-topline"><span>' + esc(numericDate(game.date)) + '</span><span class="pill ' + (game.partial ? "pill-neutral" : game.participated ? "pill-over" : "pill-neutral") + '">' + esc(label) + '</span></div>' +
+        '<div class="nba-team-matchup">' + matchup + '<span class="nba-matchup-opponent">' + esc(game.opponent) + '</span></div>' +
         '<div class="nba-team-game-result"><strong>' + esc(game.result || "—") + '</strong><span>Total <b>' + num(game.game_total) + '</b></span></div>' +
         '<div class="nba-team-game-stats"><span><small>PF</small><b>' + num(game.points_for) + '</b></span><span><small>PC</small><b>' + num(game.points_against) + '</b></span><span><small>MIN</small><b>' + num(game.minutes, 1) + '</b></span></div>' +
         (detail ? '<small class="market-line">' + esc(detail) + '</small>' : '') + '</article>';
@@ -2270,7 +2290,12 @@ async function loadTeammateAbsenceImpact() {
     $("#teammateImpactCards").innerHTML = data.teammates.map((player) => {
       const delta = player.delta_pts == null ? "—" : signed(player.delta_pts, 1);
       const cls = player.delta_pts > 0 ? "pill-over" : player.delta_pts < 0 ? "pill-under" : "pill-neutral";
-      return '<article class="nba-teammate-card"><div class="nba-card-topline"><strong>' + esc(player.name) + '</strong><span class="pill ' + cls + '">' + delta + ' PTS</span></div>' +
+      const headshot = nbaPlayerHeadshotUrl(player.player_id);
+      const avatar = '<span class="nba-teammate-avatar"><span class="nba-teammate-initials">' + esc(initials(player.name)) + '</span>' +
+        (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">' : '') + '</span>';
+      return '<article class="nba-teammate-card"><div class="nba-teammate-heading">' + avatar +
+        '<div class="nba-teammate-name"><strong>' + esc(player.name) + '</strong><small>Compañero · ' + esc(team) + '</small></div>' +
+        '<span class="pill ' + cls + '">' + delta + ' PTS</span></div>' +
         '<div class="nba-teammate-comparison"><span><small>PTS con</small><b>' + num(player.with_star.pts) + '</b></span><span><small>PTS sin</small><b>' + num(player.without_star.pts) + '</b></span><span><small>MIN con/sin</small><b>' + num(player.with_star.min) + ' / ' + num(player.without_star.min) + '</b></span></div>' +
         '<div class="nba-teammate-foot"><span>AST sin ' + num(player.without_star.ast) + ' · REB sin ' + num(player.without_star.reb) + '</span><span>USO ' + signed((player.delta_usage || 0) * 100, 1) + ' pp</span><span>Muestras ' + player.with_star.games + ' / ' + player.without_star.games + '</span></div></article>';
     }).join("");
