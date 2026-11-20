@@ -1946,6 +1946,30 @@ def _predict_for_game(
     return result
 
 
+@lru_cache(maxsize=512)
+def _translate_espn_note_to_spanish(note: str) -> str:
+    """Traduce notas de ESPN al español; conserva el original si falla el servicio."""
+    original = str(note or "").strip()
+    if not original:
+        return original
+    english_markers = (" is expected to ", " is questionable", " is out", " will miss ", " is doubtful", " is probable", " underwent ", " has been ruled ", " is listed as ")
+    if not any(marker in f" {original.lower()} " for marker in english_markers):
+        return original
+    try:
+        response = httpx.get(
+            "https://translate.googleapis.com/translate_a/single",
+            params={"client": "gtx", "sl": "auto", "tl": "es", "dt": "t", "q": original},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=2.5,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        translated = "".join(part[0] for part in payload[0] if part and part[0])
+        return translated.strip() or original
+    except Exception:
+        return original
+
+
 def _injury_report(
     state: pd.DataFrame,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -2092,6 +2116,17 @@ def _injury_report(
                 "role_note": role_note,
             }
             teams[abbreviation]["injuries"].append(injury)
+
+    # Traducir las notas en paralelo para no ralentizar el reporte completo.
+    all_injuries = [injury for team in teams.values() for injury in team["injuries"]]
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        translated_notes = list(executor.map(
+            _translate_espn_note_to_spanish,
+            [str(injury.get("short_comment") or "") for injury in all_injuries],
+        ))
+    for injury, translated in zip(all_injuries, translated_notes):
+        injury["short_comment_original"] = injury.get("short_comment") or ""
+        injury["short_comment"] = translated
 
     report_teams: list[dict[str, Any]] = []
     for team in teams.values():
