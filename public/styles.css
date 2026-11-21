@@ -4238,3 +4238,31 @@ touch-action: manipulation;
 .nba-team-matchup{flex-wrap:wrap;row-gap:2px}
 .nba-matchup-opponent{display:block;flex:0 0 100%;text-align:center;color:var(--muted);font-size:.68rem;font-weight:700;letter-spacing:.02em}
 @media(max-width:700px){.nba-teammate-avatar{width:40px;height:40px;flex-basis:40px;border-radius:11px}.nba-teammate-heading{gap:8px}.nba-teammate-name strong{font-size:.78rem;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}.nba-team-matchup{min-height:58px;gap:10px}.nba-team-logo-wrap{width:42px;height:42px;flex-basis:42px}}
+
+
+/* Favorite-player live scoring alerts */
+.player-alert-trigger{position:absolute;right:clamp(14px,3vw,34px);top:18px;display:grid;place-items:center;width:42px;height:42px;border:1px solid var(--border);border-radius:13px;background:rgba(255,255,255,.06);color:var(--text);font-size:1.05rem;cursor:pointer}
+.player-alert-trigger span{position:absolute;right:-5px;top:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:20px;background:#f97316;color:#fff;font-size:.65rem;font-weight:900;line-height:18px}
+.player-alert-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.72);backdrop-filter:blur(8px)}
+.player-alert-backdrop[hidden]{display:none}
+.player-alert-dialog{width:min(100%,540px);max-height:min(88vh,760px);overflow:auto;padding:22px;border:1px solid var(--border);border-radius:22px;background:var(--panel,#111827);box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.player-alert-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.player-alert-heading h2{margin:2px 0 8px;font-size:1.25rem}
+.player-alert-close{width:36px;height:36px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text);font-size:1.4rem;cursor:pointer}
+.player-alert-search{display:flex;gap:8px;margin:16px 0}
+.player-alert-search input{flex:1;min-width:0;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:rgba(255,255,255,.05);color:var(--text)}
+.player-alert-search button,.player-alert-player button{border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:rgba(255,255,255,.07);color:var(--text);font-weight:750;cursor:pointer}
+.player-alert-dialog h3{display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px;font-size:.88rem}
+.player-alert-results,.player-alert-favorites,.player-alert-feed{display:grid;gap:7px}
+.player-alert-player{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.025)}
+.player-alert-player strong{display:block;font-size:.82rem}
+.player-alert-player small{color:var(--muted);font-size:.68rem}
+.player-alert-player button{font-size:.72rem}
+.player-alert-item{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:rgba(249,115,22,.07)}
+.player-alert-item img{width:38px;height:38px;object-fit:cover;border-radius:50%;background:rgba(255,255,255,.06)}
+.player-alert-item div{flex:1;min-width:0}
+.player-alert-item strong{display:block;font-size:.8rem}
+.player-alert-item small{color:var(--muted);font-size:.68rem}
+.player-alert-item b{color:#fb923c;font:800 .95rem var(--mono)}
+.player-alert-footnote{margin:16px 0 0;color:var(--muted);font-size:.68rem;line-height:1.5}
+@media(max-width:600px){.player-alert-dialog{padding:17px;border-radius:18px}.player-alert-search{flex-direction:column}.player-alert-trigger{top:12px;right:12px;width:38px;height:38px}}
