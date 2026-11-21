@@ -9,7 +9,6 @@
   let feed = [];
   let pollTimer = null;
   let initialized = false;
-  let baselineReady = false;
   let searchTimer = null;
   const activeGames = new Set();
 
@@ -69,13 +68,10 @@
       if (!points) continue;
       cumulative.set(pid, (cumulative.get(pid) || 0) + points);
       const key = String(game.event_id)+":"+String(play.id || "");
-      if (favorites.has(pid) && play.id && !seen.has(key)) favoritePlays.push({key,play,scorer,pid,points});
-    }
-    // On first load, establish a baseline so historical scoring plays do not trigger alerts.
-    if (!baselineReady) {
-      for (const item of favoritePlays) seen.add(item.key);
-      save();
-      return;
+      if (!play.id) continue;
+      const isNew = !seen.has(key);
+      seen.add(key);
+      if (favorites.has(pid) && isNew) favoritePlays.push({key,play,scorer,pid,points});
     }
     for (const item of favoritePlays) {
       seen.add(item.key);
@@ -109,7 +105,6 @@
         activeGames.add(game.event_id);
         try { await pollGame(game); } catch {}
       }
-      baselineReady = true;
     } catch {}
   }
   function start() {
