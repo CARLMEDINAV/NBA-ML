@@ -5831,6 +5831,102 @@ def results(
     )
 
 
+
+
+# ---------------------------------------------------------------------------
+# Live player scoring feed (ESPN). Independent from the prediction pipeline.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/live/games")
+def live_scoring_games() -> JSONResponse:
+    """Returns ESPN event IDs for games currently in progress."""
+    url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    try:
+        response = httpx.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; nba-totals/1.0)", "Accept": "application/json"},
+            timeout=LIVE_TIMEOUT,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        events = response.json().get("events", [])
+    except Exception as error:
+        return _ok({"games": [], "warning": f"No se pudo consultar el marcador en vivo: {error}"})
+
+    games = []
+    for event in events:
+        competitions = event.get("competitions") or []
+        if not competitions:
+            continue
+        competition = competitions[0]
+        status = (event.get("status") or {}).get("type") or {}
+        if status.get("state") != "in":
+            continue
+        competitors = competition.get("competitors") or []
+        home = next((item for item in competitors if item.get("homeAway") == "home"), {})
+        away = next((item for item in competitors if item.get("homeAway") == "away"), {})
+        games.append({
+            "event_id": str(event.get("id") or ""),
+            "name": event.get("name") or event.get("shortName") or "Partido NBA",
+            "status": status.get("shortDetail") or status.get("detail") or "En vivo",
+            "home_team": (home.get("team") or {}).get("abbreviation", ""),
+            "away_team": (away.get("team") or {}).get("abbreviation", ""),
+            "home_score": home.get("score"),
+            "away_score": away.get("score"),
+        })
+    return _ok({"games": games})
+
+
+@app.get("/api/live/plays")
+def live_scoring_plays(event_id: str = Query(..., min_length=5, max_length=20)) -> JSONResponse:
+    """Proxies ESPN's play-by-play feed for a single live game."""
+    url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+    try:
+        response = httpx.get(
+            url,
+            params={"event": event_id},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; nba-totals/1.0)", "Accept": "application/json"},
+            timeout=LIVE_TIMEOUT,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as error:
+        return _ok({"event_id": event_id, "plays": [], "warning": f"No se pudo consultar el relato del partido: {error}"})
+
+    plays = payload.get("plays") or (payload.get("gameInfo") or {}).get("plays") or []
+    output = []
+    for play in plays:
+        if not isinstance(play, dict) or not play.get("scoringPlay"):
+            continue
+        participants = []
+        for participant in play.get("participants") or []:
+            athlete = participant.get("athlete") or {}
+            athlete_id = athlete.get("id") or participant.get("athleteId")
+            if not athlete_id:
+                continue
+            role = participant.get("type")
+            if isinstance(role, dict):
+                role = role.get("text") or role.get("name") or role.get("abbreviation")
+            participants.append({
+                "player_id": str(athlete_id),
+                "player_name": athlete.get("displayName") or athlete.get("fullName") or "",
+                "role": str(role or ""),
+            })
+        output.append({
+            "id": str(play.get("id") or ""),
+            "text": play.get("text") or "",
+            "score_value": play.get("scoreValue"),
+            "home_score": play.get("homeScore"),
+            "away_score": play.get("awayScore"),
+            "clock": (play.get("clock") or {}).get("displayValue") if isinstance(play.get("clock"), dict) else play.get("clock"),
+            "period": (play.get("period") or {}).get("number") if isinstance(play.get("period"), dict) else play.get("period"),
+            "team": (play.get("team") or {}).get("abbreviation") if isinstance(play.get("team"), dict) else play.get("team"),
+            "participants": participants,
+        })
+    return _ok({"event_id": event_id, "plays": output})
+
+
 if PUBLIC_DIR.exists():
     # Debe ir al final: las rutas /api tienen prioridad sobre el mount estatico.
     app.mount("/", StaticFiles(directory=str(PUBLIC_DIR), html=True), name="static")
