@@ -4241,7 +4241,7 @@ touch-action: manipulation;
 
 
 /* Favorite-player live scoring alerts */
-.player-alert-trigger{position:absolute;right:clamp(14px,3vw,34px);top:18px;display:grid;place-items:center;width:42px;height:42px;border:1px solid var(--border);border-radius:13px;background:rgba(255,255,255,.06);color:var(--text);font-size:1.05rem;cursor:pointer}
+.player-alert-trigger{position:absolute;z-index:3;right:clamp(14px,3vw,34px);top:18px;display:grid;place-items:center;width:42px;height:42px;border:1px solid var(--border);border-radius:13px;background:rgba(255,255,255,.06);color:var(--text);font-size:1.05rem;cursor:pointer;pointer-events:auto;touch-action:manipulation}
 .player-alert-trigger span{position:absolute;right:-5px;top:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:20px;background:#f97316;color:#fff;font-size:.65rem;font-weight:900;line-height:18px}
 .player-alert-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.72);backdrop-filter:blur(8px)}
 .player-alert-backdrop[hidden]{display:none}
