@@ -35,6 +35,7 @@
         <span class="brand-status-divider" aria-hidden="true"></span>
         <span>LIVE DATA</span>
       </div>
+      <button type="button" class="player-alert-trigger" id="playerAlertsOpen" aria-label="Alertas de jugadores" title="Alertas de jugadores">🔔<span id="playerAlertsCount" hidden>0</span></button>
     </header>
 
     <section class="panel line-panel" aria-label="Línea de referencia">
@@ -766,8 +767,20 @@
     </p>
   </noscript>
   <script src="/app.js?v=20261118-availability-images" defer></script>
+  <script src="/player-notifications.js?v=1" defer></script>
   <script src="/bet-builder.js?v=20261111-1" defer></script>
   <script src="/injuries.js?v=20261111-1" defer></script>
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
-</body>
+<div class="player-alert-backdrop" id="playerAlertsBackdrop" hidden>
+  <section class="player-alert-dialog" role="dialog" aria-modal="true" aria-labelledby="playerAlertsTitle">
+    <div class="player-alert-heading"><div><p class="eyebrow">NBA TOTALS · LIVE</p><h2 id="playerAlertsTitle">Alertas de jugadores</h2></div><button type="button" id="playerAlertsClose" class="player-alert-close" aria-label="Cerrar">×</button></div>
+    <p class="muted">Elige jugadores y recibe una alerta cuando anoten durante un partido en vivo.</p>
+    <div class="player-alert-search"><input id="playerAlertsSearch" type="search" placeholder="Buscar jugador..." autocomplete="off"><button type="button" id="playerAlertsPermission">Activar avisos</button></div>
+    <div id="playerAlertsResults" class="player-alert-results"></div>
+    <h3>Mis favoritos <span id="playerAlertsFavoriteCount">0</span></h3>
+    <div id="playerAlertsFavorites" class="player-alert-favorites"></div>
+    <h3>Últimas anotaciones</h3><div id="playerAlertsFeed" class="player-alert-feed"><p class="muted">Todavía no hay anotaciones detectadas.</p></div>
+    <p class="player-alert-footnote">Las alertas en tiempo real requieren mantener NBA TOTALS abierto. La disponibilidad y el retraso dependen del feed de ESPN.</p>
+  </section>
+</div></body>
 </html>
