@@ -137,5 +137,6 @@
     renderFavorites();
     if(favorites.size)start();
   }
-  document.addEventListener("DOMContentLoaded",bind);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind, { once: true });
+  else bind();
 })();
