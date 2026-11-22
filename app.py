@@ -5927,6 +5927,218 @@ def live_scoring_plays(event_id: str = Query(..., min_length=5, max_length=20)) 
     return _ok({"event_id": event_id, "plays": output})
 
 
+@app.get("/api/live/player-stats")
+def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
+    """Estadísticas ESPN en vivo y escenarios de producción restantes del jugador."""
+    player_state = _player_state()
+    player_rows = player_state[
+        pd.to_numeric(player_state["player_id"], errors="coerce").eq(player_id)
+    ]
+    if player_rows.empty:
+        raise HTTPException(status_code=404, detail="Jugador no disponible en el estado actual.")
+    player_row = player_rows.iloc[0]
+    team = str(player_row.get("team") or "").upper().strip()
+    player_name = str(player_row.get("player_name") or "")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; nba-totals/1.0)",
+        "Accept": "application/json",
+    }
+    scoreboard_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    try:
+        response = httpx.get(scoreboard_url, headers=headers, timeout=LIVE_TIMEOUT, follow_redirects=True)
+        response.raise_for_status()
+        events = response.json().get("events") or []
+    except Exception as error:
+        return _ok({"available": False, "player_id": player_id, "warning": f"No se pudo consultar ESPN: {error}"})
+
+    def _live_team_key(value: Any) -> str:
+        code = str(value or "").upper().strip()
+        return {"GS": "GSW", "NO": "NOP", "NY": "NYK", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS"}.get(code, code)
+
+    event = None
+    for candidate in events:
+        status = candidate.get("status") or {}
+        status_type = status.get("type") or {}
+        if status_type.get("state") != "in":
+            continue
+        competition = (candidate.get("competitions") or [{}])[0]
+        competitors = competition.get("competitors") or []
+        if any(
+            _live_team_key((item.get("team") or {}).get("abbreviation")) == team
+            for item in competitors
+        ):
+            event = candidate
+            break
+    if event is None:
+        return _ok({"available": False, "player_id": player_id, "player_name": player_name, "message": "El jugador no tiene un partido en vivo en este momento."})
+
+    event_id = str(event.get("id") or "")
+    summary_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+    try:
+        response = httpx.get(summary_url, params={"event": event_id}, headers=headers, timeout=LIVE_TIMEOUT, follow_redirects=True)
+        response.raise_for_status()
+        summary = response.json()
+    except Exception as error:
+        return _ok({"available": False, "player_id": player_id, "warning": f"No se pudo consultar el boxscore: {error}"})
+
+    def _live_name_key(value: Any) -> str:
+        normalized = unicodedata.normalize("NFKD", str(value or ""))
+        return re.sub(r"[^a-z0-9]", "", normalized.encode("ascii", "ignore").decode("ascii").lower())
+
+    found = None
+    for team_block in (summary.get("boxscore") or {}).get("players") or []:
+        block_team = _live_team_key((team_block.get("team") or {}).get("abbreviation"))
+        if block_team != team:
+            continue
+        statistics = (team_block.get("statistics") or [{}])[0]
+        keys = statistics.get("keys") or []
+        for athlete in statistics.get("athletes") or []:
+            athlete_info = athlete.get("athlete") or {}
+            athlete_name = athlete_info.get("displayName") or athlete_info.get("fullName") or ""
+            if _live_name_key(athlete_name) != _live_name_key(player_name):
+                continue
+            found = {
+                "name": athlete_name,
+                "did_not_play": bool(athlete.get("didNotPlay")),
+                "reason": athlete.get("reason") or "",
+                "stats": dict(zip(keys, athlete.get("stats") or [])),
+            }
+            break
+        if found:
+            break
+    if not found:
+        return _ok({"available": False, "player_id": player_id, "player_name": player_name, "game": event.get("shortName"), "message": "ESPN aún no publica estadísticas individuales para este jugador."})
+
+    raw = found["stats"]
+    def _stat_number(key: str) -> float:
+        value = raw.get(key)
+        try:
+            return float(str(value or "0").replace(",", "").strip())
+        except (TypeError, ValueError):
+            return 0.0
+
+    raw_minutes = str(raw.get("minutes") or "0").strip()
+    if ":" in raw_minutes:
+        minute_parts = raw_minutes.split(":", 1)
+        played_minutes = float(minute_parts[0] or 0) + float(minute_parts[1] or 0) / 60
+    else:
+        played_minutes = _stat_number("minutes")
+    three_point_pair = str(raw.get("threePointFieldGoalsMade-threePointFieldGoalsAttempted") or "0-0").split("-", 1)
+    current = {
+        "min": round(played_minutes, 1),
+        "pts": _stat_number("points"),
+        "reb": _stat_number("rebounds"),
+        "ast": _stat_number("assists"),
+        "stl": _stat_number("steals"),
+        "blk": _stat_number("blocks"),
+        "tov": _stat_number("turnovers"),
+        "fg3m": float(three_point_pair[0]) if three_point_pair else 0.0,
+    }
+    current["pra"] = current["pts"] + current["reb"] + current["ast"]
+
+    status = event.get("status") or {}
+    period = int(status.get("period") or 1)
+    clock = str(status.get("displayClock") or "")
+    clock_match = re.search(r"(\d{1,2}):(\d{2})", clock)
+    clock_minutes = (int(clock_match.group(1)) + int(clock_match.group(2)) / 60) if clock_match else 0.0
+    period_length = 12.0
+    periods_remaining = max(0, 4 - period)
+    if period > 4:
+        period_length = 5.0
+        periods_remaining = 0
+    game_minutes_remaining = max(0.0, periods_remaining * 12.0 + clock_minutes)
+    if period > 4:
+        game_minutes_remaining = max(0.0, clock_minutes)
+
+    def _positive(row: pd.Series, key: str) -> float | None:
+        try:
+            value = float(row.get(key))
+            return value if np.isfinite(value) and value > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    season = _players("2026-27", "pergame")
+    season_rows = season[pd.to_numeric(season["player_id"], errors="coerce").eq(player_id)]
+    season_row = season_rows.iloc[0] if not season_rows.empty else pd.Series(dtype=float)
+    season_min = _positive(season_row, "min") or _positive(player_row, "min_roll10") or 30.0
+    roll5_min = _positive(player_row, "min_roll5") or season_min
+    roll10_min = _positive(player_row, "min_roll10") or season_min
+    target_minutes = float(np.clip(0.50 * roll5_min + 0.30 * roll10_min + 0.20 * season_min, 8, 48))
+    expected_remaining = min(max(0.0, target_minutes - played_minutes), game_minutes_remaining)
+    low_remaining = min(game_minutes_remaining, expected_remaining * 0.60)
+    high_remaining = min(game_minutes_remaining, max(expected_remaining * 1.40, expected_remaining + 2.0))
+
+    rates = {}
+    for key, rate_key, season_key in (
+        ("pts", "pts_per_min_roll5", "pts"),
+        ("reb", "reb_per_min_roll5", "reb"),
+        ("ast", "ast_per_min_roll5", "ast"),
+    ):
+        rate = _positive(player_row, rate_key)
+        if rate is None:
+            avg = _positive(season_row, season_key) or 0.0
+            rate = avg / max(season_min, 1.0)
+        rates[key] = max(0.0, float(rate))
+    rates["pra"] = rates["pts"] + rates["reb"] + rates["ast"]
+
+    def _scenario(remaining: float) -> dict[str, float]:
+        result = {"min": round(played_minutes + remaining, 1)}
+        for key in ("pts", "reb", "ast", "pra"):
+            result[key] = round(current[key] + remaining * rates[key], 1)
+        return result
+
+    competition = (event.get("competitions") or [{}])[0]
+    competitors = competition.get("competitors") or []
+    home = next((item for item in competitors if item.get("homeAway") == "home"), {})
+    away = next((item for item in competitors if item.get("homeAway") == "away"), {})
+    return _ok({
+        "available": True,
+        "source": "ESPN boxscore",
+        "updated_at": pd.Timestamp.now(tz="UTC").isoformat(),
+        "player": {"player_id": player_id, "player_name": player_name, "team": team},
+        "game": {
+            "event_id": event_id,
+            "name": event.get("shortName") or event.get("name") or "",
+            "home": (home.get("team") or {}).get("abbreviation", ""),
+            "away": (away.get("team") or {}).get("abbreviation", ""),
+            "home_score": int(float(home.get("score") or 0)),
+            "away_score": int(float(away.get("score") or 0)),
+            "period": period,
+            "clock": clock,
+            "status": (status.get("type") or {}).get("shortDetail") or "",
+        },
+        "current": current,
+        "minutes": {
+            "target": round(target_minutes, 1),
+            "remaining_low": round(low_remaining, 1),
+            "remaining_expected": round(expected_remaining, 1),
+            "remaining_high": round(high_remaining, 1),
+            "game_remaining": round(game_minutes_remaining, 1),
+            "court_status": "No informado por el boxscore de ESPN",
+            "rotation_note": (
+                "La proyección central estima poca participación adicional según sus minutos habituales."
+                if expected_remaining < 1.0
+                else "Participación restante estimada según minutos recientes y de temporada."
+            ),
+        },
+        "scenarios": {
+            "conservative": _scenario(low_remaining),
+            "expected": _scenario(expected_remaining),
+            "optimistic": _scenario(high_remaining),
+        },
+        "rates_per_minute": {key: round(value, 4) for key, value in rates.items()},
+        "pregame_baseline": {
+            "min": round(season_min, 1),
+            "pts": round(_positive(season_row, "pts") or 0.0, 1),
+            "reb": round(_positive(season_row, "reb") or 0.0, 1),
+            "ast": round(_positive(season_row, "ast") or 0.0, 1),
+        },
+        "warning": "Los escenarios son estimaciones, no estadísticas oficiales ni probabilidades calibradas. ESPN no expone de forma fiable si el jugador está actualmente en cancha.",
+    })
+
+
+
+
 if PUBLIC_DIR.exists():
     # Debe ir al final: las rutas /api tienen prioridad sobre el mount estatico.
     app.mount("/", StaticFiles(directory=str(PUBLIC_DIR), html=True), name="static")
