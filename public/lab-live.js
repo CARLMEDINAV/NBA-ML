@@ -52,6 +52,7 @@
     });
   }
   function renderLab(data) {
+    document.dispatchEvent(new CustomEvent("nba:lab-result", { detail: data }));
     const base = data.baseline || {};
     const scenario = data.scenario || {};
     $("#labResult").innerHTML = `
@@ -127,6 +128,7 @@
     }
   }
   function renderLive(data) {
+    document.dispatchEvent(new CustomEvent("nba:live-result", { detail: data }));
     const score = data.score || {};
     const progress = Math.min(100, Math.max(0, Number(data.live_weight || 0) * 100 / 0.85));
     $("#liveResult").innerHTML = `
