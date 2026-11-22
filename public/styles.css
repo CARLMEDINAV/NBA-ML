@@ -4266,3 +4266,24 @@ touch-action: manipulation;
 .player-alert-item b{color:#fb923c;font:800 .95rem var(--mono)}
 .player-alert-footnote{margin:16px 0 0;color:var(--muted);font-size:.68rem;line-height:1.5}
 @media(max-width:600px){.player-alert-dialog{padding:17px;border-radius:18px}.player-alert-search{flex-direction:column}.player-alert-trigger{top:12px;right:12px;width:38px;height:38px}}
+
+/* Live player projection scenarios */
+.live-player-projection{margin:14px 0;padding:14px;border:1px solid var(--border);border-radius:16px;background:rgba(255,255,255,.025)}
+.live-player-projection-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.live-player-projection-head h3{margin:2px 0;font-size:1rem}
+.live-player-projection-head .muted{margin:4px 0 0;font-size:.7rem}
+.live-player-status{font-size:.65rem;font-weight:800;padding:6px 9px;border:1px solid var(--border);border-radius:999px;color:var(--muted);white-space:nowrap}
+.live-player-status.is-live{color:#4ade80;border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.08)}
+.live-player-status.is-warning{color:#fbbf24;border-color:rgba(251,191,36,.3)}
+.live-player-game{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.04);font-weight:800}
+.live-player-game small{display:block;color:var(--muted);font-size:.65rem;font-weight:600}
+.live-player-current,.live-player-scenarios{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}
+.live-player-stat,.live-player-scenario{padding:9px 7px;border:1px solid var(--border);border-radius:11px;min-width:0}
+.live-player-stat small,.live-player-scenario small{display:block;color:var(--muted);font-size:.58rem;font-weight:800}
+.live-player-stat strong,.live-player-scenario strong{display:block;margin-top:4px;font:800 1.05rem var(--mono)}
+.live-player-scenarios{grid-template-columns:repeat(3,minmax(0,1fr))}
+.live-player-scenario b{display:block;margin:5px 0;color:var(--text);font-size:.68rem}
+.live-player-scenario.is-expected{border-color:rgba(249,115,22,.45);background:rgba(249,115,22,.06)}
+.live-player-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;color:var(--muted);font-size:.65rem}
+.live-player-note{margin:10px 0 0;color:var(--muted);font-size:.64rem;line-height:1.5}
+@media(max-width:560px){.live-player-current{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.live-player-stat{padding:7px 4px}.live-player-stat strong{font-size:.9rem}.live-player-scenarios{gap:5px}.live-player-scenario{padding:7px 5px}.live-player-scenario strong{font-size:.88rem}.live-player-projection-head{flex-direction:column}}
