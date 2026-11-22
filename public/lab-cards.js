@@ -28,7 +28,7 @@
   const playerOutput = $("labPlayerCard");
   const unwrap = (payload) => payload?.data && typeof payload.data === "object" ? payload.data : payload;
   const avg = (rows, key) => {
-    const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
+    const values = rows.map((row) => row[key] == null ? NaN : Number(row[key])).filter(Number.isFinite);
     return values.length ? values.reduce((a,b)=>a+b,0)/values.length : null;
   };
   const stat = (value) => value == null || !Number.isFinite(Number(value)) ? "—" : fmt(value);
