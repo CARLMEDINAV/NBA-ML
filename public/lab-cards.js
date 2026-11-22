@@ -64,7 +64,7 @@
     const match = clockText.match(/(\\d{1,2}):(\\d{2})/);
     const remaining = match ? Math.min(12, Number(match[1]) + Number(match[2])/60) : 12;
     const elapsedMinutes = Math.max(0, (Math.min(period,4)-1)*12 + (12-remaining));
-    const fraction = Math.max(0, Math.min(1, elapsedMinutes/48));
+    const fraction = game ? Math.max(0, Math.min(1, elapsedMinutes/48)) : 1;
     const values = [
       ["PTS",projection.pts],["REB",projection.reb],["AST",projection.ast],
       ["MIN",projection.min],["PRA",projection.pra]
