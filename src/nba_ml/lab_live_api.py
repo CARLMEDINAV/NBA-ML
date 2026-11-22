@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+import re
 from typing import Any
 
 import httpx
@@ -163,17 +164,35 @@ def simulate_scenario(payload: LabScenarioIn) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _normalize_live_clock(clock: Any, period: int) -> tuple[str, int]:
+    """Normalize ESPN clocks (M:SS, M:SS.s, or PT#M#S) to MM:SS."""
+    if clock is None:
+        raise ValueError("ESPN no entregó un reloj válido")
+    raw = str(clock).strip()
+    match = re.fullmatch(r"(\d{1,2}):(\d{1,2})(?:\.\d+)?", raw)
+    if match:
+        minutes, seconds = int(match.group(1)), int(match.group(2))
+    else:
+        iso = re.fullmatch(r"PT(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?", raw, re.IGNORECASE)
+        if not iso or (iso.group(1) is None and iso.group(2) is None):
+            raise ValueError(f"Reloj ESPN no reconocido: {raw!r}")
+        minutes = int(iso.group(1) or 0)
+        seconds = int(float(iso.group(2) or 0))
+    if seconds >= 60:
+        raise ValueError("Los segundos del reloj deben ser menores que 60")
+    normalized = f"{minutes:02d}:{seconds:02d}"
+    remaining = minutes * 60 + seconds
+    max_seconds = 12 * 60 if int(period) <= 4 else 5 * 60
+    if remaining > max_seconds:
+        raise ValueError(f"El reloj del período {period} debe estar entre 00:00 y {max_seconds // 60:02d}:00")
+    return normalized, remaining
+
+
 def project_live_total(
     home_score: int, away_score: int, period: int, clock: str, pregame_total: float
 ) -> dict[str, Any]:
     """Blend observed scoring pace with the pregame total; supports overtime."""
-    try:
-        minute_text, second_text = clock.split(":")
-        remaining = int(minute_text) * 60 + int(second_text)
-    except (ValueError, AttributeError) as exc:
-        raise ValueError("Reloj inválido; usa MM:SS") from exc
-    if remaining < 0 or remaining > 12 * 60:
-        raise ValueError("El reloj debe estar entre 00:00 y 12:00")
+    clock, remaining = _normalize_live_clock(clock, period)
 
     if period <= 4:
         elapsed_seconds = (period - 1) * 12 * 60 + (12 * 60 - remaining)
