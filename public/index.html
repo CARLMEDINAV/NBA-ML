@@ -59,6 +59,7 @@
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
+      <button class="tab" role="tab" id="tab-btn-lab-live" aria-selected="false" aria-controls="tab-lab-live" data-tab="lab-live">NBA Lab + Live</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
     </nav>
     <div class="app-shell">
@@ -632,6 +633,58 @@
       </section>
 
       
+      <section id="tab-lab-live" class="tab-panel lab-live-section" role="tabpanel" aria-labelledby="tab-btn-lab-live" hidden>
+        <div class="section-head">
+          <div><p class="eyebrow">NBA TOTALS · NUEVO MÓDULO</p><h2>NBA Lab + Live Predictor</h2><p class="muted">Simula escenarios antes del partido y sigue la proyección del total durante el juego.</p></div>
+        </div>
+        <div class="lab-live-switch" role="tablist" aria-label="Herramientas NBA Lab">
+          <button type="button" class="lab-live-switch-btn is-active" data-lab-view="lab" role="tab" aria-selected="true">NBA Lab</button>
+          <button type="button" class="lab-live-switch-btn" data-lab-view="live" role="tab" aria-selected="false">Live Predictor</button>
+        </div>
+        <section id="labView" class="lab-live-view">
+          <div class="lab-live-intro"><div><p class="eyebrow">SIMULADOR WHAT IF?</p><h3>Construye tu escenario</h3><p class="muted">El Ridge existente vuelve a calcular el partido con cambios de ritmo y eficiencia. Los cambios de minutos son un ajuste explícito, no una predicción automática de rotaciones.</p></div></div>
+          <form id="labScenarioForm" class="lab-form">
+            <label>Equipo local<select id="labHome" required></select></label>
+            <label>Equipo visitante<select id="labAway" required></select></label>
+            <label>Fecha del partido<input id="labDate" type="date" required></label>
+            <label>Línea total (opcional)<input id="labLine" type="number" min="100" max="350" step="0.5" value="225.5"></label>
+            <div class="lab-control"><label for="labPace">Cambio de ritmo (%) <strong id="labPaceValue">0%</strong></label><input id="labPace" type="range" min="-15" max="15" step="1" value="0"></div>
+            <div class="lab-control"><label for="labHomeEff">Eficiencia ofensiva local <strong id="labHomeEffValue">0</strong></label><input id="labHomeEff" type="range" min="-10" max="10" step="1" value="0"></div>
+            <div class="lab-control"><label for="labAwayEff">Eficiencia ofensiva visitante <strong id="labAwayEffValue">0</strong></label><input id="labAwayEff" type="range" min="-10" max="10" step="1" value="0"></div>
+            <div class="lab-control"><label for="labHomeMinutes">Cambio de minutos clave local <strong id="labHomeMinutesValue">0 min</strong></label><input id="labHomeMinutes" type="range" min="-24" max="24" step="1" value="0"></div>
+            <div class="lab-control"><label for="labHomePpm">PTS por minuto local <strong id="labHomePpmValue">0.0</strong></label><input id="labHomePpm" type="range" min="0" max="2" step="0.1" value="0"></div>
+            <div class="lab-control"><label for="labAwayMinutes">Cambio de minutos clave visitante <strong id="labAwayMinutesValue">0 min</strong></label><input id="labAwayMinutes" type="range" min="-24" max="24" step="1" value="0"></div>
+            <div class="lab-control"><label for="labAwayPpm">PTS por minuto visitante <strong id="labAwayPpmValue">0.0</strong></label><input id="labAwayPpm" type="range" min="0" max="2" step="0.1" value="0"></div>
+            <button class="btn btn-primary" type="submit" id="labRun">Simular escenario</button>
+          </form>
+          <div id="labNotice" class="notice" role="status" hidden></div>
+          <div id="labResult" class="lab-result" aria-live="polite"><p class="muted">Selecciona un enfrentamiento y modifica las variables para comenzar.</p></div>
+        </section>
+        <section id="liveView" class="lab-live-view" hidden>
+          <div class="lab-live-intro"><div><p class="eyebrow">EN PARTIDO</p><h3>Proyección dinámica del total</h3><p class="muted">Elige un encuentro en vivo o introduce manualmente el marcador, período y reloj.</p></div><button type="button" class="btn btn-ghost" id="liveRefresh">Actualizar partidos</button></div>
+          <div class="live-mode-switch"><button type="button" class="is-active" data-live-mode="automatic">Automático</button><button type="button" data-live-mode="manual">Manual</button></div>
+          <div id="liveAutomatic">
+            <label>Partido en vivo<select id="liveGameSelect"><option value="">Buscando partidos en vivo…</option></select></label>
+            <label>Total prepartido<input id="livePregameTotal" type="number" min="100" max="350" step="0.5" value="225.5"></label>
+            <label class="lab-check"><input id="liveAutoRefresh" type="checkbox" checked> Actualizar automáticamente cada 15 segundos</label>
+            <button type="button" class="btn btn-primary" id="liveRunAutomatic">Calcular proyección</button>
+          </div>
+          <form id="liveManualForm" class="live-manual-form" hidden>
+            <label>Local<input id="liveHomeTeam" maxlength="8" value="BOS" required></label>
+            <label>Visitante<input id="liveAwayTeam" maxlength="8" value="LAL" required></label>
+            <label>Puntos local<input id="liveHomeScore" type="number" min="0" max="250" value="78" required></label>
+            <label>Puntos visitante<input id="liveAwayScore" type="number" min="0" max="250" value="72" required></label>
+            <label>Período<input id="livePeriod" type="number" min="1" max="10" value="3" required></label>
+            <label>Reloj (MM:SS)<input id="liveClock" pattern="[0-9]{1,2}:[0-9]{2}" value="06:42" required></label>
+            <label>Total prepartido<input id="liveManualPregame" type="number" min="100" max="350" step="0.5" value="225.5" required></label>
+            <button class="btn btn-primary" type="submit">Calcular manualmente</button>
+          </form>
+          <div id="liveNotice" class="notice" role="status" hidden></div>
+          <div id="liveResult" class="live-result" aria-live="polite"><p class="muted">Esperando datos de un partido.</p></div>
+          <p class="table-note">La proyección live combina el ritmo observado con el total prepartido. No es una cuota ni una probabilidad de apuesta calibrada.</p>
+        </section>
+      </section>
+      
     </main>
     </div>
 
@@ -771,6 +824,8 @@
   <script src="/bet-builder.js?v=20261111-1" defer></script>
   <script src="/injuries.js?v=20261111-1" defer></script>
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
+  <link rel="stylesheet" href="/lab-live.css?v=1">
+  <script src="/lab-live.js?v=1" defer></script>
 <div class="player-alert-backdrop" id="playerAlertsBackdrop" hidden>
   <section class="player-alert-dialog" role="dialog" aria-modal="true" aria-labelledby="playerAlertsTitle">
     <div class="player-alert-heading"><div><p class="eyebrow">NBA TOTALS · LIVE</p><h2 id="playerAlertsTitle">Alertas de jugadores</h2></div><button type="button" id="playerAlertsClose" class="player-alert-close" aria-label="Cerrar">×</button></div>
