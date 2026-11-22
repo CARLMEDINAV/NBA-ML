@@ -683,6 +683,28 @@
           <div id="liveResult" class="live-result" aria-live="polite"><p class="muted">Esperando datos de un partido.</p></div>
           <p class="table-note">La proyección live combina el ritmo observado con el total prepartido. No es una cuota ni una probabilidad de apuesta calibrada.</p>
         </section>
+
+        <section class="nba-lab-cards" aria-labelledby="labCardsTitle">
+          <div class="lab-live-intro"><div><p class="eyebrow">NBA CARDS · LAB + LIVE</p><h3 id="labCardsTitle">Centro de tarjetas</h3><p class="muted">Tarjetas de partido, seguimiento live y proyecciones individuales dentro del mismo módulo.</p></div></div>
+          <div class="lab-cards-grid">
+            <article class="lab-card-shell"><div class="lab-card-kicker">GAME CARD · NBA LAB</div><div id="labGameCard" class="lab-card-content"><p class="muted">Ejecuta una simulación en NBA Lab para generar la tarjeta del partido.</p></div></article>
+            <article class="lab-card-shell"><div class="lab-card-kicker">LIVE CARD · LIVE PREDICTOR</div><div id="labLiveCard" class="lab-card-content"><p class="muted">Calcula un partido en vivo para generar su tarjeta dinámica.</p></div></article>
+          </div>
+          <article class="lab-card-shell lab-player-card-shell">
+            <div class="lab-card-kicker">PLAYER CARD · PROYECCIÓN INDIVIDUAL</div>
+            <form id="labPlayerCardForm" class="lab-player-form">
+              <label>Jugador<input id="labCardPlayer" maxlength="60" placeholder="Ej. Luka Doncic" required></label>
+              <label>Equipo<select id="labCardTeam"><option value="ATL">ATL</option><option value="BOS">BOS</option><option value="BKN">BKN</option><option value="CHA">CHA</option><option value="CHI">CHI</option><option value="CLE">CLE</option><option value="DAL">DAL</option><option value="DEN">DEN</option><option value="DET">DET</option><option value="GSW">GSW</option><option value="HOU">HOU</option><option value="IND">IND</option><option value="LAC">LAC</option><option value="LAL">LAL</option><option value="MEM">MEM</option><option value="MIA">MIA</option><option value="MIL">MIL</option><option value="MIN">MIN</option><option value="NOP">NOP</option><option value="NYK">NYK</option><option value="OKC">OKC</option><option value="ORL">ORL</option><option value="PHI">PHI</option><option value="PHX">PHX</option><option value="POR">POR</option><option value="SAC">SAC</option><option value="SAS">SAS</option><option value="TOR">TOR</option><option value="UTA">UTA</option><option value="WAS">WAS</option></select></label>
+              <label>PTS proyectados<input id="labCardPts" type="number" min="0" max="100" step="0.5" value="20.5" required></label>
+              <label>REB proyectados<input id="labCardReb" type="number" min="0" max="40" step="0.5" value="5.5" required></label>
+              <label>AST proyectadas<input id="labCardAst" type="number" min="0" max="40" step="0.5" value="6.5" required></label>
+              <label>Minutos estimados<input id="labCardMin" type="number" min="0" max="60" step="0.5" value="34" required></label>
+              <button class="btn btn-primary" type="submit">Crear Player Card</button>
+            </form>
+            <div id="labPlayerCard" class="lab-card-content"><p class="muted">Completa los datos para crear una ficha individual. Se identifica como entrada manual, no como predicción ML.</p></div>
+          </article>
+          <p class="table-note">Las Player Cards creadas manualmente no se presentan como predicciones del modelo. Las Game Cards y Live Cards reflejan los resultados calculados por NBA Lab y Live Predictor.</p>
+        </section>
       </section>
       
     </main>
@@ -824,8 +846,10 @@
   <script src="/bet-builder.js?v=20261111-1" defer></script>
   <script src="/injuries.js?v=20261111-1" defer></script>
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
-  <link rel="stylesheet" href="/lab-live.css?v=1">
-  <script src="/lab-live.js?v=1" defer></script>
+  <link rel="stylesheet" href="/lab-live.css?v=2">
+  <link rel="stylesheet" href="/lab-cards.css?v=1">
+  <script src="/lab-live.js?v=2" defer></script>
+  <script src="/lab-cards.js?v=1" defer></script>
 <div class="player-alert-backdrop" id="playerAlertsBackdrop" hidden>
   <section class="player-alert-dialog" role="dialog" aria-modal="true" aria-labelledby="playerAlertsTitle">
     <div class="player-alert-heading"><div><p class="eyebrow">NBA TOTALS · LIVE</p><h2 id="playerAlertsTitle">Alertas de jugadores</h2></div><button type="button" id="playerAlertsClose" class="player-alert-close" aria-label="Cerrar">×</button></div>
