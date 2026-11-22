@@ -656,6 +656,10 @@
         <div id="pdLoading" class="pd-loading"><span class="spinner"></span>Cargando ficha…</div>
         <div id="pdContent" hidden>
         <header class="pd-hero" id="pdHero"></header>
+        <section class="pd-card live-player-projection" id="livePlayerProjection" aria-live="polite">
+          <div class="live-player-projection-head"><div><p class="eyebrow">NBA TOTALS · LIVE</p><h3>Live Player Projection</h3><p class="muted">Estadísticas reales y escenarios de producción restante.</p></div><span class="live-player-status" id="livePlayerStatus">Buscando partido…</span></div>
+          <div id="livePlayerProjectionBody"><p class="muted">Consultando partidos en vivo…</p></div>
+        </section>
         <div id="pdNotice" class="notice" role="status" hidden></div>
         <nav class="pd-tabs" id="pdTabs" role="tablist" aria-label="Estadística"></nav>
         <div class="pd-layout">
@@ -767,6 +771,7 @@
     </p>
   </noscript>
   <script src="/app.js?v=20261118-availability-images" defer></script>
+  <script src="/live-player-projection.js?v=1" defer></script>
   <script src="/player-notifications.js?v=2" defer></script>
   <script src="/bet-builder.js?v=20261111-1" defer></script>
   <script src="/injuries.js?v=20261111-1" defer></script>
