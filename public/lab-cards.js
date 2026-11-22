@@ -45,18 +45,66 @@
     livePlayerTimer = null;
     livePlayerToken += 1;
   };
-  const renderLivePlayerStats = (data) => {
-    const s = data.stats || {}, game = data.game || {};
+  const parsePlayerMinutes = (value) => {
+    if (value == null) return 0;
+    const raw = String(value).trim();
+    if (raw.includes(":")) {
+      const [minutes, seconds] = raw.split(":").map(Number);
+      return Number.isFinite(minutes) && Number.isFinite(seconds) ? minutes + seconds / 60 : 0;
+    }
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const renderLivePlayerStats = (data, player, projection) => {
+    const s = data.stats || {}, game = data.game || {}, averages = player.averages || {};
     const stats = [
       ["PTS",s.pts],["REB",s.reb],["AST",s.ast],["MIN",s.min],
       ["3PM",s.fg3m],["STL",s.stl],["BLK",s.blk],["TOV",s.tov]
     ];
     const score = Object.entries(data.score || {}).map(([team,value]) => `${safe(team)} ${fmt(value,0)}`).join(" · ");
+    const currentMin = parsePlayerMinutes(s.min);
+    const projectedMin = Math.max(0, Number(projection.min ?? averages.min ?? 0));
+    const completed = String(game.state || "").toLowerCase() === "post";
+    const remainingMin = completed ? 0 : Math.max(0, projectedMin - currentMin);
+    const metrics = [
+      {key:"pts", label:"PTS", current:Number(s.pts || 0), season:Number(averages.pts || 0), baseline:Number(projection.pts ?? averages.pts ?? 0)},
+      {key:"reb", label:"REB", current:Number(s.reb || 0), season:Number(averages.reb || 0), baseline:Number(projection.reb ?? averages.reb ?? 0)},
+      {key:"ast", label:"AST", current:Number(s.ast || 0), season:Number(averages.ast || 0), baseline:Number(projection.ast ?? averages.ast ?? 0)}
+    ];
+    const remaining = {};
+    const final = {};
+    metrics.forEach(metric => {
+      const perMinute = averages.min > 0 ? metric.season / Number(averages.min) : 0;
+      const rateEstimate = metric.current + perMinute * remainingMin;
+      // Blend the minute-rate estimate with the pregame model as a prior,
+      // while never projecting a final total below the already-recorded stats.
+      const blended = completed ? metric.current : (rateEstimate * 0.7 + metric.baseline * 0.3);
+      final[metric.key] = Math.max(metric.current, blended);
+      remaining[metric.key] = Math.max(0, final[metric.key] - metric.current);
+    });
+    final.pra = final.pts + final.reb + final.ast;
+    remaining.pra = remaining.pts + remaining.reb + remaining.ast;
+    const scoreLine = [
+      ["PTS",metrics[0]],["REB",metrics[1]],["AST",metrics[2]],["PRA",{current:Number(s.pts||0)+Number(s.reb||0)+Number(s.ast||0)}]
+    ];
+    const finalCells = scoreLine.map(([label,item]) => {
+      const key = label.toLowerCase();
+      return `<div><strong>${fmt(final[key],1)}</strong><small>${label} FINAL</small></div>`;
+    }).join("");
+    const remainingCells = scoreLine.map(([label,item]) => {
+      const key = label.toLowerCase();
+      return `<div><strong>+${fmt(remaining[key],1)}</strong><small>${label} RESTANTE</small></div>`;
+    }).join("");
     $("labPlayerLiveStats").innerHTML = `
       <div class="lab-player-live-head"><span class="lab-live-dot"></span> DATOS REALES · EN VIVO · ${safe(game.status || "Partido en curso")} · ${safe(game.clock || "")} · Q${safe(game.period || "")}</div>
       <div class="lab-player-live-score">${score}</div>
       <div class="lab-player-live-grid">${stats.map(([label,value])=>`<div><strong>${safe(value ?? "—")}</strong><small>${label}</small></div>`).join("")}</div>
-      <p class="lab-card-foot">Estadísticas oficiales disponibles en ESPN · Actualizado: ${safe(data.updated_at || "—")}</p>`;
+      <div class="lab-card-kicker" style="margin-top:12px">PROYECCIÓN FINAL ESTIMADA</div>
+      <div class="lab-player-live-grid">${finalCells}</div>
+      <div class="lab-card-kicker" style="margin-top:12px">APORTE RESTANTE ESTIMADO</div>
+      <div class="lab-player-live-grid">${remainingCells}</div>
+      <p class="lab-card-foot">Proyección dinámica: estadísticas oficiales actuales + aporte esperado según minutos restantes estimados y promedios de temporada, combinados con el modelo prepartido. Minutos restantes estimados: ${fmt(remainingMin,1)}. No son datos oficiales ni una garantía.</p>
+      <p class="lab-card-foot">ESPN · Actualizado: ${safe(data.updated_at || "—")}</p>`;
   };
   const renderEstimatedLivePlayerStats = (player, projection, game, note) => {
     const period = Math.max(1, Number(game?.period || 1));
@@ -101,7 +149,7 @@
         }
         throw new Error(payload.detail || "No se pudieron recuperar estadísticas live");
       }
-      if (token === livePlayerToken) renderLivePlayerStats(payload);
+      if (token === livePlayerToken) renderLivePlayerStats(payload, player, projection);
     } catch(error) {
       if (token === livePlayerToken) {
         renderEstimatedLivePlayerStats(player, projection, null,
