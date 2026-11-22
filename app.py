@@ -5960,7 +5960,7 @@ def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
         competition = (candidate.get("competitions") or [{}])[0]
         competitors = competition.get("competitors") or []
         if any(
-            str((item.get("team") or {}).get("abbreviation") or "").upper() == team
+            _live_team_key((item.get("team") or {}).get("abbreviation")) == team
             for item in competitors
         ):
             event = candidate
@@ -5981,9 +5981,13 @@ def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
         normalized = unicodedata.normalize("NFKD", str(value or ""))
         return re.sub(r"[^a-z0-9]", "", normalized.encode("ascii", "ignore").decode("ascii").lower())
 
+    def _live_team_key(value: Any) -> str:
+        code = str(value or "").upper().strip()
+        return {"GS": "GSW", "NO": "NOP", "NY": "NYK", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS"}.get(code, code)
+
     found = None
     for team_block in (summary.get("boxscore") or {}).get("players") or []:
-        block_team = str((team_block.get("team") or {}).get("abbreviation") or "").upper()
+        block_team = _live_team_key((team_block.get("team") or {}).get("abbreviation"))
         if block_team != team:
             continue
         statistics = (team_block.get("statistics") or [{}])[0]
@@ -6019,6 +6023,7 @@ def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
         played_minutes = float(minute_parts[0] or 0) + float(minute_parts[1] or 0) / 60
     else:
         played_minutes = _stat_number("minutes")
+    three_point_pair = str(raw.get("threePointFieldGoalsMade-threePointFieldGoalsAttempted") or "0-0").split("-", 1)
     current = {
         "min": round(played_minutes, 1),
         "pts": _stat_number("points"),
@@ -6027,7 +6032,7 @@ def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
         "stl": _stat_number("steals"),
         "blk": _stat_number("blocks"),
         "tov": _stat_number("turnovers"),
-        "fg3m": _stat_number("threePointFieldGoalsMade"),
+        "fg3m": float(three_point_pair[0]) if three_point_pair else 0.0,
     }
     current["pra"] = current["pts"] + current["reb"] + current["ast"]
 
