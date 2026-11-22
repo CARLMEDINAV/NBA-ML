@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
+import unicodedata
 from typing import Any
 
 import httpx
@@ -21,7 +23,15 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def _parse_player_stats(summary: dict[str, Any], player_id: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+def _normalize_name(value: Any) -> str:
+    raw = unicodedata.normalize("NFKD", str(value or ""))
+    raw = "".join(char for char in raw if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]", "", raw.lower())
+
+
+def _parse_player_stats(
+    summary: dict[str, Any], player_id: str, player_name: str | None = None
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     boxscore = summary.get("boxscore") or {}
     players = boxscore.get("players") or []
     for team_block in players:
@@ -30,7 +40,11 @@ def _parse_player_stats(summary: dict[str, Any], player_id: str) -> tuple[dict[s
             names = [str(name).upper() for name in (category.get("names") or category.get("labels") or [])]
             for athlete_row in category.get("athletes") or []:
                 athlete = athlete_row.get("athlete") or {}
-                if str(athlete.get("id") or athlete_row.get("athleteId") or "") != player_id:
+                espn_id = str(athlete.get("id") or athlete_row.get("athleteId") or "")
+                espn_name = athlete.get("displayName") or athlete.get("fullName") or athlete.get("name") or athlete_row.get("displayName") or ""
+                id_match = bool(player_id and espn_id == player_id)
+                name_match = bool(player_name and _normalize_name(espn_name) == _normalize_name(player_name))
+                if not (id_match or name_match):
                     continue
                 raw = athlete_row.get("stats") or []
                 values = {name: raw[index] if index < len(raw) else None for index, name in enumerate(names)}
@@ -59,7 +73,8 @@ def _parse_player_stats(summary: dict[str, Any], player_id: str) -> tuple[dict[s
 
 @router.get("/api/live/player-stats")
 def live_player_stats(
-    player_id: str = Query(..., min_length=1, max_length=20),
+    player_id: str = Query("", max_length=20),
+    player_name: str | None = Query(None, min_length=2, max_length=80),
     event_id: str = Query(..., min_length=5, max_length=20),
 ) -> dict[str, Any]:
     """Return current ESPN box-score stats for one player in one live game."""
@@ -73,9 +88,12 @@ def live_player_stats(
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"No se pudo consultar el box score ESPN: {exc}") from exc
 
-    stats, team = _parse_player_stats(summary, player_id)
+    if not player_id and not player_name:
+        raise HTTPException(status_code=422, detail="Debes indicar player_id o player_name.")
+    stats, team = _parse_player_stats(summary, player_id, player_name)
     if stats is None:
-        raise HTTPException(status_code=404, detail="El jugador todavía no aparece en el box score de este partido.")
+        raise HTTPException(status_code=404, detail="ESPN aún no publica estadísticas de este jugador en el box score del partido.")
+    player_id = player_id or ""
     header = summary.get("header") or {}
     competitions = header.get("competitions") or []
     competition = competitions[0] if competitions else {}
