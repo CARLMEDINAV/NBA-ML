@@ -5951,6 +5951,10 @@ def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
     except Exception as error:
         return _ok({"available": False, "player_id": player_id, "warning": f"No se pudo consultar ESPN: {error}"})
 
+    def _live_team_key(value: Any) -> str:
+        code = str(value or "").upper().strip()
+        return {"GS": "GSW", "NO": "NOP", "NY": "NYK", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS"}.get(code, code)
+
     event = None
     for candidate in events:
         status = candidate.get("status") or {}
@@ -5980,10 +5984,6 @@ def live_player_stats(player_id: int = Query(..., ge=1)) -> JSONResponse:
     def _live_name_key(value: Any) -> str:
         normalized = unicodedata.normalize("NFKD", str(value or ""))
         return re.sub(r"[^a-z0-9]", "", normalized.encode("ascii", "ignore").decode("ascii").lower())
-
-    def _live_team_key(value: Any) -> str:
-        code = str(value or "").upper().strip()
-        return {"GS": "GSW", "NO": "NOP", "NY": "NYK", "SA": "SAS", "UTAH": "UTA", "WSH": "WAS"}.get(code, code)
 
     found = None
     for team_block in (summary.get("boxscore") or {}).get("players") or []:
