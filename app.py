@@ -61,6 +61,7 @@ from nba_ml.models.player_props import (
 )
 from nba_ml.models.predict import load_artifact, load_team_state, predict_game
 from nba_ml.models.results import add_over_under, summarize_results
+from nba_ml.lab_live_api import router as lab_live_router
 
 AVAILABLE_SEASONS = ("2025-26", "2026-27")
 PLAYER_MODES = {"pergame": "pergame", "totals": "totals"}
@@ -242,6 +243,8 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+app.include_router(lab_live_router)
 
 
 # ---------------------------------------------------------------------------
