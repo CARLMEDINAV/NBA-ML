@@ -98,12 +98,13 @@ def simulate_scenario(payload: LabScenarioIn) -> dict[str, Any]:
         if "off_rtg_roll10" in away:
             away["off_rtg_roll10"] = float(away["off_rtg_roll10"]) + payload.away_off_rating_delta
 
-        features = build_feature_row(home, away)[artifact["features"]]
+        feature_frame = build_feature_row(home, away)
+        features = feature_frame[artifact["features"]]
         total_before_player_overlay = float(artifact["model"].predict(features)[0])
         margin_model = artifact.get("margin_model")
         margin_features = artifact.get("margin_features", artifact["features"])
         if margin_model is not None:
-            margin = float(margin_model.predict(features[margin_features])[0])
+            margin = float(margin_model.predict(feature_frame[margin_features])[0])
         else:
             margin = float(baseline.get("predicted_margin") or 0.0)
 
@@ -111,8 +112,8 @@ def simulate_scenario(payload: LabScenarioIn) -> dict[str, Any]:
         away_score = (total_before_player_overlay - margin) / 2.0
         home_player_delta = _minute_points(payload.home_minutes_delta, payload.home_points_per_minute)
         away_player_delta = _minute_points(payload.away_minutes_delta, payload.away_points_per_minute)
-        home_score += home_player_delta
-        away_score += away_player_delta
+        home_score = max(0.0, home_score + home_player_delta)
+        away_score = max(0.0, away_score + away_player_delta)
         simulated_total = home_score + away_score
         simulated_margin = home_score - away_score
 
