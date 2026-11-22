@@ -53,12 +53,30 @@
     ];
     const score = Object.entries(data.score || {}).map(([team,value]) => `${safe(team)} ${fmt(value,0)}`).join(" · ");
     $("labPlayerLiveStats").innerHTML = `
-      <div class="lab-player-live-head"><span class="lab-live-dot"></span> EN VIVO · ${safe(game.status || "Partido en curso")} · ${safe(game.clock || "")} · Q${safe(game.period || "")}</div>
+      <div class="lab-player-live-head"><span class="lab-live-dot"></span> DATOS REALES · EN VIVO · ${safe(game.status || "Partido en curso")} · ${safe(game.clock || "")} · Q${safe(game.period || "")}</div>
       <div class="lab-player-live-score">${score}</div>
       <div class="lab-player-live-grid">${stats.map(([label,value])=>`<div><strong>${safe(value ?? "—")}</strong><small>${label}</small></div>`).join("")}</div>
-      <p class="lab-card-foot">Datos del box score de ESPN · Actualizado: ${safe(data.updated_at || "—")}</p>`;
+      <p class="lab-card-foot">Estadísticas oficiales disponibles en ESPN · Actualizado: ${safe(data.updated_at || "—")}</p>`;
   };
-  const refreshLivePlayerStats = async (player, token) => {
+  const renderEstimatedLivePlayerStats = (player, projection, game, note) => {
+    const period = Math.max(1, Number(game?.period || 1));
+    const clockText = String(game?.clock || "12:00");
+    const match = clockText.match(/(\\d{1,2}):(\\d{2})/);
+    const remaining = match ? Math.min(12, Number(match[1]) + Number(match[2])/60) : 12;
+    const elapsedMinutes = Math.max(0, (Math.min(period,4)-1)*12 + (12-remaining));
+    const fraction = Math.max(0, Math.min(1, elapsedMinutes/48));
+    const values = [
+      ["PTS",projection.pts],["REB",projection.reb],["AST",projection.ast],
+      ["MIN",projection.min],["PRA",projection.pra]
+    ];
+    const score = game ? `${safe(game.away_team)} ${fmt(game.away_score,0)} · ${safe(game.home_team)} ${fmt(game.home_score,0)}` : "";
+    $("labPlayerLiveStats").innerHTML = `
+      <div class="lab-player-live-head"><span class="lab-live-dot"></span> ESTIMACIÓN DEL MODELO · ${game ? `EN VIVO · Q${safe(period)} · ${safe(clockText)}` : "PROYECCIÓN BASE"}</div>
+      ${score ? `<div class="lab-player-live-score">${score}</div>` : ""}
+      <div class="lab-player-live-grid">${values.map(([label,value])=>`<div><strong>${value == null ? "—" : fmt(Number(value)*fraction,1)}</strong><small>${label}</small></div>`).join("")}</div>
+      <p class="lab-card-foot">${safe(note || "Estimación acumulada proporcional al tiempo transcurrido, calculada desde la proyección completa del jugador. No son estadísticas oficiales ni confirma que el jugador esté en cancha.")}</p>`;
+  };
+  const refreshLivePlayerStats = async (player, projection, token) => {
     if (token !== livePlayerToken) return;
     const target = $("labPlayerLiveStats");
     try {
@@ -69,29 +87,34 @@
         String(item.home_team || "").toUpperCase() === team || String(item.away_team || "").toUpperCase() === team
       );
       if (!game) {
-        target.innerHTML = '<p class="lab-card-foot">Sin partido en vivo para este jugador. La tarjeta comprobará nuevamente en 15 segundos.</p>';
+        renderEstimatedLivePlayerStats(player, projection, null,
+          "No hay partido en vivo asociado al equipo del jugador. Se muestra la proyección completa del modelo; no son estadísticas observadas.");
         return;
       }
       const response = await fetch(`/api/live/player-stats?player_id=${encodeURIComponent(player.player_id || "")}&player_name=${encodeURIComponent(player.player_name || "")}&event_id=${encodeURIComponent(game.event_id)}`,{headers:{Accept:"application/json"}});
       const payload = unwrap(await response.json());
       if (!response.ok) {
         if (response.status === 404) {
-          target.innerHTML = '<p class="lab-card-foot">Partido en vivo detectado; esperando que el jugador aparezca en el box score de ESPN.</p>';
+          renderEstimatedLivePlayerStats(player, projection, game,
+            "ESPN todavía no entrega una línea individual para este jugador. Se estima el acumulado según el tiempo transcurrido y la proyección del modelo; no son datos oficiales.");
           return;
         }
         throw new Error(payload.detail || "No se pudieron recuperar estadísticas live");
       }
       if (token === livePlayerToken) renderLivePlayerStats(payload);
     } catch(error) {
-      if (token === livePlayerToken) target.innerHTML = `<p class="lab-card-foot">Estadísticas live no disponibles: ${safe(error.message)}</p>`;
+      if (token === livePlayerToken) {
+        renderEstimatedLivePlayerStats(player, projection, null,
+          `No se pudieron recuperar datos oficiales (${error.message}). Se muestra una estimación basada en el modelo, no estadísticas reales.`);
+      }
     }
   };
-  const startLivePlayerPolling = (player) => {
+  const startLivePlayerPolling = (player, projection) => {
     stopLivePlayerPolling();
     const token = livePlayerToken;
-    $("labPlayerLiveStats").innerHTML = '<p class="lab-card-foot">Buscando partido en vivo y box score de ESPN…</p>';
-    refreshLivePlayerStats(player, token);
-    livePlayerTimer = window.setInterval(() => refreshLivePlayerStats(player, token), 15000);
+    $("labPlayerLiveStats").innerHTML = '<p class="lab-card-foot">Calculando estadísticas estimadas y consultando datos oficiales…</p>';
+    refreshLivePlayerStats(player, projection, token);
+    livePlayerTimer = window.setInterval(() => refreshLivePlayerStats(player, projection, token), 15000);
   };
 
   const renderPlayerCard = (data) => {
@@ -126,7 +149,7 @@
       <div class="lab-card-kicker">ÚLTIMOS PARTIDOS</div>
       <div class="lab-player-log-wrap"><table class="lab-player-log"><thead><tr><th>Fecha</th><th>Rival</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>PRA</th></tr></thead><tbody>${rows || '<tr><td colspan="7">Sin historial disponible</td></tr>'}</tbody></table></div>
       <p class="lab-card-foot">${safe(data.note || "Proyección estadística; puede cambiar con lesiones, minutos y alineaciones.")}</p>`;
-    startLivePlayerPolling(player);
+    startLivePlayerPolling(player, projection);
     playerOutput.querySelectorAll("[data-player-line]").forEach(input => input.addEventListener("input", () => {
       const lines = [...playerOutput.querySelectorAll("[data-player-line]")].filter(item=>item.value.trim()!=="");
       $("labPlayerLineResults").innerHTML = lines.length ? lines.map(item=>{
