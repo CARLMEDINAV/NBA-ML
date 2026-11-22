@@ -72,7 +72,7 @@
         target.innerHTML = '<p class="lab-card-foot">Sin partido en vivo para este jugador. La tarjeta comprobará nuevamente en 15 segundos.</p>';
         return;
       }
-      const response = await fetch(`/api/live/player-stats?player_id=${encodeURIComponent(player.player_id)}&event_id=${encodeURIComponent(game.event_id)}`,{headers:{Accept:"application/json"}});
+      const response = await fetch(`/api/live/player-stats?player_id=${encodeURIComponent(player.player_id || "")}&player_name=${encodeURIComponent(player.player_name || "")}&event_id=${encodeURIComponent(game.event_id)}`,{headers:{Accept:"application/json"}});
       const payload = unwrap(await response.json());
       if (!response.ok) {
         if (response.status === 404) {
