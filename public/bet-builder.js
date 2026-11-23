@@ -582,7 +582,9 @@
       : "";
     const players = renderPlayerRecommendations(event);
     const status = event.status && event.status !== "Programado" ? event.status : "";
-    const meta = [shortDate(event.date), event.time_et ? `${event.time_et} ET` : "", status]
+    const localDate = window.NBATime?.date(event.date, event.time_et) || event.date;
+    const localTime = window.NBATime?.time(event.date, event.time_et) || event.time_et;
+    const meta = [shortDate(localDate), localTime ? `${localTime} Chile` : "", status]
       .filter(Boolean)
       .map(esc)
       .join(" · ");
