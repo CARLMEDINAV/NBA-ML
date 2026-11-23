@@ -125,6 +125,71 @@ function winProbabilityCell(game) {
   </div>`;
 }
 
+
+const NBA_DISPLAY_TIME_ZONE = "America/Santiago";
+const NBA_SOURCE_TIME_ZONE = "America/New_York";
+const nbaSourceTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: NBA_SOURCE_TIME_ZONE,
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+const nbaChileTimeFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: NBA_DISPLAY_TIME_ZONE,
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+
+function nbaChileGameDateTime(dateValue, timeValue) {
+  if (!dateValue || !timeValue) return null;
+  const dateMatch = String(dateValue).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = String(timeValue).match(/^(\d{1,2}):(\d{2})/);
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2]);
+  if (hour > 23 || minute > 59) return null;
+
+  const targetUtc = Date.UTC(Number(year), Number(month) - 1, Number(day), hour, minute);
+  let instant = targetUtc;
+
+  // Interpret the schedule's local Eastern time correctly across EST/EDT.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const parts = Object.fromEntries(
+      nbaSourceTimeFormatter.formatToParts(new Date(instant))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, Number(part.value)]),
+    );
+    const representedUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+    const correction = targetUtc - representedUtc;
+    instant += correction;
+    if (correction === 0) break;
+  }
+
+  const chileParts = Object.fromEntries(
+    nbaChileTimeFormatter.formatToParts(new Date(instant))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return {
+    date: `${chileParts.year}-${chileParts.month}-${chileParts.day}`,
+    time: `${chileParts.hour}:${chileParts.minute}`,
+  };
+}
+
+function chileGameDate(dateValue, timeValue) {
+  return nbaChileGameDateTime(dateValue, timeValue)?.date || dateValue;
+}
+
+function chileGameTime(dateValue, timeValue) {
+  return nbaChileGameDateTime(dateValue, timeValue)?.time || timeValue || "";
+}
+
+window.NBATime = {
+  date: chileGameDate,
+  time: chileGameTime,
+};
+
 function shortDate(value) {
   if (!value) return "—";
   const date = new Date(`${value}T12:00:00`);
@@ -493,7 +558,7 @@ function upcomingCard(game) {
   const raw = Number(game.probability_over);
   const probability = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw > 1 ? raw / 100 : raw)) : null;
   const width = probability === null ? 0 : Math.round(probability * 100);
-  return '<article class="upcoming-game-card signal-' + tone + '"><div class="upcoming-card-top"><span>' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + '</span><span class="pill ' + (tone === "over" ? "pill-over" : tone === "under" ? "pill-under" : "pill-neutral") + '">' + esc(side || "NEUTRAL") + '</span></div>' +
+  return '<article class="upcoming-game-card signal-' + tone + '"><div class="upcoming-card-top"><span>' + esc(shortDate(chileGameDate(game.date, game.time_et))) + ' · ' + esc(chileGameTime(game.date, game.time_et) || "Hora por confirmar") + '</span><span class="pill ' + (tone === "over" ? "pill-over" : tone === "under" ? "pill-under" : "pill-neutral") + '">' + esc(side || "NEUTRAL") + '</span></div>' +
     '<div class="upcoming-matchup"><div class="upcoming-team">' + upcomingTeamLogo(game.away) + '<strong>' + esc(game.away || "Visitante") + '</strong><small>VISITANTE</small></div><span class="upcoming-at">@</span><div class="upcoming-team">' + upcomingTeamLogo(game.home) + '<strong>' + esc(game.home || "Local") + '</strong><small>LOCAL</small></div></div>' +
     '<div class="upcoming-total"><span>Total proyectado</span><strong>' + num(game.predicted_total) + '</strong></div><div class="upcoming-card-stats"><div><small>IC 80%</small><strong>' + num(game.interval_low,0) + "–" + num(game.interval_high,0) + '</strong></div><div><small>P(over)</small><strong>' + pct(game.probability_over) + '</strong></div><div><small>Hándicap</small><strong>' + esc(game.model_handicap || "—") + '</strong></div></div>' +
     '<div class="upcoming-probability"><div><span>Probabilidad OVER</span><b>' + (probability === null ? "—" : width + "%") + '</b></div><div class="upcoming-probability-track"><i style="width:' + width + '%"></i></div></div></article>';
@@ -547,8 +612,8 @@ async function loadUpcoming(silent = false) {
       .map(
         (game) => `
         <tr>
-          <td>${esc(shortDate(game.date))}</td>
-          <td>${esc(game.time_et || "—")}</td>
+          <td>${esc(shortDate(chileGameDate(game.date, game.time_et)))}</td>
+          <td>${esc(chileGameTime(game.date, game.time_et) || "—")}</td>
           <td><span class="team">${esc(game.away)}</span> <span class="vs">@</span> <span class="team">${esc(game.home)}</span></td>
           <td class="num">${num(game.predicted_total)}</td>
           <td>${num(game.interval_low, 0)} – ${num(game.interval_high, 0)}</td>
@@ -638,7 +703,7 @@ async function loadAnalysis(silent = false) {
         return `
         <tr>
           <td>${esc(numericDate(game.date))}</td>
-          <td>${esc(game.time_et || "—")}</td>
+          <td>${esc(chileGameTime(game.date, game.time_et) || "—")}</td>
           <td><span class="team">${esc(game.home_name || game.home)}</span></td>
           <td><span class="team">${esc(game.away_name || game.away)}</span></td>
           <td class="num">${num(game.projected_home_score)}</td>
@@ -669,7 +734,7 @@ async function loadAnalysis(silent = false) {
         <article class="analysis-card">
           <div class="analysis-card-head">
             <div>
-              <span class="analysis-date">${esc(shortDate(game.date))} · ${esc(game.time_et || "hora por confirmar")}</span>
+              <span class="analysis-date">${esc(shortDate(chileGameDate(game.date, game.time_et)))} · ${esc(game.time_et || "hora por confirmar")}</span>
               <h3>${esc(game.home_name || game.home)} <span class="vs">vs</span> ${esc(game.away_name || game.away)}</h3>
             </div>
             ${leanPill(side)}
@@ -992,7 +1057,7 @@ async function loadModelComparison(silent = false) {
     const rows = data.predictions || [];
     $("#modelComparisonPredictionsBody").innerHTML = rows.length ? rows.map(game => {
       const cells = keys.map(key => { const item = game.models?.[key]; return item ? `<td class="num">${num(item.predicted, 1)} <small class="muted">(${signed(item.error, 1)})</small></td>` : '<td class="num">—</td>'; }).join("");
-      return `<tr><td>${esc(shortDate(game.date))}</td><td>${esc(game.matchup)}</td><td class="num">${num(game.actual, 1)}</td>${cells}</tr>`;
+      return `<tr><td>${esc(shortDate(chileGameDate(game.date, game.time_et)))}</td><td>${esc(game.matchup)}</td><td class="num">${num(game.actual, 1)}</td>${cells}</tr>`;
     }).join("") : '<tr><td colspan="6">No hay predicciones individuales exportadas. Ejecuta entrenamiento y exportación de artefactos.</td></tr>';
     const diagnostics = data.diagnostics || {};
     const diagnosticModels = diagnostics.models || [];
@@ -1316,7 +1381,7 @@ function populatePropsGameFilters() {
     .sort((a, b) => String(a.time_et || "").localeCompare(String(b.time_et || "")));
   const previousGame = state.props.gameId || gameSelect.value || "";
   gameSelect.innerHTML = '<option value="">Todos los partidos</option>' + uniqueGames.map((game) =>
-    '<option value="' + esc(game.game_id) + '">' + esc((game.away || "—") + " @ " + (game.home || "—")) + ' · ' + esc(game.time_et || "Hora por confirmar") + '</option>'
+    '<option value="' + esc(game.game_id) + '">' + esc((game.away || "—") + " @ " + (game.home || "—")) + ' · ' + esc(chileGameTime(game.date, game.time_et) || "Hora por confirmar") + '</option>'
   ).join("");
   state.props.gameId = uniqueGames.some((game) => String(game.game_id) === String(previousGame)) ? String(previousGame) : "";
   gameSelect.value = state.props.gameId;
@@ -1357,7 +1422,7 @@ function renderPropsCandidates() {
     ].map(([label, value]) => '<div><small>' + label + '</small><strong>' + (Number.isFinite(Number(value)) ? num(value) : "—") + '</strong></div>').join("");
     const confidencePct = Math.max(0, Math.min(100, Math.round(confidence * 100)));
     return '<article class="props-candidate-card upcoming-game-card signal-neutral">' +
-      '<div class="upcoming-card-top"><span>' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + '</span><span class="props-candidate-grade grade-' + grade.toLowerCase() + '"><b>' + grade + '</b><small>' + confidencePct + '%</small></span></div>' +
+      '<div class="upcoming-card-top"><span>' + esc(shortDate(chileGameDate(game.date, game.time_et))) + ' · ' + esc(chileGameTime(game.date, game.time_et) || "Hora por confirmar") + '</span><span class="props-candidate-grade grade-' + grade.toLowerCase() + '"><b>' + grade + '</b><small>' + confidencePct + '%</small></span></div>' +
       '<div class="upcoming-matchup"><div class="upcoming-team">' + upcomingTeamLogo(game.away) + '<strong>' + esc(game.away || "Visitante") + '</strong><small>VISITANTE</small></div><span class="upcoming-at">@</span><div class="upcoming-team">' + upcomingTeamLogo(game.home) + '<strong>' + esc(game.home || "Local") + '</strong><small>LOCAL</small></div></div>' +
       '<div class="props-player-card-identity">' + (headshot ? '<img src="' + esc(headshot) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '<span class="props-candidate-avatar">' + esc((player.player_name || "NBA").split(" ").map((part) => part[0]).slice(0,2).join("").toUpperCase()) + '</span>') + '<div><strong>' + esc(player.player_name || "Jugador") + '</strong><small>' + esc(player.team || "") + ' · ' + (isHome ? "LOCAL" : "VISITA") + ' vs ' + esc(opponent) + '</small></div></div>' +
       '<div class="upcoming-total"><span>Proyección ' + labels[market] + '</span><strong>' + num(statValue) + '</strong></div>' +
@@ -1703,7 +1768,7 @@ function renderDetailGames(data) {
         <span class="pd-game-logos">${logos}</span>
         <span class="pd-game-main">
           <strong>${data.upcoming.is_home ? "vs" : "@"} ${esc(data.upcoming.opponent)}</strong>
-          <small>PRÓX. · ${dayMonth(data.upcoming.date)}${data.upcoming.time_et ? ` · ${esc(data.upcoming.time_et)} ET` : ""}${state.detail.stat !== "min" && data.upcoming.projection?.min != null ? ` · ${num(data.upcoming.projection.min)} min proy.` : ""}</small>
+          <small>PRÓX. · ${dayMonth(chileGameDate(data.upcoming.date, data.upcoming.time_et))}${data.upcoming.time_et ? ` · ${esc(chileGameTime(data.upcoming.date, data.upcoming.time_et))} Chile` : ""}${state.detail.stat !== "min" && data.upcoming.projection?.min != null ? ` · ${num(data.upcoming.projection.min)} min proy.` : ""}</small>
         </span>
         <span class="pd-game-value">${value}</span>
       </button>`);
@@ -2414,7 +2479,7 @@ async function loadExternalAnalysis(silent = false) {
         }).join("") + '</div>';
       };
       return '<article class="external-game-card">' +
-        '<header class="external-game-head"><div><span class="external-date">' + esc(shortDate(game.date)) + ' · ' + esc(game.time_et || "Hora por confirmar") + ' ET</span><h3>' + esc(game.away_name || game.away) + ' <span class="vs">@</span> ' + esc(game.home_name || game.home) + '</h3></div><span class="external-game-total">Modelo ' + num(game.predicted_total) + ' pts</span></header>' +
+        '<header class="external-game-head"><div><span class="external-date">' + esc(shortDate(chileGameDate(game.date, game.time_et))) + ' · ' + esc(chileGameTime(game.date, game.time_et) || "Hora por confirmar") + ' Chile</span><h3>' + esc(game.away_name || game.away) + ' <span class="vs">@</span> ' + esc(game.home_name || game.home) + '</h3></div><span class="external-game-total">Modelo ' + num(game.predicted_total) + ' pts</span></header>' +
         '<div class="external-matchup-grid">' +
           '<section><h4>Visitante · ' + esc(game.away) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.away_rest)) + (awayB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p>' + travelLine("away") + '<b>Bajas</b>' + injuryHtml(game.away) + (awayImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(awayImpact,1) + ' pts</small>' : '') + '</section>' +
           '<section><h4>Local · ' + esc(game.home) + '</h4><p><b>Descanso:</b> ' + esc(restText(game.home_rest)) + (homeB2B ? ' <span class="external-flag">B2B</span>' : '') + '</p>' + travelLine("home") + '<b>Bajas</b>' + injuryHtml(game.home) + (homeImpact != null ? '<small>Ajuste experimental del modelo: ' + signed(homeImpact,1) + ' pts</small>' : '') + '</section>' +
