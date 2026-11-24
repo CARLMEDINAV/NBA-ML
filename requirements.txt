@@ -8,3 +8,6 @@ numpy>=1.26,<2.5
 pandas>=2.1,<3
 python-dateutil>=2.9
 scikit-learn>=1.5,<1.8
+
+# PostgreSQL persistente para Supabase/Vercel.
+psycopg[binary]>=3.2,<4
