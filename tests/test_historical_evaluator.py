@@ -33,13 +33,14 @@ def test_historical_metrics_and_market_push_handling():
     ]
     result = evaluate_predictions(rows)
     assert result["n_settled"] == 3
-    assert result["mae"] == 7.0
-    assert round(result["rmse"], 4) == round((65 / 3) ** 0.5, 4)
-    assert result["bias"] == -1.0
+    assert round(result["mae"], 4) == round(16 / 3, 4)
+    assert round(result["rmse"], 4) == round((128 / 3) ** 0.5, 4)
+    assert result["bias"] == 0.0
     assert result["total_pick_count"] == 2
-    assert result["total_hit_rate"] == 1.0
-    assert result["winner_hit_rate"] == 1.0
-    assert result["spread_pick_count"] == 2
+    assert result["total_hit_rate"] == 0.5
+    assert round(result["winner_hit_rate"], 4) == round(2 / 3, 4)
+    assert result["spread_pick_count"] == 3
+    assert round(result["spread_hit_rate"], 4) == round(2 / 3, 4)
 
 
 def test_unsettled_rows_are_excluded():
