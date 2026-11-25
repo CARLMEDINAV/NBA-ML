@@ -177,7 +177,7 @@ INJURY_MODEL_NOTE = (
     "confirmada (Out) y sube lo mismo por la fracción del rival. El coeficiente "
     "se estimó en 2024-25 y se evaluó en 2025-26; el holdout aislado fue 8,17, "
     "así que 5,53 es conservador. Solo aplica a bajas Out de jugadores del top-5 "
-    "con al menos 2 partidos y PRA 2026-27; día a día, dudas y jugadores sin "
+    "con al menos 1 partido y PRA 2026-27; día a día, dudas y jugadores sin "
     "muestra no se ajustan. No es un modelo de minutos ni una probabilidad oficial."
 )
 INJURY_IMPACT_NOTE = (
@@ -195,7 +195,7 @@ INJURY_LIMITATIONS = [
     "El ranking interno usa las medias por partido de 2026-27 y puede estar "
     "afectado por muestras cortas, traspasos o jugadores sin minutos.",
     "El ajuste solo aplica a bajas confirmadas (Out) de jugadores del top-5 con "
-    "al menos 2 partidos y PRA 2026-27. Día a día, dudas, jugadores sin muestra "
+    "al menos 1 partido y PRA 2026-27. Día a día, dudas, jugadores sin muestra "
     "y cambios de última hora no se ajustan.",
     "El total del partido y los props no se ajustan: solo cambian el margen, el "
     "ganador y el hándicap. No se modelan minutos ni la sustitución del jugador.",
@@ -2082,12 +2082,12 @@ def _injury_report(
                 teams[abbreviation]["top5_pra"] = match.get("team_top5_pra")
             gp = stats.get("gp")
             pra_rank = stats.get("pra_rank")
-            is_key_player = bool(gp and gp >= 2 and pra_rank is not None and pra_rank <= 5)
+            is_key_player = bool(gp and gp >= 1 and pra_rank is not None and pra_rank <= 5)
             if not match:
                 role_note = "Sin estadísticas 2026-27"
             elif not gp:
                 role_note = "Sin minutos registrados"
-            elif gp < 2:
+            elif gp < 1:
                 role_note = f"Muestra corta ({gp} PJ)"
             elif is_key_player:
                 role_note = f"Top {pra_rank} del equipo en PRA"
