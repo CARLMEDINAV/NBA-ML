@@ -224,7 +224,7 @@ def project_live_total(
         "pace_projection": round(pace_projection, 1),
         "live_weight": round(live_weight, 3),
         "elapsed_minutes": round(elapsed_minutes, 1),
-        "remaining_minutes": round(period_remaining_minutes, 1),
+        "remaining_minutes": round(period_remaining_minutes, 2),
     }
 
 
