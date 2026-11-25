@@ -671,8 +671,8 @@
             <label>Fecha del partido<input id="liDate" type="date"></label><div class="li-control-action"><span class="muted">Carga los jugadores y estadísticas de la temporada disponible.</span></div>
           </div>
           <div class="li-team-grid">
-            <section class="li-team"><div class="li-team-head"><h3>Local · titulares y banca</h3><button class="btn btn-ghost btn-small" id="liLoadHome" type="button">Cargar roster</button></div><div id="liHomePlayers" class="li-player-list"><p class="muted">Cargando jugadores…</p></div></section>
-            <section class="li-team"><div class="li-team-head"><h3>Visitante · titulares y banca</h3><button class="btn btn-ghost btn-small" id="liLoadAway" type="button">Cargar roster</button></div><div id="liAwayPlayers" class="li-player-list"><p class="muted">Cargando jugadores…</p></div></section>
+            <section class="li-team"><div class="li-team-head"><h3>Local · titulares y banca</h3><button class="btn btn-ghost btn-small" id="liLoadHome" type="button">Cargar roster</button></div><div class="li-court-wrap"><div class="li-court" id="liHomeCourt" aria-label="Quinteto local en cancha"></div></div><div id="liHomePlayers" class="li-player-list"><p class="muted">Cargando jugadores…</p></div></section>
+            <section class="li-team"><div class="li-team-head"><h3>Visitante · titulares y banca</h3><button class="btn btn-ghost btn-small" id="liLoadAway" type="button">Cargar roster</button></div><div class="li-court-wrap"><div class="li-court" id="liAwayCourt" aria-label="Quinteto visitante en cancha"></div></div><div id="liAwayPlayers" class="li-player-list"><p class="muted">Cargando jugadores…</p></div></section>
           </div>
           <p class="li-legend"><span>✓ Titular</span><span>Fuera = simular ausencia</span><span>El primer suplente disponible cubre minutos</span></p>
           <div id="liNotice" class="notice" role="status" hidden></div>
