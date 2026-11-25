@@ -58,11 +58,11 @@ def _team_impact(team: TeamScenarioIn, replacement_share: float) -> dict[str, An
     ]
     available_bench = [
         player for player in team.bench
-        if player.availability_status.upper() != "OUT"
+        if player.availability_status.upper() not in {"OUT", "QUESTIONABLE", "DOUBTFUL", "DAY-TO-DAY", "UNKNOWN"}
     ]
     excluded_bench = [
         player.name for player in team.bench
-        if player.availability_status.upper() == "OUT"
+        if player.availability_status.upper() in {"OUT", "QUESTIONABLE", "DOUBTFUL", "DAY-TO-DAY", "UNKNOWN"}
     ]
     if not removed:
         return {
