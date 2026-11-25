@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/styles.css?v=20261118-availability-names">
   <link rel="stylesheet" href="/lab-live.css?v=2">
   <link rel="stylesheet" href="/lab-cards.css?v=4">
+  <link rel="stylesheet" href="/lineup-impact.css?v=1">
 </head>
 <body>
   <div class="page">
@@ -641,6 +642,7 @@
         </div>
         <div class="lab-live-switch" role="tablist" aria-label="Herramientas NBA Lab">
           <button type="button" class="lab-live-switch-btn is-active" data-lab-view="lab" role="tab" aria-selected="true">NBA Lab</button>
+          <button type="button" class="lab-live-switch-btn" data-lab-view="lineup" role="tab" aria-selected="false">Lineup Impact</button>
           <button type="button" class="lab-live-switch-btn" data-lab-view="live" role="tab" aria-selected="false">Live Predictor</button>
         </div>
         <section id="labView" class="lab-live-view">
@@ -661,6 +663,22 @@
           </form>
           <div id="labNotice" class="notice" role="status" hidden></div>
           <div id="labResult" class="lab-result" aria-live="polite"><p class="muted">Selecciona un enfrentamiento y modifica las variables para comenzar.</p></div>
+        </section>
+        <section id="lineupImpactView" class="lab-live-view" hidden>
+          <div class="lab-live-intro"><div><p class="eyebrow">PLAYER IMPACT · WHAT IF?</p><h3>Lineup Impact Simulator</h3><p class="muted">Selecciona cinco titulares por equipo, marca las ausencias y compara el baseline Ridge con el escenario ajustado por la producción de los reemplazos.</p></div></div>
+          <div class="li-controls">
+            <label>Equipo local<select id="liHome"></select></label><label>Equipo visitante<select id="liAway"></select></label>
+            <label>Fecha del partido<input id="liDate" type="date"></label><div class="li-control-action"><span class="muted">Carga los jugadores y estadísticas de la temporada disponible.</span></div>
+          </div>
+          <div class="li-team-grid">
+            <section class="li-team"><div class="li-team-head"><h3>Local · titulares y banca</h3><button class="btn btn-ghost btn-small" id="liLoadHome" type="button">Cargar roster</button></div><div id="liHomePlayers" class="li-player-list"><p class="muted">Cargando jugadores…</p></div></section>
+            <section class="li-team"><div class="li-team-head"><h3>Visitante · titulares y banca</h3><button class="btn btn-ghost btn-small" id="liLoadAway" type="button">Cargar roster</button></div><div id="liAwayPlayers" class="li-player-list"><p class="muted">Cargando jugadores…</p></div></section>
+          </div>
+          <p class="li-legend"><span>✓ Titular</span><span>Fuera = simular ausencia</span><span>El primer suplente disponible cubre minutos</span></p>
+          <div id="liNotice" class="notice" role="status" hidden></div>
+          <button class="btn btn-primary" id="liRun" type="button">Simular impacto en el partido</button>
+          <div id="liResult" class="lab-result" aria-live="polite"><p class="muted">Carga los rosters, confirma los quintetos y marca los jugadores que quieras retirar.</p></div>
+          <p class="table-note">Estimación exploratoria basada en estadísticas por 36 minutos y producción de banca. No modela defensa individual, química de quinteto ni redistribución avanzada del uso; no equivale a una probabilidad calibrada.</p>
         </section>
         <section id="liveView" class="lab-live-view" hidden>
           <div class="lab-live-intro"><div><p class="eyebrow">EN PARTIDO</p><h3>Proyección dinámica del total</h3><p class="muted">Elige un encuentro en vivo o introduce manualmente el marcador, período y reloj.</p></div><button type="button" class="btn btn-ghost" id="liveRefresh">Actualizar partidos</button></div>
@@ -852,6 +870,7 @@
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
   <script src="/lab-live.js?v=2" defer></script>
   <script src="/lab-cards.js?v=5" defer></script>
+  <script src="/lineup-impact.js?v=1" defer></script>
 <div class="player-alert-backdrop" id="playerAlertsBackdrop" hidden>
   <section class="player-alert-dialog" role="dialog" aria-modal="true" aria-labelledby="playerAlertsTitle">
     <div class="player-alert-heading"><div><p class="eyebrow">NBA TOTALS · LIVE</p><h2 id="playerAlertsTitle">Alertas de jugadores</h2></div><button type="button" id="playerAlertsClose" class="player-alert-close" aria-label="Cerrar">×</button></div>
