@@ -4573,6 +4573,8 @@ def players(
         "ast",
         "pra",
     ]
+    if "position" in frame.columns:
+        fields.insert(3, "position")
     rows = []
     for record in frame.head(limit)[fields].to_dict(orient="records"):
         player_id = record.get("player_id")
