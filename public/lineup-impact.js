@@ -97,7 +97,7 @@
       notice.hidden=false;
       notice.textContent=injuryData.warning
         ? injuryData.warning+" Los jugadores sin registro se conservan en rotación como SIN BAJA REPORTADA, no como confirmación oficial de activo."
-        : "Disponibilidad consultada en ESPN"+(injuryData.updated?" · actualizado "+injuryData.updated:"")+". OUT se excluye automáticamente; OUT, QUESTIONABLE, DOUBTFUL y DÍA A DÍA se excluyen de los reemplazos automáticos; puedes corregir el estado manualmente.";
+        : "Disponibilidad consultada en ESPN"+(injuryData.updated?" · actualizado "+injuryData.updated:"")+". OUT se excluye automáticamente. QUESTIONABLE, DOUBTFUL y DÍA A DÍA no se asignan como reemplazos sin confirmación manual.";
     } catch(e) { $("#liNotice").textContent=e.message; $("#liNotice").hidden=false; }
     finally {button.disabled=false;button.textContent="Cargar roster";}
   }
