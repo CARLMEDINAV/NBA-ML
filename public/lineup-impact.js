@@ -32,7 +32,8 @@
   }
   function renderTeam(side) {
     const host = $(side === "home" ? "#liHomePlayers" : "#liAwayPlayers");
-    renderCourt(side);\n    host.innerHTML = state[side].map((p,i) => `
+    renderCourt(side);
+    host.innerHTML = state[side].map((p,i) => `
       <div class="li-player">
         <label class="li-starter"><input type="checkbox" data-kind="starter" data-side="${side}" data-index="${i}" ${p.starter?"checked":""}> <span>Titular</span></label>
         <span class="li-player-main"><b>${safe(p.name)}</b><small>${fmt(p.minutes)} MIN · ${fmt(p.pts)} PTS · ${fmt(p.reb)} REB · ${fmt(p.ast)} AST</small></span>
