@@ -49,11 +49,11 @@ def _team_impact(team: TeamScenarioIn, replacement_share: float) -> dict[str, An
         # The replacement absorbs a configurable share of the missing minutes.
         share = replacement_share if replacement else 0.0
         replacement_minutes = minutes * share
-        missing_rate = minutes / 36.0
-        replacement_rate = replacement_minutes / 36.0
-        points_delta += (replacement_rate * (replacement.pts if replacement else 0.0)) - (missing_rate * player.pts)
-        rebounds_delta += (replacement_rate * (replacement.reb if replacement else 0.0)) - (missing_rate * player.reb)
-        assists_delta += (replacement_rate * (replacement.ast if replacement else 0.0)) - (missing_rate * player.ast)
+        missing_rate = 1.0 / max(player.minutes, 1.0)
+        replacement_rate = 1.0 / max(replacement.minutes, 1.0) if replacement else 0.0
+        points_delta += (replacement_rate * replacement_minutes * replacement.pts if replacement else 0.0) - (missing_rate * minutes * player.pts)
+        rebounds_delta += (replacement_rate * replacement_minutes * replacement.reb if replacement else 0.0) - (missing_rate * minutes * player.reb)
+        assists_delta += (replacement_rate * replacement_minutes * replacement.ast if replacement else 0.0) - (missing_rate * minutes * player.ast)
         usage_removed += player.usage
         replacements.append({
             "out": player.name,
