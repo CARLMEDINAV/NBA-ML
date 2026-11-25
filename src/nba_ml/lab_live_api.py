@@ -164,23 +164,23 @@ def simulate_scenario(payload: LabScenarioIn) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _normalize_live_clock(clock: Any, period: int) -> tuple[str, int]:
+def _normalize_live_clock(clock: Any, period: int) -> tuple[str, float]:
     """Normalize ESPN clocks (M:SS, M:SS.s, or PT#M#S) to MM:SS."""
     if clock is None:
         raise ValueError("ESPN no entregó un reloj válido")
     raw = str(clock).strip()
     match = re.fullmatch(r"(\d{1,2}):(\d{1,2})(?:\.\d+)?", raw)
     if match:
-        minutes, seconds = int(match.group(1)), int(match.group(2))
+        minutes, seconds = int(match.group(1)), float(match.group(2))
     else:
         iso = re.fullmatch(r"PT(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?", raw, re.IGNORECASE)
         if not iso or (iso.group(1) is None and iso.group(2) is None):
             raise ValueError(f"Reloj ESPN no reconocido: {raw!r}")
         minutes = int(iso.group(1) or 0)
-        seconds = int(float(iso.group(2) or 0))
+        seconds = float(iso.group(2) or 0)
     if seconds >= 60:
         raise ValueError("Los segundos del reloj deben ser menores que 60")
-    normalized = f"{minutes:02d}:{seconds:02d}"
+    normalized = f"{minutes:02d}:{int(seconds):02d}"
     remaining = minutes * 60 + seconds
     max_seconds = 12 * 60 if int(period) <= 4 else 5 * 60
     if remaining > max_seconds:
@@ -207,7 +207,7 @@ def project_live_total(
         return {
             "current_total": current, "projected_total": round(float(pregame_total), 1),
             "pace_projection": None, "live_weight": 0.0, "elapsed_minutes": 0.0,
-            "remaining_minutes": round(period_remaining_minutes, 1),
+            "remaining_minutes": round(period_remaining_minutes, 2),
         }
 
     pace_projection = current * regulation_seconds / elapsed_seconds
