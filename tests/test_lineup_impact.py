@@ -1,3 +1,5 @@
+import app  # noqa: F401 - registers src/ on sys.path for test imports
+
 from nba_ml.lineup_impact_api import (
     LineupImpactIn,
     PlayerIn,
