@@ -5,9 +5,9 @@
   const teamName = (side) => side === "home" ? $("#liHome").value : $("#liAway").value;
   const fmt = (n) => Number(n || 0).toFixed(1);
   const safe = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const statusLabel = (status) => ({OUT:"OUT",QUESTIONABLE:"QUESTIONABLE",DOUBTFUL:"DOUBTFUL",PROBABLE:"PROBABLE",ACTIVE:"ACTIVE",UNKNOWN:"SIN REPORTE"}[status] || status);
-  const statusClass = (status) => status === "OUT" ? "out" : ["QUESTIONABLE","DOUBTFUL"].includes(status) ? "doubtful" : status === "PROBABLE" ? "probable" : status === "ACTIVE" ? "active" : "unknown";
-  const statusOptions = ["UNKNOWN","ACTIVE","PROBABLE","QUESTIONABLE","DOUBTFUL","OUT"];
+  const statusLabel = (status) => ({OUT:"OUT",QUESTIONABLE:"QUESTIONABLE",DOUBTFUL:"DOUBTFUL",PROBABLE:"PROBABLE",ACTIVE:"SIN BAJA REPORTADA",UNKNOWN:"SIN REPORTE","DAY-TO-DAY":"DÍA A DÍA"}[status] || status);
+  const statusClass = (status) => status === "OUT" ? "out" : ["QUESTIONABLE","DOUBTFUL","DAY-TO-DAY"].includes(status) ? "doubtful" : status === "PROBABLE" ? "probable" : status === "ACTIVE" ? "active" : "unknown";
+  const statusOptions = ["ACTIVE","PROBABLE","QUESTIONABLE","DOUBTFUL","DAY-TO-DAY","OUT","UNKNOWN"];
   const nameKey = (value) => String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
 
   async function getPlayers(team) {
@@ -28,7 +28,7 @@
     const id = String(p.player_id ?? p.id ?? index);
     const name = p.player_name || p.name || "Jugador";
     const injury = injuryMap.byId.get(id) || injuryMap.byName.get(nameKey(name));
-    const status = injury ? String(injury.status || "UNKNOWN").toUpperCase() : "UNKNOWN";
+    const status = injury ? String(injury.status || "UNKNOWN").toUpperCase() : "ACTIVE";
     return {
       player_id:id,name,minutes:Number(p.min ?? p.minutes ?? 0),pts:Number(p.pts ?? 0),
       reb:Number(p.reb ?? 0),ast:Number(p.ast ?? 0),usage:Number(p.usage ?? p.usg_pct ?? 0),
@@ -96,8 +96,8 @@
       const notice=$("#liNotice");
       notice.hidden=false;
       notice.textContent=injuryData.warning
-        ? injuryData.warning+" Se permite ajustar manualmente el estado; sin reporte no se presume que un jugador esté activo."
-        : "Disponibilidad consultada en ESPN"+(injuryData.updated?" · actualizado "+injuryData.updated:"")+". OUT se excluye automáticamente; QUESTIONABLE y DOUBTFUL requieren confirmación.";
+        ? injuryData.warning+" Los jugadores sin registro se conservan en rotación como SIN BAJA REPORTADA, no como confirmación oficial de activo."
+        : "Disponibilidad consultada en ESPN"+(injuryData.updated?" · actualizado "+injuryData.updated:"")+". OUT se excluye automáticamente; OUT, QUESTIONABLE, DOUBTFUL y DÍA A DÍA se excluyen de los reemplazos automáticos; puedes corregir el estado manualmente.";
     } catch(e) { $("#liNotice").textContent=e.message; $("#liNotice").hidden=false; }
     finally {button.disabled=false;button.textContent="Cargar roster";}
   }
