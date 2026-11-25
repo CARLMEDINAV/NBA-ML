@@ -15,11 +15,24 @@
   function normalize(p, index) {
     return {player_id:String(p.player_id ?? p.id ?? index),name:p.player_name || p.name || "Jugador",
       minutes:Number(p.min ?? p.minutes ?? 0),pts:Number(p.pts ?? 0),reb:Number(p.reb ?? 0),
-      ast:Number(p.ast ?? 0),usage:Number(p.usage ?? p.usg_pct ?? 0),starter:index<5,out:false};
+      ast:Number(p.ast ?? 0),usage:Number(p.usage ?? p.usg_pct ?? 0),headshot:p.player_id ? "https://cdn.nba.com/headshots/nba/latest/1040x760/"+p.player_id+".png" : "",starter:index<5,out:false};
+  }
+  function renderCourt(side) {
+    const host = $(side === "home" ? "#liHomeCourt" : "#liAwayCourt");
+    const starters = state[side].filter(p => p.starter);
+    const slots = ["li-slot-pg","li-slot-sg","li-slot-sf","li-slot-pf","li-slot-c"];
+    host.innerHTML = starters.map((p,i) => {
+      const initials = safe(p.name.split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase());
+      return '<article class="li-court-player '+slots[i]+'"><div class="li-court-photo-wrap">' +
+        (p.headshot ? '<img class="li-court-photo" src="'+safe(p.headshot)+'" alt="Foto de '+safe(p.name)+'" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\'">' : '') +
+        '<span class="li-photo-fallback">'+initials+'</span>' + (p.out ? '<span class="li-out-stamp">OUT</span>' : '') +
+        '</div><b>'+safe(p.name)+'</b><small>'+["PG","SG","SF","PF","C"][i]+'</small></article>';
+    }).join("");
+    if (!starters.length) host.innerHTML = '<p class="li-court-empty">Selecciona cinco titulares para visualizar el quinteto.</p>';
   }
   function renderTeam(side) {
     const host = $(side === "home" ? "#liHomePlayers" : "#liAwayPlayers");
-    host.innerHTML = state[side].map((p,i) => `
+    renderCourt(side);\n    host.innerHTML = state[side].map((p,i) => `
       <div class="li-player">
         <label class="li-starter"><input type="checkbox" data-kind="starter" data-side="${side}" data-index="${i}" ${p.starter?"checked":""}> <span>Titular</span></label>
         <span class="li-player-main"><b>${safe(p.name)}</b><small>${fmt(p.minutes)} MIN · ${fmt(p.pts)} PTS · ${fmt(p.reb)} REB · ${fmt(p.ast)} AST</small></span>
