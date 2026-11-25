@@ -204,6 +204,7 @@
       });
       $("#labView").hidden = activeView !== "lab";
       $("#liveView").hidden = activeView !== "live";
+      $("#lineupImpactView").hidden = activeView !== "lineup";
       activate();
     }));
     $$("[data-live-mode]").forEach((button) => button.addEventListener("click", () => setLiveMode(button.dataset.liveMode)));
