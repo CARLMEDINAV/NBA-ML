@@ -28,7 +28,7 @@
     const id = String(p.player_id ?? p.id ?? index);
     const name = p.player_name || p.name || "Jugador";
     const injury = injuryMap.byId.get(id) || injuryMap.byName.get(nameKey(name));
-    const status = injury ? String(injury.status || "UNKNOWN").toUpperCase() : "ACTIVE";
+    const status = injury ? String(injury.status || "UNKNOWN").toUpperCase() : (injuryMap.unknownFallback ? "UNKNOWN" : "ACTIVE");
     return {
       player_id:id,name,minutes:Number(p.min ?? p.minutes ?? 0),pts:Number(p.pts ?? 0),
       reb:Number(p.reb ?? 0),ast:Number(p.ast ?? 0),usage:Number(p.usage ?? p.usg_pct ?? 0),
@@ -91,12 +91,12 @@
         if(injury.player_id!=null)byId.set(String(injury.player_id),injury);
         byName.set(nameKey(injury.player_name),injury);
       });
-      state[side]=rows.slice(0,15).map((p,i)=>normalize(p,i,{byId,byName}));
+      state[side]=rows.slice(0,15).map((p,i)=>normalize(p,i,{byId,byName,unknownFallback:Boolean(injuryData.warning)}));
       renderTeam(side);
       const notice=$("#liNotice");
       notice.hidden=false;
       notice.textContent=injuryData.warning
-        ? injuryData.warning+" Los jugadores sin registro se conservan en rotación como SIN BAJA REPORTADA, no como confirmación oficial de activo."
+        ? injuryData.warning+" Sin un parte válido, los jugadores quedan como SIN REPORTE y no se asignan automáticamente como reemplazos."
         : "Disponibilidad consultada en ESPN"+(injuryData.updated?" · actualizado "+injuryData.updated:"")+". OUT se excluye automáticamente. QUESTIONABLE, DOUBTFUL y DÍA A DÍA no se asignan como reemplazos sin confirmación manual.";
     } catch(e) { $("#liNotice").textContent=e.message; $("#liNotice").hidden=false; }
     finally {button.disabled=false;button.textContent="Cargar roster";}
