@@ -202,17 +202,21 @@ def project_live_total(
         regulation_seconds = 48 * 60 + (period - 4) * 5 * 60
 
     current = int(home_score) + int(away_score)
+    period_remaining_minutes = remaining / 60.0
     if elapsed_seconds <= 0:
         return {
             "current_total": current, "projected_total": round(float(pregame_total), 1),
             "pace_projection": None, "live_weight": 0.0, "elapsed_minutes": 0.0,
-            "remaining_minutes": round(regulation_seconds / 60, 1),
+            "remaining_minutes": round(period_remaining_minutes, 1),
         }
 
     pace_projection = current * regulation_seconds / elapsed_seconds
     elapsed_minutes = elapsed_seconds / 60.0
-    live_weight = min(0.85, elapsed_minutes / (elapsed_minutes + 18.0))
-    projected = (1.0 - live_weight) * float(pregame_total) + live_weight * pace_projection
+    # The prior is progressively replaced by the observed score. Unlike a
+    # weighted average of two full-game totals, this guarantees that the
+    # projection converges to the actual score at the end of regulation.
+    live_weight = min(1.0, elapsed_seconds / regulation_seconds)
+    projected = current + (1.0 - live_weight) * (float(pregame_total) - current)
     projected = max(float(current), projected)
     return {
         "current_total": current,
@@ -220,7 +224,7 @@ def project_live_total(
         "pace_projection": round(pace_projection, 1),
         "live_weight": round(live_weight, 3),
         "elapsed_minutes": round(elapsed_minutes, 1),
-        "remaining_minutes": round(max(0.0, (regulation_seconds - elapsed_seconds) / 60), 1),
+        "remaining_minutes": round(period_remaining_minutes, 1),
     }
 
 
