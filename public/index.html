@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/styles.css?v=20261118-availability-names">
   <link rel="stylesheet" href="/lab-live.css?v=2">
   <link rel="stylesheet" href="/lab-cards.css?v=4">
+  <link rel="stylesheet" href="/prop-lab.css?v=1">
 </head>
 <body>
   <div class="page">
@@ -60,6 +61,7 @@
       <button class="tab" role="tab" id="tab-btn-players" aria-selected="false" aria-controls="tab-players" data-tab="players">Jugadores</button>
       <button class="tab" role="tab" id="tab-btn-injuries" aria-selected="false" aria-controls="tab-injuries" data-tab="injuries">Lesiones <span class="tab-count" id="injuriesTabCount" hidden>0</span></button>
       <button class="tab" role="tab" id="tab-btn-props" aria-selected="false" aria-controls="tab-props" data-tab="props">Props</button>
+      <button class="tab" role="tab" id="tab-btn-prop-lab" aria-selected="false" aria-controls="tab-prop-lab" data-tab="prop-lab">PROP LAB <span class="tab-count">NEW</span></button>
       <button class="tab" role="tab" id="tab-btn-teams" aria-selected="false" aria-controls="tab-teams" data-tab="teams">Equipos</button>
       <button class="tab" role="tab" id="tab-btn-lab-live" aria-selected="false" aria-controls="tab-lab-live" data-tab="lab-live">NBA Lab + Live</button>
       <button class="tab" role="tab" id="tab-btn-predict" aria-selected="false" aria-controls="tab-predict" data-tab="predict">Predicción</button>
@@ -366,6 +368,52 @@
         <div id="injuriesModelNote" class="injury-model-note"></div>
         <div id="injuriesList" class="injury-list" aria-live="polite"></div>
         <p class="table-note" id="injuriesNote"></p>
+      </section>
+
+      <section id="tab-prop-lab" class="tab-panel prop-lab-page" role="tabpanel" aria-labelledby="tab-btn-prop-lab" hidden>
+        <div class="section-head prop-lab-head">
+          <div>
+            <p class="eyebrow">NBA TOTALS · PLAYER ANALYTICS</p>
+            <h2>PROP LAB</h2>
+            <p class="muted">Tendencias históricas y proyecciones disponibles para PTS, REB, AST, 3PM y PRA.</p>
+          </div>
+          <button class="btn btn-ghost" type="button" id="propLabRefresh">Actualizar</button>
+        </div>
+        <nav class="prop-lab-subnav" aria-label="Vistas de PROP LAB" role="tablist">
+          <button type="button" class="is-active" data-prop-view="props" aria-selected="true">Props</button>
+          <button type="button" data-prop-view="trends" aria-selected="false">Tendencias</button>
+          <button type="button" data-prop-view="value" aria-selected="false">Valor</button>
+        </nav>
+        <section class="prop-lab-filters" aria-label="Filtros PROP LAB">
+          <label>Mercado
+            <select id="propLabMarket">
+              <option value="PTS">Puntos · PTS</option>
+              <option value="REB">Rebotes · REB</option>
+              <option value="AST">Asistencias · AST</option>
+              <option value="3PM">Triples · 3PM</option>
+              <option value="PRA">PRA</option>
+            </select>
+          </label>
+          <label>Línea de referencia
+            <input id="propLabLine" type="number" min="0" max="100" step="0.5" placeholder="Ej. 24.5">
+          </label>
+          <label>Historial
+            <select id="propLabWindow"><option value="5">Últimos 5</option><option value="10" selected>Últimos 10</option><option value="15">Últimos 15</option></select>
+          </label>
+          <label>Tendencia
+            <select id="propLabSide"><option value="ALL">Todas</option><option value="OVER">Over</option><option value="UNDER">Under</option></select>
+          </label>
+          <label>Buscar jugador
+            <input id="propLabSearch" type="search" placeholder="Nombre del jugador" autocomplete="off">
+          </label>
+          <label>Temporada
+            <select id="propLabSeason"><option value="2026-27">2026–27</option><option value="2025-26">2025–26</option><option value="">Todas disponibles</option></select>
+          </label>
+        </section>
+        <div id="propLabStatus" class="prop-lab-status" role="status" aria-live="polite">Cargando tendencias de jugadores…</div>
+        <div id="propLabSummary" class="prop-lab-summary"></div>
+        <div id="propLabCards" class="prop-lab-grid" aria-live="polite"></div>
+        <p class="prop-lab-disclaimer">Las frecuencias describen resultados pasados; no son probabilidades futuras. Las cuotas de props no están disponibles en la fuente actual y no se estiman ni inventan. Las proyecciones se muestran solo cuando el modelo existente las proporciona.</p>
       </section>
 
       <section id="tab-props" class="tab-panel props-page" role="tabpanel" aria-labelledby="tab-btn-props" hidden>
@@ -845,6 +893,7 @@
     </p>
   </noscript>
   <script src="/app.js?v=20261123-chile-time" defer></script>
+  <script src="/prop-lab.js?v=1" defer></script>
   <script src="/live-player-projection.js?v=1" defer></script>
   <script src="/player-notifications.js?v=2" defer></script>
   <script src="/bet-builder.js?v=20261123-chile-time" defer></script>
