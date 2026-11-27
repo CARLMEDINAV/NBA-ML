@@ -109,6 +109,8 @@
   }
   function setView(view) {
     state.view = view;
+    const page = $(".prop-lab-page");
+    if (page) page.dataset.view = view;
     document.querySelectorAll("[data-prop-view]").forEach((button) => {
       const active = button.dataset.propView === view;
       button.classList.toggle("is-active", active);
@@ -116,7 +118,8 @@
     });
     const disclaimer = document.querySelector(".prop-lab-disclaimer");
     if (disclaimer && view === "value") disclaimer.textContent = "Valor: no se calculan EV ni ventaja de cuota porque la fuente actual no proporciona cuotas de jugador. Solo se muestra la diferencia entre proyección y línea manual, que no equivale a valor esperado.";
-    else if (disclaimer) disclaimer.textContent = "Las frecuencias describen resultados pasados; no son probabilidades futuras. Las cuotas de props no están disponibles en la fuente actual y no se estiman ni inventan. Las proyecciones se muestran solo cuando el modelo existente las proporciona.";
+    else if (disclaimer && view === "trends") disclaimer.textContent = "Tendencias históricas: frecuencia observada sobre partidos válidos. Los pushes se excluyen del denominador y la muestra se limita a la ventana elegida.";
+    else if (disclaimer) disclaimer.textContent = "Props: proyecciones disponibles del modelo actual junto con el rendimiento reciente. No se generan líneas ni cuotas de apuestas.";
   }
   document.addEventListener("click", (event) => {
     const tab = event.target.closest('[data-tab="prop-lab"]');
