@@ -25,7 +25,6 @@ MARKETS = {
 }
 
 
-@lru_cache(maxsize=1)
 def _history_mtime() -> float:
     return HISTORY_PATH.stat().st_mtime if HISTORY_PATH.exists() else 0.0
 
@@ -40,7 +39,7 @@ def _load_history(mtime: float) -> pd.DataFrame:
         dtype={"player_id": "Int64", "game_id": str},
         parse_dates=["game_date"],
     )
-    required = {"player_id", "player_name", "team", "game_date", "min", *[v[0] for v in MARKETS.values()]}
+    required = {"player_id", "player_name", "team", "game_id", "game_date", "min", *[v[0] for v in MARKETS.values()]}
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Historial de jugadores incompleto: {sorted(missing)}")
