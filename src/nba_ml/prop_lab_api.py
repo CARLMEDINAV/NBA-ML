@@ -43,8 +43,10 @@ def _load_history(mtime: float) -> pd.DataFrame:
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Historial de jugadores incompleto: {sorted(missing)}")
-    for column in ["min", *[v[0] for v in MARKETS.values()]]:
+    for column in ["min", "pts", "reb", "ast", "fg3m", "pra"]:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    # PRA se deriva de sus componentes para evitar depender de una columna opcional del feed.
+    frame["pra"] = frame[["pts", "reb", "ast"]].sum(axis=1, min_count=3)
     frame["player_id"] = pd.to_numeric(frame["player_id"], errors="coerce")
     frame = frame.dropna(subset=["player_id", "game_date"])
     frame["player_id"] = frame["player_id"].astype(int)
