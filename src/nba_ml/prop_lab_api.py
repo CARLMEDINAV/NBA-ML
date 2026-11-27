@@ -33,7 +33,7 @@ def _history_mtime() -> float:
 def _load_history(mtime: float) -> pd.DataFrame:
     del mtime
     if not HISTORY_PATH.exists():
-        return pd.DataFrame()
+        raise FileNotFoundError(HISTORY_PATH)
     frame = pd.read_csv(
         HISTORY_PATH,
         dtype={"player_id": "Int64", "game_id": str},
