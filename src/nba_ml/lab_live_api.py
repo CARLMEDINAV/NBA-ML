@@ -212,11 +212,19 @@ def project_live_total(
 
     pace_projection = current * regulation_seconds / elapsed_seconds
     elapsed_minutes = elapsed_seconds / 60.0
-    # The prior is progressively replaced by the observed score. Unlike a
-    # weighted average of two full-game totals, this guarantees that the
-    # projection converges to the actual score at the end of regulation.
+    # Shrink the *remaining scoring rate*, not the full-game total toward
+    # the current score. Blending full-game totals with the live score
+    # subtracts points already scored (e.g. 174 -> 183.8 late in Q4).
+    # Weight rises with elapsed regulation time, so late-game pace dominates.
     live_weight = min(1.0, elapsed_seconds / regulation_seconds)
-    projected = current + (1.0 - live_weight) * (float(pregame_total) - current)
+    remaining_seconds = max(0, regulation_seconds - elapsed_seconds)
+    live_points_per_second = current / elapsed_seconds
+    prior_points_per_second = float(pregame_total) / regulation_seconds
+    blended_remaining_rate = (
+        live_weight * live_points_per_second
+        + (1.0 - live_weight) * prior_points_per_second
+    )
+    projected = current + remaining_seconds * blended_remaining_rate
     projected = max(float(current), projected)
     return {
         "current_total": current,
