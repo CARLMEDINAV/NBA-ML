@@ -78,7 +78,8 @@
     const period = status.match(/OT/i) ? 5 : safeNumber(periodMatch && periodMatch[1], 2);
     const clockMatch = status.match(/(\d{1,2}:\d{2})/);
     const clock = clockMatch ? clockMatch[1] : "12:00";
-    const clockMinutes = safeNumber(clock.split(":")[0], period > 4 ? 5 : 12) + safeNumber(clock.split(":")[1]) / 60;\n    const elapsed = Math.max(1, period <= 4 ? (period - 1) * 12 + (12 - clockMinutes) : 48 + (5 - clockMinutes));
+    const clockMinutes = safeNumber(clock.split(":")[0], period > 4 ? 5 : 12) + safeNumber(clock.split(":")[1]) / 60;
+    const elapsed = Math.max(1, period <= 4 ? (period - 1) * 12 + (12 - clockMinutes) : 48 + (5 - clockMinutes));
     const left = remainingMinutes(period, clock);
     const max = scoringMax(plays, homeScore, awayScore);
     const homeReached = max.homeMax >= 20;
