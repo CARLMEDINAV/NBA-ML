@@ -18,6 +18,7 @@
   <link rel="dns-prefetch" href="https://stats.nba.com">
   <link rel="stylesheet" href="/styles.css?v=20261118-availability-names">
   <link rel="stylesheet" href="/lab-live.css?v=2">
+  <link rel="stylesheet" href="/blowout-tracker.css?v=1">
   <link rel="stylesheet" href="/lab-cards.css?v=4">
   <link rel="stylesheet" href="/lineup-impact.css?v=2">
 </head>
@@ -701,7 +702,12 @@
           </form>
           <div id="liveNotice" class="notice" role="status" hidden></div>
           <div id="liveResult" class="live-result" aria-live="polite"><p class="muted">Esperando datos de un partido.</p></div>
-          <p class="table-note">La proyección live combina el ritmo observado con el total prepartido. No es una cuota ni una probabilidad de apuesta calibrada.</p>
+          <section class="blowout-tracker" aria-labelledby="blowoutTrackerTitle">
+            <div class="blowout-tracker-head"><div><p class="eyebrow">NBA TOTALS · LIVE EVENT TRACKER</p><h3 id="blowoutTrackerTitle">Blowout Tracker · ventaja +20</h3><p>Detecta si un equipo ya alcanzó o podría alcanzar una ventaja de 20 puntos en cualquier momento.</p></div><div class="blowout-controls"><select id="blowoutGameSelect" aria-label="Partido para seguimiento"><option value="">Buscando partidos…</option></select><button type="button" class="btn btn-ghost" id="blowoutTrackerRefresh">Actualizar</button></div></div>
+            <div id="blowoutTrackerNotice" class="blowout-notice" role="status"></div>
+            <div id="blowoutTrackerResult" aria-live="polite"><p class="muted">Cargando marcador y play-by-play…</p></div>
+          </section>
+          <p class="table-note">La máxima ventaja se confirma con las jugadas de anotación. Las probabilidades son estimaciones experimentales en vivo, no métricas calibradas.</p>
         </section>
 
         <section class="nba-lab-cards" aria-labelledby="labCardsTitle">
@@ -869,6 +875,7 @@
   <script src="/injuries.js?v=20261111-1" defer></script>
   <script src="/advanced-analytics.js?v=20261114-2" defer></script>
   <script src="/lab-live.js?v=2" defer></script>
+  <script src="/blowout-tracker.js?v=1" defer></script>
   <script src="/lab-cards.js?v=5" defer></script>
   <script src="/lineup-impact.js?v=2" defer></script>
 <div class="player-alert-backdrop" id="playerAlertsBackdrop" hidden>
